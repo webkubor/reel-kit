@@ -40,7 +40,9 @@
 
   /* 表情图区：固定高度容器，图片等比内切，保证每帧主体位置一致 */
   .stage {
-    flex: 1; width: 100%;
+    /* flex:1 会吃掉全部剩余空间 —— 小图放大后正好把 caption 顶出画布底边。
+       改成有上限的弹性：最多占 46% 画布高，剩下的留给文案与引导语。 */
+    flex: 0 1 auto; height: 46%; width: 100%;
     display: flex; align-items: center; justify-content: center;
     /* 底部 padding 比顶部大：下面紧接文案，图片填满 stage 后会顶到文字上。
        改成放大小图之后这条才暴露出来 —— 之前小图本来就不满，看不出缺间距。 */
