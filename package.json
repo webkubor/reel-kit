@@ -1,6 +1,6 @@
 {
   "name": "@kubor/reel-kit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "竖版短视频合成工作台 —— 素材 + 逐句文案 + BGM，套模板出片。把一次性的 ffmpeg 命令固化成可复用流程。",
   "bin": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "demo": "node bin/reel.mjs make --help",
-    "check": "node --check bin/reel.mjs && node --check src/render.mjs && node --check src/compose.mjs && node --check src/voice.mjs && node --check src/voxcraft-locate.mjs && node --check src/voxcraft-server.mjs",
+    "check": "node --check bin/reel.mjs && node --check src/render.mjs && node --check src/compose.mjs && node --check src/voice.mjs && node --check src/bgm-library.mjs && node --check src/voxcraft-locate.mjs && node --check src/voxcraft-server.mjs",
     "lint": "node scripts/lint.mjs",
     "test": "pnpm check && pnpm lint && node bin/reel.mjs templates >/dev/null && echo 'ok: 语法 + lint + 模板枚举'",
     "audit": "npx --yes github:webkubor/scorecard scorecard webkubor/reel-kit --min 5 || true"

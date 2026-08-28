@@ -202,7 +202,7 @@ async function cmdMake(args) {
     const frames = await renderFrames({ template: tplFile, shots, vars, outDir: frameDir, width: w, height: h })
     console.log(`${frames.length} 帧`)
 
-    // --bgm 可以是本地路径，也可以是配乐库别名（真源 web-assets/manifest/music.json 的 bgm 段）
+    // --bgm 可以是本地路径，也可以是配乐库别名（清单由 REEL_BGM_MANIFEST 指定，见 bgm-library.mjs）
     const bgmFile = args.bgm ? await resolveBgm(String(args.bgm)) : undefined
 
     process.stdout.write('[reel] 合成中… ')
