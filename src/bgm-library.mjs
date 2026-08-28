@@ -89,23 +89,28 @@ export async function resolveBgm(input) {
 
   mkdirSync(CACHE_DIR, { recursive: true })
   const local = join(CACHE_DIR, hit.key.split('/').pop())
-  if (existsSync(local)) return local
 
-  const url = CDN_BASE + hit.key.split('/').map(encodeURIComponent).join('/')
-  process.stderr.write(`[reel] 下载配乐「${hit.alias}」…`)
-  const resp = await fetch(url)
-  if (!resp.ok) throw new Error(`下载配乐失败 HTTP ${resp.status}: ${url}`)
-  // 写临时文件再改名：中途断了不会留下半个 mp3 被当成缓存命中
-  const tmp = local + '.part'
-  try {
-    await pipeline(Readable.fromWeb(resp.body), createWriteStream(tmp))
-    const { rename } = await import('node:fs/promises')
-    await rename(tmp, local)
-  } catch (e) {
-    await unlink(tmp).catch(() => {})
-    throw e
+  if (!existsSync(local)) {
+    const url = CDN_BASE + hit.key.split('/').map(encodeURIComponent).join('/')
+    process.stderr.write(`[reel] 下载配乐「${hit.alias}」…`)
+    const resp = await fetch(url)
+    if (!resp.ok) throw new Error(`下载配乐失败 HTTP ${resp.status}: ${url}`)
+    // 写临时文件再改名：中途断了不会留下半个 mp3 被当成缓存命中
+    const tmp = local + '.part'
+    try {
+      await pipeline(Readable.fromWeb(resp.body), createWriteStream(tmp))
+      const { rename } = await import('node:fs/promises')
+      await rename(tmp, local)
+    } catch (e) {
+      await unlink(tmp).catch(() => {})
+      throw e
+    }
+    process.stderr.write(` 完成\n`)
   }
-  process.stderr.write(` 完成\n`)
-  if (hit.license) process.stderr.write(`[reel] 授权：${hit.license}\n`)
+
+  // 授权**每次**都打印，不只是首次下载时 —— 片子是要对外发的，
+  // 「这首能不能商用」必须在出片那一刻看得见。只在下载时提示的话，
+  // 第二次之后就静默了，而人恰恰是在反复出片时忘掉授权的。
+  if (hit.license) process.stderr.write(`[reel] 配乐「${hit.alias}」授权：${hit.license}\n`)
   return local
 }

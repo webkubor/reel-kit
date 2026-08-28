@@ -42,10 +42,16 @@
   .stage {
     flex: 1; width: 100%;
     display: flex; align-items: center; justify-content: center;
-    z-index: 2; padding: 40px 90px;
+    /* 底部 padding 比顶部大：下面紧接文案，图片填满 stage 后会顶到文字上。
+       改成放大小图之后这条才暴露出来 —— 之前小图本来就不满，看不出缺间距。 */
+    z-index: 2; padding: 40px 90px 96px;
   }
   .stage img {
-    max-width: 100%; max-height: 100%;
+    /* 用 width/height 而不是 max-width/max-height —— max-* 只限上限、**不放大小图**。
+       表情包素材是 240×240（平台硬规格），在 900px 宽的 stage 里不放大就只占一小块，
+       画面空得离谱。这跟 PIL 的 thumbnail「只缩不放」是同一个坑，换成了 CSS 皮。
+       object-fit: contain 保证放大时不变形、不裁切。 */
+    width: 100%; height: 100%;
     object-fit: contain;
     border-radius: 28px;
     /* 素材若已抠图（透明底）此阴影会贴着主体，是想要的效果；
