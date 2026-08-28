@@ -7,7 +7,6 @@
   <img src="https://img.shields.io/badge/Node-%E2%89%A518-5fa8b2?style=flat-square" alt="Node >= 18" />
   <img src="https://img.shields.io/badge/deps-ffmpeg%20%2B%20Chrome-A873C4?style=flat-square" alt="ffmpeg + Chrome" />
   <img src="https://img.shields.io/badge/TTS-%E6%9C%AC%E5%9C%B0%20%C2%B7%20%E9%9B%B6%E6%88%90%E6%9C%AC-4c9a6b?style=flat-square" alt="本地 TTS 零成本" />
-  <img src="https://img.shields.io/badge/output-1080%C3%971920-8a8a8a?style=flat-square" alt="1080x1920" />
 </p>
 
 <p align="center">
@@ -154,31 +153,58 @@ reel make ... --voice <音色> --voice-engine museav   # API 后端
 
 ---
 
-## 🎵 配乐库
+## 🎵 配乐库（可选）
 
-`--bgm` 可以给别名，不必写死路径：
+最简单的用法是直接给文件：
 
 ```bash
-reel bgm                          # 看有哪些曲子（别名 / 时长 / 情绪 / 授权）
-reel make ... --bgm 儿童轻快       # 按别名取，首次自动下载并缓存
-reel make ... --bgm ./local.mp3   # 本地文件照旧可用
+reel make ... --bgm ./local.mp3
 ```
 
-真源是 [`web-assets`](https://gitlab.com/webkubor/web-assets) 的 `manifest/music.json`
-的 `bgm` 段，本体在 R2（`music.webkubor.online/bgm/`），缓存落在 `~/.reel-kit/bgm/`。
+如果你有一批常用配乐，可以建一份清单，之后按**别名**取，不必每次翻路径：
 
-**每条配乐都带 `license` 和 `source`，出片时会把授权打印出来**：
+```bash
+export REEL_BGM_MANIFEST=https://你的域名/music-manifest.json
+# 或写进 ~/.reel-kit/config.json： { "bgmManifest": "..." }
+
+reel bgm                        # 看有哪些曲子（别名 / 时长 / 情绪 / 授权）
+reel make ... --bgm 轻快         # 按别名取，首次自动下载并缓存到 ~/.reel-kit/bgm/
+```
+
+清单格式（`REEL_BGM_MANIFEST` 可以是 URL，也可以是本地 json 路径）：
+
+```json
+{
+  "cdn": "https://你的域名/",
+  "bgm": [
+    {
+      "alias": "轻快",
+      "key": "bgm/upbeat.mp3",
+      "duration": 113,
+      "mood": ["轻快", "日常"],
+      "license": "CC0 / 免署名可商用",
+      "source": "曲子从哪来的"
+    }
+  ]
+}
+```
+
+`key` 可以是相对 `cdn` 的路径、完整 URL，或本地绝对路径。
+
+> **reel-kit 不自带任何配乐** —— 音乐授权是使用者自己的事，塞一批曲子进来只会给你添麻烦。
+
+### 填了 `license` 就会在出片时打印出来
 
 ```
-[reel] 下载配乐「儿童轻快」… 完成
-[reel] 授权：Mixkit Free License — 免费、免署名、可商用
+[reel] 配乐「轻快」授权：CC0 / 免署名可商用
 ```
 
-这不是装饰。片子是要对外发的，「这首能不能商用、要不要署名」必须当场看得见 ——
-等发出去了再翻聊天记录找来源就晚了。所以配乐进库时**必须**填授权，
-不填的曲子不要往清单里加。
+**每次**都打印，不只首次下载时。这不是装饰：片子是要对外发的，「这首能不能商用、
+要不要署名」必须在出片那一刻看得见 —— 等发出去了再翻记录找来源就晚了，
+而人恰恰是在反复出片时忘掉授权的。所以建议清单里每条都填。
 
-离线时用上次的清单缓存兜底，拉不到清单也不会让出片失败。
+远端清单会缓存一天，离线时用上次的缓存兜底，拉不到也不会让出片失败；
+本地清单不缓存，改完立刻生效。
 
 ---
 

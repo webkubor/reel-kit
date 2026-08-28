@@ -1,0 +1,22 @@
+name: 功能建议
+description: 新模板、新参数、新的配音后端
+labels: [enhancement]
+body:
+  - type: textarea
+    id: scene
+    attributes:
+      label: 你在做什么片子
+      description: 具体场景比抽象需求有用 —— 竖版还是横版、几镜、有没有配音
+    validations: { required: true }
+  - type: textarea
+    id: current
+    attributes:
+      label: 现在怎么绕过去的
+      description: 如果暂时用别的办法做了，说说那个办法卡在哪
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: 范围确认
+      description: "reel-kit 只做「一图一镜 + 逐句文案」的模板化竖版短片"
+      options:
+        - label: 我的需求不是「通用剪辑」（调色/多轨/精确到帧对齐那些请用 DaVinci）

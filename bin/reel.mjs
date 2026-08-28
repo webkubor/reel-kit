@@ -21,7 +21,7 @@ import { mkdtempSync } from 'node:fs'
 import { renderFrames, findChrome } from '../src/render.mjs'
 import { compose, probeDuration } from '../src/compose.mjs'
 import { synthesizeCaptions, durationsFromVoice } from '../src/voice.mjs'
-import { resolveBgm, listBgm } from '../src/bgm-library.mjs'
+import { resolveBgm, listBgm, NOT_CONFIGURED } from '../src/bgm-library.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const TEMPLATES = join(ROOT, 'templates')
@@ -60,9 +60,9 @@ make 选项:
   --title <文本>       主标题（如专辑名）
   --subtitle <文本>    副标题（如 IP 名）
   --footer <文本>      底部引导语
-  --bgm <别名|文件>    背景音乐（自动循环补满 + 片尾淡出）。别名见 reel bgm，
-                       取自配乐库（web-assets/manifest/music.json，带授权信息），
-                       首次用会下载并缓存到 ~/.reel-kit/bgm/；也可直接给本地路径
+  --bgm <别名|文件>    背景音乐（自动循环补满 + 片尾淡出）。给文件路径即可用；
+                       想按别名取，先配一个配乐清单（REEL_BGM_MANIFEST 或
+                       ~/.reel-kit/config.json），清单见 reel bgm
   --bgm-gain <0~1>     BGM 音量增益。**有配音时默认 0.22**（垫底不抢人声），
                        无配音时默认 1.0。觉得垫太轻调 0.3~0.4，太吵调 0.12~0.18
   --fade-out <秒>      片尾 BGM 淡出时长，默认 1.5
@@ -241,7 +241,9 @@ async function main() {
   }
   if (cmd === 'bgm') {
     const list = await listBgm()
-    if (!list.length) { console.log('配乐库还是空的（真源 web-assets/manifest/music.json 的 bgm 段）'); return }
+    // null = 没配清单（要告诉人怎么配）；[] = 配了但里面没曲子。两种要分开提示
+    if (list === null) { console.log(NOT_CONFIGURED); return }
+    if (!list.length) { console.log('清单里还没有配乐。'); return }
     console.log('可用配乐（--bgm <别名>）:')
     for (const b of list) {
       console.log(`  ${b.alias.padEnd(14)} ${String(b.duration || '?').padStart(4)}s  ${(b.mood || []).join('/')}`)

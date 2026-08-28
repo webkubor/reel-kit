@@ -1,0 +1,32 @@
+name: Bug 报告
+description: 出片失败、版式错乱、配音对不上
+labels: [bug]
+body:
+  - type: textarea
+    id: cmd
+    attributes:
+      label: 完整命令
+      description: 把 reel make 那条命令原样贴出来（可以脱敏路径）
+      render: bash
+    validations: { required: true }
+  - type: textarea
+    id: output
+    attributes:
+      label: 输出
+      description: 终端里的完整输出，包括 [reel] 开头的那几行
+      render: text
+    validations: { required: true }
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      description: "node -v / ffmpeg -version 第一行 / 系统"
+      placeholder: "node v20.11.0 · ffmpeg 8.0.1 · macOS 15.2"
+    validations: { required: true }
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: 先确认
+      options:
+        - label: "`pnpm test` 能通过（语法 + lint + 模板枚举）"
+        - label: 用 `--keep-frames` 看过中间帧，确认是合成阶段的问题

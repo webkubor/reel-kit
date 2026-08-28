@@ -26,6 +26,9 @@ jobs:
           for f in src/*.mjs; do node --check "$f"; done
           node bin/reel.mjs templates
 
+      - name: lint
+        run: node scripts/lint.mjs
+
       # 每个模板都必须能被占位符替换器处理，且不引外部资源 ——
       # 引了外链的模板在离线/CI 环境会静默渲染成空白，比报错更难查
       - name: 模板自包含检查

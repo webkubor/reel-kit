@@ -9,7 +9,8 @@
   "scripts": {
     "demo": "node bin/reel.mjs make --help",
     "check": "node --check bin/reel.mjs && node --check src/render.mjs && node --check src/compose.mjs && node --check src/voice.mjs && node --check src/voxcraft-locate.mjs && node --check src/voxcraft-server.mjs",
-    "test": "pnpm check && node bin/reel.mjs templates >/dev/null && echo 'ok: 语法通过，模板可枚举'",
+    "lint": "node scripts/lint.mjs",
+    "test": "pnpm check && pnpm lint && node bin/reel.mjs templates >/dev/null && echo 'ok: 语法 + lint + 模板枚举'",
     "audit": "npx --yes github:webkubor/scorecard scorecard webkubor/reel-kit --min 5 || true"
   },
   "dependencies": {
