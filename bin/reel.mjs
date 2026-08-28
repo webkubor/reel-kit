@@ -157,7 +157,10 @@ async function cmdMake(args) {
       voice: typeof args.voice === 'string' ? args.voice : undefined,
       design: args.design ? String(args.design) : undefined,
       instruction: args.instruction ? String(args.instruction) : undefined,
-      onProgress: (i, total, d) => process.stdout.write(`\r[reel] 配音 ${i}/${total}（本句 ${d.toFixed(1)}s）   `),
+      onProgress: (i, total, d, meta) => {
+        if (meta) { console.log(`[reel] voxcraft: ${meta.home}  音色库: ${meta.personas.join(', ') || '（空）'}`); return }
+        process.stdout.write(`\r[reel] 配音 ${i}/${total}（本句 ${d.toFixed(1)}s）   `)
+      },
     })
     console.log('')
     durations = durationsFromVoice(
