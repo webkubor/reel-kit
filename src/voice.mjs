@@ -20,6 +20,7 @@ import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import { promisify } from 'node:util'
 import { locateVoxcraft, voxcraftHint } from './voxcraft-locate.mjs'
+import { ensureServer, stopServer, synthesizeViaServer } from './voxcraft-server.mjs'
 
 const run = promisify(execFile)
 
@@ -36,30 +37,6 @@ async function speakViaMuseav({ text, out, voice, design, instruction }) {
   const args = ['kyvault', 'run', '--env', `MIMO_API_KEY=${MIMO_SECRET}`, '--', 'museav', ...inner]
   await run('cs', args, { maxBuffer: 8 * 1024 * 1024 })
   if (!existsSync(out)) throw new Error(`museav speak 未产出文件: ${out}`)
-  return out
-}
-
-async function speakViaVoxcraft({ text, out, voice, bin, home }) {
-  if (!voice) throw new Error('voxcraft 后端必须用 --voice 指定已注册音色（voice voice list 可查）')
-  /*
-   * voxcraft 的 clone 命令自己决定输出路径、不接受 --out，所以要从 stdout 里捞。
-   * 两个坑：
-   *   ① 它打印的是**相对路径**（out/[克隆]xxx.wav），相对的是它自己的项目根，
-   *      而调用方的 cwd 通常不在那儿 —— 必须用 home 拼成绝对路径。
-   *   ② 文件名含中文和方括号，正则不能用 \S+ 贪到行尾的其它内容。
-   * 顺带把 cwd 设成 home，让它的相对路径逻辑在自己的地盘上成立。
-   */
-  const { stdout } = await run(bin || 'voice', ['clone', voice, text], {
-    maxBuffer: 8 * 1024 * 1024,
-    cwd: home || undefined,
-  })
-  const m = stdout.match(/(\S*\.wav)/)
-  if (!m) throw new Error(`没能从 voxcraft 输出里解析出 wav 路径:\n${stdout.slice(0, 400)}`)
-  const produced = isAbsolute(m[1]) ? m[1] : join(home || '.', m[1])
-  if (!existsSync(produced)) {
-    throw new Error(`voxcraft 声称产出 ${m[1]}，解析为 ${produced}，但文件不存在`)
-  }
-  copyFileSync(produced, out)
   return out
 }
 
@@ -89,17 +66,11 @@ export async function synthesizeCaptions({
    * 重复装是实打实的浪费（实测本机就有两份 clone，各自下过一份模型）。
    * 所以先定位再决定，缺什么明确报出来，不自动装那种体量的东西。
    */
-  let bin = null
-  let home = null
   if (engine === 'voxcraft') {
     const info = locateVoxcraft()
     if (!info.ok) {
-      throw new Error(
-        `voxcraft 不可用：${info.reason}\n\n${voxcraftHint(info)}`,
-      )
+      throw new Error(`voxcraft 不可用：${info.reason}\n\n${voxcraftHint(info)}`)
     }
-    bin = info.bin
-    home = info.home
     if (voice && info.personas.length && !info.personas.includes(voice)) {
       throw new Error(
         `音色 "${voice}" 未注册。${info.home} 里已有：${info.personas.join(', ') || '（空）'}\n` +
@@ -107,14 +78,39 @@ export async function synthesizeCaptions({
       )
     }
     onProgress?.(0, captions.length, 0, { home: info.home, personas: info.personas })
+
+    /*
+     * 走 web 服务模式，不逐句起进程。
+     *
+     * voxcraft 的 CLI 每次调用都重新加载 4.2GB 模型 —— 8 句就是加载 8 次，
+     * 慢且不稳（实测第 5 句崩在 libc++ 的 recursive_mutex）。
+     * 服务模式一次加载多次调用，代价是要管生命周期，所以用 try/finally 兜住：
+     * 无论成功失败都关掉自己起的服务，不留孤儿进程占着模型内存。
+     */
+    let handle = null
+    try {
+      handle = await ensureServer({
+        home: info.home, bin: info.bin,
+        onLog: msg => onProgress?.(0, captions.length, 0, { log: msg }),
+      })
+      const files = await synthesizeViaServer({
+        base: handle.base, persona: voice, texts: captions, outDir,
+        onProgress: (i, total) => onProgress?.(i, total, 0, { pending: true }),
+      })
+      for (const f of files) results.push({ file: f, duration: await probeDuration(f) })
+      // 时长要等全部下载完再统一读，避免把网络等待混进单句进度里
+      results.forEach((r, i) => onProgress?.(i + 1, captions.length, r.duration))
+      return results
+    } finally {
+      stopServer(handle)
+    }
   }
 
   for (let i = 0; i < captions.length; i++) {
     const text = captions[i]
     const out = join(outDir, `voice_${String(i).padStart(4, '0')}.wav`)
     try {
-      if (engine === 'voxcraft') await speakViaVoxcraft({ text, out, voice, bin, home })
-      else await speakViaMuseav({ text, out, voice, design, instruction })
+      await speakViaMuseav({ text, out, voice, design, instruction })
     } catch (e) {
       throw new Error(`第 ${i + 1} 句配音失败（"${text.slice(0, 20)}"）: ${e.message}`)
     }

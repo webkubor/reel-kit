@@ -158,7 +158,9 @@ async function cmdMake(args) {
       design: args.design ? String(args.design) : undefined,
       instruction: args.instruction ? String(args.instruction) : undefined,
       onProgress: (i, total, d, meta) => {
-        if (meta) { console.log(`[reel] voxcraft: ${meta.home}  音色库: ${meta.personas.join(', ') || '（空）'}`); return }
+        if (meta?.log) { console.log(`[reel] ${meta.log}`); return }
+        if (meta?.home) { console.log(`[reel] voxcraft: ${meta.home}  音色库: ${meta.personas.join(', ') || '（空）'}`); return }
+        if (meta?.pending) { process.stdout.write(`\r[reel] 配音 ${i}/${total}   `); return }
         process.stdout.write(`\r[reel] 配音 ${i}/${total}（本句 ${d.toFixed(1)}s）   `)
       },
     })

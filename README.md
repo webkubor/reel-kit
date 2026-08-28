@@ -76,6 +76,16 @@ reel make ... --voice-engine museav     # MiMo API 后端
 > ⚠️ voxcraft 的音色库**初始为空**。没注册音色前 `--voice` 会失败，
 > 此时用 `--voice-engine museav` 兜底。
 
+### voxcraft 走服务模式，不逐句起进程
+
+voxcraft 的 CLI **每次调用都重新加载 4.2GB 模型** —— 一支 8 句的片子就是加载 8 次，
+慢且不稳（实测第 5 句崩在 `libc++abi: recursive_mutex lock failed`）。
+
+所以这里起一次 `voice web` 服务（`POST /api/clone` + 轮询 `/api/tasks`），
+一次加载多次调用，用完 `try/finally` 关掉。已在跑的服务会被复用而不是重复起。
+
+实测 8 句一次跑通，全程 61 秒（含一次模型加载），结束后端口关闭、无残留进程。
+
 ### 对齐是怎么保证的
 
 每句念白后面补上「镜头时长 − 念白时长」的静音（`apad=whole_dur=<镜头时长>`），
