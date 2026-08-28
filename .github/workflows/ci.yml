@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+
+      - name: 语法检查与模板枚举
+        run: |
+          node --check bin/reel.mjs
+          for f in src/*.mjs; do node --check "$f"; done
+          node bin/reel.mjs templates
+
+      # 每个模板都必须能被占位符替换器处理，且不引外部资源 ——
+      # 引了外链的模板在离线/CI 环境会静默渲染成空白，比报错更难查
+      - name: 模板自包含检查
+        run: |
+          fail=0
+          for t in templates/*.html; do
+            if grep -qE '(src|href)="https?://' "$t"; then
+              echo "❌ $t 引用了外部资源，模板必须自包含"; fail=1
+            fi
+            grep -q '{{caption}}' "$t" || { echo "❌ $t 缺 {{caption}} 占位符"; fail=1; }
+            grep -q '{{image}}'   "$t" || { echo "❌ $t 缺 {{image}} 占位符"; fail=1; }
+          done
+          exit $fail
+
+      - name: README 里的命令与 CLI 实际参数是否一致
+        run: |
+          node bin/reel.mjs make --help > /tmp/help.txt 2>&1 || true
+          fail=0
+          # 只取代码块里的长选项；正文的 Markdown 分隔线 --- 会被误判成参数
+          for opt in $(grep -oE '(^|[[:space:]])--[a-z][a-z-]+' README.md | tr -d ' ' | sort -u); do
+            grep -q -- "$opt" /tmp/help.txt || { echo "❌ README 写了 $opt，但 --help 里没有"; fail=1; }
+          done
+          exit $fail

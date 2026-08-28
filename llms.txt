@@ -1,0 +1,52 @@
+# reel-kit
+
+> 竖版短视频合成工作台：素材 + 逐句文案 + 配音/BGM，套模板出片。
+> 版式用 HTML/CSS 写，镜头时长由念白决定，配音走本地 TTS 零成本。
+
+## 它是什么
+
+一个 Node.js CLI。输入一组素材图、一份逐句文案（一行一句）、可选的 BGM 与配音音色，
+输出一支 1080×1920 的竖版短片。适合表情包推广、产品短视频这类**模板化批量**内容。
+
+**不是通用剪辑器** —— 只做「一图一镜 + 逐句文案」这一类。要调色、多轨、
+精确到帧的对齐，用 DaVinci Resolve 这类专业工具。
+
+## 核心命令
+
+```bash
+reel make --template sticker-promo \
+  --assets ./stickers --caps caps.txt \
+  --voice <音色> --bgm bgm.mp3 \
+  --out out.mp4
+
+reel templates          # 列出可用模板
+```
+
+## 关键设计（回答「为什么这么做」）
+
+- **版式是 templates/*.html**，占位符 {{title}} {{caption}} {{image}}。
+  加模板 = 丢一个 HTML，不改代码。用浏览器渲染而非 ffmpeg drawtext，
+  是因为后者要手写中文字体路径/描边/换行，圆弧装饰画不出来。
+- **镜头时长由念白决定**（开 --voice 时）：每镜 = 该句配音时长 + 余量。
+  余量不能省，否则帧率舍入会吃掉每句最后半个字。
+- **音画对齐**用 apad=whole_dur 把每句补齐到镜头长度再 concat，
+  不算 offset，因此没有累积误差。
+- **配音默认走本地 voxcraft**（Qwen3-TTS），批量零成本；
+  可切 --voice-engine museav 走 API。
+- **voxcraft 用 web 服务模式**，因为它的 CLI 每次调用都重载 4.2GB 模型。
+
+## 依赖
+
+ffmpeg（合成）、本机 Chrome（渲染版式，不下 chromium）。
+配音是可选的，不加 --voice 就不需要任何 TTS。
+
+## 目录
+
+- bin/reel.mjs            CLI 入口
+- src/render.mjs          HTML → 逐帧 PNG
+- src/compose.mjs         PNG + 音轨 → mp4
+- src/voice.mjs           逐句配音，两个后端
+- src/voxcraft-*.mjs      voxcraft 定位与服务模式
+- templates/*.html        版式模板
+- examples/               可复现的完整示例
+- docs/video-compositing-notes.md   合成工程笔记（9 条踩坑结论）

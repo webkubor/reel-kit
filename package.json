@@ -3,8 +3,32 @@
   "version": "0.1.0",
   "type": "module",
   "description": "竖版短视频合成工作台 —— 素材 + 逐句文案 + BGM，套模板出片。把一次性的 ffmpeg 命令固化成可复用流程。",
-  "bin": { "reel": "./bin/reel.mjs" },
-  "scripts": { "demo": "node bin/reel.mjs make --help" },
-  "dependencies": { "playwright-core": "^1.62.1" },
-  "license": "MIT"
+  "bin": {
+    "reel": "./bin/reel.mjs"
+  },
+  "scripts": {
+    "demo": "node bin/reel.mjs make --help",
+    "check": "node --check bin/reel.mjs && node --check src/render.mjs && node --check src/compose.mjs && node --check src/voice.mjs && node --check src/voxcraft-locate.mjs && node --check src/voxcraft-server.mjs",
+    "test": "pnpm check && node bin/reel.mjs templates >/dev/null && echo 'ok: 语法通过，模板可枚举'",
+    "audit": "npx --yes github:webkubor/scorecard scorecard webkubor/reel-kit --min 5 || true"
+  },
+  "dependencies": {
+    "playwright-core": "^1.62.1"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/webkubor/reel-kit.git"
+  },
+  "homepage": "https://github.com/webkubor/reel-kit#readme",
+  "keywords": [
+    "video",
+    "ffmpeg",
+    "tts",
+    "short-video",
+    "vertical-video",
+    "video-generation",
+    "cli",
+    "content-creation"
+  ]
 }
