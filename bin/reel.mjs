@@ -21,6 +21,7 @@ import { mkdtempSync } from 'node:fs'
 import { renderFrames, findChrome } from '../src/render.mjs'
 import { compose, probeDuration } from '../src/compose.mjs'
 import { synthesizeCaptions, durationsFromVoice } from '../src/voice.mjs'
+import { resolveBgm, listBgm } from '../src/bgm-library.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const TEMPLATES = join(ROOT, 'templates')
@@ -50,6 +51,7 @@ reel — 竖版短视频合成工作台
 用法:
   reel make [选项]
   reel templates
+  reel bgm              # 配乐库（别名 + 授权 + 时长）
 
 make 选项:
   --template <名>     模板名（见 reel templates），默认 sticker-promo
@@ -58,7 +60,9 @@ make 选项:
   --title <文本>       主标题（如专辑名）
   --subtitle <文本>    副标题（如 IP 名）
   --footer <文本>      底部引导语
-  --bgm <文件>         背景音乐（自动循环补满 + 片尾淡出）
+  --bgm <别名|文件>    背景音乐（自动循环补满 + 片尾淡出）。别名见 reel bgm，
+                       取自配乐库（web-assets/manifest/music.json，带授权信息），
+                       首次用会下载并缓存到 ~/.reel-kit/bgm/；也可直接给本地路径
   --bgm-gain <0~1>     BGM 音量增益。**有配音时默认 0.22**（垫底不抢人声），
                        无配音时默认 1.0。觉得垫太轻调 0.3~0.4，太吵调 0.12~0.18
   --fade-out <秒>      片尾 BGM 淡出时长，默认 1.5
@@ -198,10 +202,13 @@ async function cmdMake(args) {
     const frames = await renderFrames({ template: tplFile, shots, vars, outDir: frameDir, width: w, height: h })
     console.log(`${frames.length} 帧`)
 
+    // --bgm 可以是本地路径，也可以是配乐库别名（真源 web-assets/manifest/music.json 的 bgm 段）
+    const bgmFile = args.bgm ? await resolveBgm(String(args.bgm)) : undefined
+
     process.stdout.write('[reel] 合成中… ')
     const { out, duration } = await compose({
       frames, durations,
-      bgm: args.bgm ? String(args.bgm) : undefined,
+      bgm: bgmFile,
       voiceClips: voiceClips || undefined,
       bgmGain: args['bgm-gain'] !== undefined ? Number(args['bgm-gain']) : undefined,
       fadeOut: args['fade-out'] !== undefined ? Number(args['fade-out']) : undefined,
@@ -230,6 +237,17 @@ async function main() {
   if (cmd === 'templates') {
     console.log('可用模板:')
     for (const t of listTemplates()) console.log(`  ${t}`)
+    return
+  }
+  if (cmd === 'bgm') {
+    const list = await listBgm()
+    if (!list.length) { console.log('配乐库还是空的（真源 web-assets/manifest/music.json 的 bgm 段）'); return }
+    console.log('可用配乐（--bgm <别名>）:')
+    for (const b of list) {
+      console.log(`  ${b.alias.padEnd(14)} ${String(b.duration || '?').padStart(4)}s  ${(b.mood || []).join('/')}`)
+      if (b.license) console.log(`  ${' '.repeat(14)} ${b.license}`)
+      if (b.usedBy?.length) console.log(`  ${' '.repeat(14)} 用过：${b.usedBy.join('、')}`)
+    }
     return
   }
   if (cmd === 'make') {

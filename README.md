@@ -141,6 +141,34 @@ reel make ... --voice <音色> --voice-engine museav   # API 后端
 
 ---
 
+## 🎵 配乐库
+
+`--bgm` 可以给别名，不必写死路径：
+
+```bash
+reel bgm                          # 看有哪些曲子（别名 / 时长 / 情绪 / 授权）
+reel make ... --bgm 儿童轻快       # 按别名取，首次自动下载并缓存
+reel make ... --bgm ./local.mp3   # 本地文件照旧可用
+```
+
+真源是 [`web-assets`](https://gitlab.com/webkubor/web-assets) 的 `manifest/music.json`
+的 `bgm` 段，本体在 R2（`music.webkubor.online/bgm/`），缓存落在 `~/.reel-kit/bgm/`。
+
+**每条配乐都带 `license` 和 `source`，出片时会把授权打印出来**：
+
+```
+[reel] 下载配乐「儿童轻快」… 完成
+[reel] 授权：Mixkit Free License — 免费、免署名、可商用
+```
+
+这不是装饰。片子是要对外发的，「这首能不能商用、要不要署名」必须当场看得见 ——
+等发出去了再翻聊天记录找来源就晚了。所以配乐进库时**必须**填授权，
+不填的曲子不要往清单里加。
+
+离线时用上次的清单缓存兜底，拉不到清单也不会让出片失败。
+
+---
+
 ## ⚙️ 常用参数
 
 ```
@@ -148,7 +176,7 @@ reel make ... --voice <音色> --voice-engine museav   # API 后端
 --assets <目录|文件>  素材图，目录按文件名排序
 --caps <文件>         逐句文案，一行一句，行数决定镜头数
 --title/--subtitle/--footer   模板文字
---bgm <文件>          背景音乐，自动循环补满 + 片尾淡出
+--bgm <别名|文件>     背景音乐，自动循环补满 + 片尾淡出。别名见 reel bgm
 --bgm-gain <0~1>      BGM 增益，有配音时默认 0.22
 --voice <音色>        开启配音，镜头时长改由念白决定
 --voice-margin <秒>   每镜在念白后多留的时间，默认 0.45
