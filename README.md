@@ -1,12 +1,47 @@
-# reel-kit
+<h1 align="center">🎬 reel-kit</h1>
 
-**竖版短视频合成工作台** —— 素材 + 逐句文案 + 配音/BGM，套模板出片。
+<p align="center">
+  <img src="https://img.shields.io/github/license/webkubor/reel-kit?style=flat-square&color=92a8b3" alt="License" />
+  <img src="https://img.shields.io/github/stars/webkubor/reel-kit?style=flat-square&color=cc584d" alt="Stars" />
+  <img src="https://img.shields.io/badge/Node-%E2%89%A518-5fa8b2?style=flat-square" alt="Node >= 18" />
+  <img src="https://img.shields.io/badge/deps-ffmpeg%20%2B%20Chrome-A873C4?style=flat-square" alt="ffmpeg + Chrome" />
+  <img src="https://img.shields.io/badge/TTS-%E6%9C%AC%E5%9C%B0%20%C2%B7%20%E9%9B%B6%E6%88%90%E6%9C%AC-4c9a6b?style=flat-square" alt="本地 TTS 零成本" />
+  <img src="https://img.shields.io/badge/output-1080%C3%971920-8a8a8a?style=flat-square" alt="1080x1920" />
+</p>
 
-一条命令，出一支带配音、音画对齐、节奏跟着念白走的竖版短片。
+<p align="center">
+  <b>竖版短视频合成工作台</b> —— 素材 + 逐句文案 + 配音/BGM，套模板出片。
+  <br />
+  版式用 <b>HTML/CSS</b> 写，镜头时长由<b>念白</b>决定，配音走<b>本地 TTS</b> 不花钱。
+</p>
 
-![demo](docs/preview.png)
+<p align="center">
+  <a href="#-30-秒上手"><strong>快速上手</strong></a> ·
+  <a href="#-和其它方案的区别"><strong>差异对比</strong></a> ·
+  <a href="#-配音"><strong>配音</strong></a> ·
+  <a href="docs/video-compositing-notes.md"><strong>合成笔记</strong></a>
+</p>
+
+<p align="center">
+  <img src="docs/demo.gif" width="240" alt="reel-kit demo" />
+</p>
+
+<p align="center">
+  <sub>上图由 reel-kit 自己生成 —— 素材、配音、合成全在本地，
+  <a href="examples/">examples/</a> 里有完整可复现的输入</sub>
+</p>
+
+<p align="center">
+  <img src="docs/preview.png" width="720" alt="三帧预览" />
+</p>
+
+---
+
+## ⚡ 30 秒上手
 
 ```bash
+git clone https://github.com/webkubor/reel-kit && cd reel-kit && pnpm install
+
 reel make --template sticker-promo \
   --title "reel-kit" --subtitle "竖版短视频合成工作台" \
   --assets ./examples/assets --caps ./examples/demo-caps.txt \
@@ -14,12 +49,9 @@ reel make --template sticker-promo \
   --out demo.mp4
 ```
 
-上面这条命令生成的就是 [`examples/demo.mp4`](examples/demo.mp4)（14.2s，5 镜，配音由本地 TTS 生成）。
-仓库里带了完整素材与文案，clone 下来就能跑。
+仓库里带了完整素材与文案，这条命令复现的就是上面那支 demo。
 
----
-
-## 它解决什么问题
+## 🎯 它解决什么问题
 
 做表情包推广、产品短视频这类内容时，每次都是临时拼一串 ffmpeg 命令。
 **成品留下了，流程没留下** —— 目录里只有 mp4、素材和文案，合成逻辑用完就丢，
@@ -27,7 +59,7 @@ reel make --template sticker-promo \
 
 reel-kit 把那段流程固化成可复用的命令。
 
-## 和其它方案的区别
+## ⚖️ 和其它方案的区别
 
 | | 剪映 / CapCut | FFmpeg 裸写 | MoviePy | Remotion | **reel-kit** |
 |---|:---:|:---:|:---:|:---:|:---:|
@@ -67,7 +99,7 @@ reel-kit 把那段流程固化成可复用的命令。
 
 ---
 
-## 装
+## 📦 装
 
 ```bash
 git clone https://github.com/webkubor/reel-kit
@@ -79,7 +111,7 @@ npm link          # 或直接 node bin/reel.mjs
 
 配音是可选的 —— 不加 `--voice` 就不需要任何 TTS。
 
-## 配音
+## 🎙️ 配音
 
 ```bash
 reel make ... --voice <音色>                 # voxcraft 本地（默认）
@@ -109,7 +141,7 @@ reel make ... --voice <音色> --voice-engine museav   # API 后端
 
 ---
 
-## 常用参数
+## ⚙️ 常用参数
 
 ```
 --template <名>      模板，默认 sticker-promo（reel templates 查看全部）
@@ -125,7 +157,7 @@ reel make ... --voice <音色> --voice-engine museav   # API 后端
 --keep-frames         保留中间产物，调版式用
 ```
 
-## 设计取舍
+## 🧩 设计取舍
 
 **为什么用浏览器渲染版式** —— 见上面「三个具体的差异」第 ①。代价是每帧跑一次截图，
 但一支片子只有 8~20 帧，几秒的事。顺带绕开了 MoviePy 生态里字体度量、
@@ -143,18 +175,18 @@ reel make ... --voice <音色> --voice-engine museav   # API 后端
 逐句起进程做 8 句就是加载 8 次，慢且不稳（实测第 5 句崩在 `libc++ recursive_mutex`）。
 现在起一次服务多次调用，用完关掉；已在跑的服务会被复用。
 
-## 素材要求
+## 🖼 素材要求
 
 模板把素材当**主体图**居中呈现。要做出贴纸效果，素材需**预先抠图**（透明 PNG）。
 本工具不做抠图 —— 那是上游的职责，在这里重做只会变成第二套实现。
 
-## 已知局限
+## ⚠️ 已知局限
 
 - **无转场**：镜与镜之间硬切。要转场得在 `compose.mjs` 里加 xfade 滤镜链。
 - **一句一镜**：长句在模板里会自然折行，但不会拆成两镜。
 - **只有一个模板**：`sticker-promo`（1080×1920 竖版）。横版多镜头模板还没做。
 - **BGM 短于片长会循环**：已用 `aloop` 补满并淡出，若接缝明显请换更长的曲子。
 
-## License
+## 📄 License
 
 MIT
