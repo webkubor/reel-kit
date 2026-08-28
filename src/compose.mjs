@@ -33,7 +33,8 @@ function buildConcatList(frames, durations) {
  * @param {number}   [opts.fps]      输出帧率，默认 30
  * @param {number}   [opts.fadeOut]  片尾音频淡出秒数，默认 1.5
  */
-export async function compose({ frames, durations, bgm, voiceClips, out, fps = 30, fadeOut = 1.5, bgmGain = 0.22 }) {
+export async function compose({ frames, durations, bgm, voiceClips, out, fps = 30, fadeOut, bgmGain }) {
+  if (fadeOut === undefined || Number.isNaN(fadeOut)) fadeOut = 1.5
   if (!frames.length) throw new Error('没有帧可合成')
   if (frames.length !== durations.length) throw new Error('frames 与 durations 长度不一致')
   if (voiceClips && voiceClips.length !== frames.length) {
@@ -73,8 +74,14 @@ export async function compose({ frames, durations, bgm, voiceClips, out, fps = 3
     const bgmIdx = 1 + (voiceClips?.length || 0)
     args.push('-i', bgm)
     const fadeStart = Math.max(0, total - fadeOut)
-    // 有配音时 BGM 压到背景音量，否则念白会被盖住
-    const gain = voiceClips?.length ? bgmGain : 1
+    /*
+     * 有配音时 BGM 必须压下去，否则念白被盖住。0.22 是实测值：
+     * 念白段 -17~-21dB、间隙纯 BGM -25~-33dB，差 6~13dB，人声清晰在前。
+     * 但「垫多重」是听感问题，不同曲子差异很大，所以留 --bgm-gain 让人调。
+     */
+    const gain = bgmGain !== undefined && !Number.isNaN(bgmGain)
+      ? bgmGain
+      : (voiceClips?.length ? 0.22 : 1)
     filters.push(
       `[${bgmIdx}:a]aloop=loop=-1:size=2e9,atrim=0:${total},volume=${gain},afade=t=out:st=${fadeStart}:d=${fadeOut}[bgm]`,
     )

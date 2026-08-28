@@ -59,6 +59,9 @@ make 选项:
   --subtitle <文本>    副标题（如 IP 名）
   --footer <文本>      底部引导语
   --bgm <文件>         背景音乐（自动循环补满 + 片尾淡出）
+  --bgm-gain <0~1>     BGM 音量增益。**有配音时默认 0.22**（垫底不抢人声），
+                       无配音时默认 1.0。觉得垫太轻调 0.3~0.4，太吵调 0.12~0.18
+  --fade-out <秒>      片尾 BGM 淡出时长，默认 1.5
   --per-shot <秒>      每镜时长，默认 2.5
   --last-shot <秒>     末镜时长（留给引导语），默认与 per-shot 相同
   --out <文件>         输出 mp4
@@ -200,6 +203,8 @@ async function cmdMake(args) {
       frames, durations,
       bgm: args.bgm ? String(args.bgm) : undefined,
       voiceClips: voiceClips || undefined,
+      bgmGain: args['bgm-gain'] !== undefined ? Number(args['bgm-gain']) : undefined,
+      fadeOut: args['fade-out'] !== undefined ? Number(args['fade-out']) : undefined,
       out: resolve(String(args.out)),
       fps: Number(args.fps || 30),
     })
