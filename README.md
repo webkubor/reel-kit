@@ -1,6 +1,7 @@
 <h1 align="center">🎬 reel-kit</h1>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/@kubor/reel-kit"><img src="https://img.shields.io/npm/v/@kubor/reel-kit?style=flat-square&color=cb3837&label=npm" alt="npm" /></a>
   <img src="https://img.shields.io/github/license/webkubor/reel-kit?style=flat-square&color=92a8b3" alt="License" />
   <img src="https://img.shields.io/github/stars/webkubor/reel-kit?style=flat-square&color=cc584d" alt="Stars" />
   <img src="https://img.shields.io/badge/Node-%E2%89%A518-5fa8b2?style=flat-square" alt="Node >= 18" />
@@ -40,7 +41,7 @@
 ## ⚡ 30 秒上手
 
 ```bash
-git clone https://github.com/webkubor/reel-kit && cd reel-kit && pnpm install
+npm i -g @kubor/reel-kit          # 或 npx @kubor/reel-kit ...
 
 reel make --template sticker-promo \
   --title "reel-kit" --subtitle "竖版短视频合成工作台" \
@@ -102,9 +103,21 @@ reel-kit 把那段流程固化成可复用的命令。
 ## 📦 装
 
 ```bash
+npm i -g @kubor/reel-kit
+```
+
+或者不装，直接用 npx：
+
+```bash
+npx @kubor/reel-kit make --template sticker-promo ...
+```
+
+想改模板 / 跑 demo 就 clone 源码（`examples/` 只在仓库里，不进 npm 包）：
+
+```bash
 git clone https://github.com/webkubor/reel-kit
 cd reel-kit && pnpm install
-npm link          # 或直接 node bin/reel.mjs
+npm link
 ```
 
 依赖：**ffmpeg**（合成）、**本机 Chrome**（渲染版式，不额外下 chromium，路径可用 `CHROME_PATH` 覆盖）。
