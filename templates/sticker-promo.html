@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  /* 表情包推广模板 —— 版式从已发布成片反推（1080×1920 竖版）。
+     占位符由 render.mjs 用 {{key}} 替换，不引任何外部资源（离线可渲染）。 */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1080px; height: 1920px;
+    background: {{bg}};
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center;
+  }
+
+  /* 两枚品牌色圆弧：左上 + 右下，构成对角呼应 */
+  .arc { position: absolute; border-radius: 50%; }
+  .arc-tl {
+    width: 760px; height: 620px;
+    top: -300px; left: -110px;
+    background: {{accent1}};
+  }
+  .arc-br {
+    width: 620px; height: 520px;
+    bottom: -230px; right: -140px;
+    background: {{accent2}};
+  }
+
+  .head { margin-top: 300px; text-align: center; z-index: 2; }
+  .title {
+    font-size: 88px; font-weight: 800;
+    color: #1f1f1f; letter-spacing: 2px;
+  }
+  .subtitle {
+    margin-top: 22px;
+    font-size: 40px; color: #9a9a9a; letter-spacing: 4px;
+  }
+
+  /* 表情图区：固定高度容器，图片等比内切，保证每帧主体位置一致 */
+  .stage {
+    flex: 1; width: 100%;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2; padding: 40px 90px;
+  }
+  .stage img {
+    max-width: 100%; max-height: 100%;
+    object-fit: contain;
+    border-radius: 28px;
+    /* 素材若已抠图（透明底）此阴影会贴着主体，是想要的效果；
+       未抠图的原图则表现为卡片投影，也不难看 —— 两种素材都能用 */
+    filter: drop-shadow(0 12px 34px rgba(0,0,0,0.14));
+  }
+
+  .caption {
+    z-index: 2; text-align: center;
+    font-size: 62px; font-weight: 700; color: #1f1f1f;
+    line-height: 1.4; padding: 0 90px;
+    margin-bottom: 140px;
+    min-height: 88px;
+  }
+
+  .footer {
+    z-index: 2; margin-bottom: 96px;
+    font-size: 34px; color: #a5a5a5; letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+  <div class="arc arc-tl"></div>
+  <div class="arc arc-br"></div>
+
+  <div class="head">
+    <div class="title">{{title}}</div>
+    <div class="subtitle">{{subtitle}}</div>
+  </div>
+
+  <div class="stage"><img src="{{image}}" alt=""></div>
+
+  <div class="caption">{{caption}}</div>
+  <div class="footer">{{footer}}</div>
+</body>
+</html>

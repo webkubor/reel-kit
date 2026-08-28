@@ -1,0 +1,10 @@
+{
+  "name": "reel-kit",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "竖版短视频合成工作台 —— 素材 + 逐句文案 + BGM，套模板出片。把一次性的 ffmpeg 命令固化成可复用流程。",
+  "bin": { "reel": "./bin/reel.mjs" },
+  "scripts": { "demo": "node bin/reel.mjs make --help" },
+  "dependencies": { "playwright-core": "^1.62.1" },
+  "license": "MIT"
+}
