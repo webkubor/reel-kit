@@ -20,6 +20,7 @@ import { mkdtempSync } from 'node:fs'
 
 import { renderFrames, findChrome } from '../src/render.mjs'
 import { compose, probeDuration } from '../src/compose.mjs'
+import { synthesizeCaptions, durationsFromVoice } from '../src/voice.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const TEMPLATES = join(ROOT, 'templates')
@@ -66,7 +67,15 @@ make 选项:
   --bg <色>            背景色，默认 #ffffff
   --accent1 <色>       左上圆弧色，默认 #FADCE4
   --accent2 <色>       右下圆弧色，默认 #CFEBE0
-  --keep-frames        保留中间帧（排版调试用）
+  --keep-frames        保留中间产物（排版/配音调试用）
+
+配音（让念白驱动镜头时长，而非固定 --per-shot）:
+  --voice <音色>       开启配音。voxcraft 后端此项为已注册音色 key（voice list 可查）
+  --voice-engine <名>  voxcraft（默认，本地 Qwen3-TTS，免费）| museav（MiMo API，按量计费）
+  --design <描述>      museav 后端：一句话描述音色，当场造一个
+  --instruction <文本> 语气/风格指令
+  --voice-margin <秒>  每镜在念白之后多留的时间，默认 0.45
+  --min-shot <秒>      镜头下限，避免极短句一闪而过，默认 1.2
 
 素材与文案的配对规则:
   按顺序一一对应。数量不等时取较少的一方，并在开头提示实际用了几镜 ——
@@ -119,9 +128,44 @@ async function cmdMake(args) {
     caption: caps[i] || '',
   }))
 
+  // 工作目录要在配音之前建好 —— 配音产物和帧都放这儿，末尾统一清理
+  const workDir = mkdtempSync(join(tmpdir(), 'reel-'))
+
+  /*
+   * 镜头时长有两种来源：
+   *   固定（默认）      每镜 --per-shot 秒，无念白时用
+   *   念白驱动（--voice）每镜 = 该句配音时长 + 余量
+   *
+   * 后者才是「AI 全程代劳」那条线该有的样子 —— 念快的句子不用干等，
+   * 念慢的不会被切。余量不能省：画面做到「刚好等于念白」时，帧率舍入
+   * 会让画面略短于音频，每句最后半个字被吃掉。
+   */
   const perShot = Number(args['per-shot'] || 2.5)
   const lastShot = Number(args['last-shot'] || perShot)
-  const durations = shots.map((_, i) => (i === shots.length - 1 ? lastShot : perShot))
+  let durations = shots.map((_, i) => (i === shots.length - 1 ? lastShot : perShot))
+  let voiceClips = null
+
+  if (args.voice || args['voice-engine']) {
+    if (!caps.length) { console.error('❌ --voice 需要配合 --caps（配音内容来自逐句文案）'); process.exit(1) }
+    const engine = String(args['voice-engine'] || 'voxcraft')
+    console.log(`[reel] 配音后端 ${engine}${typeof args.voice === 'string' ? ` · 音色 ${args.voice}` : ''}`)
+    const voiceDir = join(workDir, 'voice')
+    voiceClips = await synthesizeCaptions({
+      captions: shots.map(s => s.caption),
+      outDir: voiceDir,
+      engine,
+      voice: typeof args.voice === 'string' ? args.voice : undefined,
+      design: args.design ? String(args.design) : undefined,
+      instruction: args.instruction ? String(args.instruction) : undefined,
+      onProgress: (i, total, d) => process.stdout.write(`\r[reel] 配音 ${i}/${total}（本句 ${d.toFixed(1)}s）   `),
+    })
+    console.log('')
+    durations = durationsFromVoice(
+      voiceClips.map(v => v.duration),
+      Number(args['voice-margin'] || 0.45),
+      Number(args['min-shot'] || 1.2),
+    )
+  }
 
   const [w, h] = String(args.size || '1080x1920').split('x').map(Number)
 
@@ -134,9 +178,13 @@ async function cmdMake(args) {
     accent2: args.accent2 || '#CFEBE0',
   }
 
-  console.log(`[reel] 模板 ${template} · ${n} 镜 · 每镜 ${perShot}s（末镜 ${lastShot}s）· 合计 ${durations.reduce((a, b) => a + b, 0).toFixed(1)}s`)
+  const totalDur = durations.reduce((a, b) => a + b, 0)
+  const shotDesc = voiceClips
+    ? `念白驱动 ${Math.min(...durations).toFixed(1)}~${Math.max(...durations).toFixed(1)}s`
+    : `每镜 ${perShot}s（末镜 ${lastShot}s）`
+  console.log(`[reel] 模板 ${template} · ${n} 镜 · ${shotDesc} · 合计 ${totalDur.toFixed(1)}s`)
 
-  const frameDir = mkdtempSync(join(tmpdir(), 'reel-'))
+  const frameDir = join(workDir, 'frames')
   try {
     process.stdout.write('[reel] 渲染帧… ')
     const frames = await renderFrames({ template: tplFile, shots, vars, outDir: frameDir, width: w, height: h })
@@ -146,19 +194,20 @@ async function cmdMake(args) {
     const { out, duration } = await compose({
       frames, durations,
       bgm: args.bgm ? String(args.bgm) : undefined,
+      voiceClips: voiceClips || undefined,
       out: resolve(String(args.out)),
       fps: Number(args.fps || 30),
     })
     const real = await probeDuration(out)
     console.log('完成')
     console.log(`\n✅ ${out}`)
-    console.log(`   ${w}×${h} · 期望 ${duration.toFixed(1)}s · 实际 ${real.toFixed(1)}s${args.bgm ? ' · 含 BGM' : ' · 无音轨'}`)
+    console.log(`   ${w}×${h} · 期望 ${duration.toFixed(1)}s · 实际 ${real.toFixed(1)}s${voiceClips ? ' · 含配音' : ''}${args.bgm ? ' · 含 BGM' : ''}${!voiceClips && !args.bgm ? ' · 无音轨' : ''}`)
     if (Math.abs(real - duration) > 0.5) {
       console.log(`   ⚠️  实际时长与期望差 ${(real - duration).toFixed(1)}s，检查 BGM 是否短于片长`)
     }
-    if (args['keep-frames']) console.log(`   帧保留在 ${frameDir}`)
+    if (args['keep-frames']) console.log(`   中间产物保留在 ${workDir}`)
   } finally {
-    if (!args['keep-frames']) rmSync(frameDir, { recursive: true, force: true })
+    if (!args['keep-frames']) rmSync(workDir, { recursive: true, force: true })
   }
 }
 
