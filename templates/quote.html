@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  /*
+   * quote — 1080×1920 纯文字金句海报(无图,适合金句/语录/文案先行)。
+   *
+   * 模板作者须知:
+   *   画布尺寸必须写在 body 的 width/height,render.mjs 会从这里读 viewport。
+   *   占位符 {{title}} {{subtitle}} {{caption}} {{footer}} {{bg}} {{accent1}} {{accent2}}。
+   *   {{image}} 会被忽略(模板里没用),不传也行。
+   *   {{title}} 作为署名(底部的「—— XXX」),{{caption}} 是金句主体。
+   */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1080px; height: 1920px;
+    background: {{bg}};
+    font-family: "Songti SC", "STSong", "SimSun", "PingFang SC", serif;
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+
+  .arc { position: absolute; border-radius: 50%; }
+  .arc-tl { width: 600px; height: 500px; top: -240px; left: -100px; background: {{accent1}}; }
+  .arc-br { width: 520px; height: 440px; bottom: -200px; right: -120px; background: {{accent2}}; }
+
+  /* 装饰引号 —— 让金句一眼可识别,不是普通的居中文字 */
+  .quote-mark {
+    z-index: 2;
+    font-size: 240px; font-weight: 900;
+    color: {{accent1}};
+    line-height: 0.8;
+    align-self: flex-start;
+    margin-left: 120px;
+    margin-bottom: -60px;
+  }
+
+  .stage {
+    z-index: 2; padding: 0 96px; text-align: center;
+    max-width: 920px;
+  }
+  .caption {
+    font-size: 88px; font-weight: 800; color: #1f1f1f;
+    line-height: 1.5; letter-spacing: 4px;
+  }
+
+  .attribution {
+    z-index: 2; margin-top: 96px;
+    font-size: 36px; color: #7a7a7a; letter-spacing: 4px;
+  }
+
+  .footer {
+    z-index: 2; position: absolute; bottom: 96px;
+    font-size: 28px; color: #a5a5a5; letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+  <div class="arc arc-tl"></div>
+  <div class="arc arc-br"></div>
+  <div class="quote-mark">"</div>
+  <div class="stage"><div class="caption">{{caption}}</div></div>
+  <div class="attribution">—— {{title}}</div>
+  <div class="footer">{{footer}}</div>
+</body>
+</html>

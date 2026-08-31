@@ -57,20 +57,36 @@ ffmpeg 不会报「路径错」，而是报「找不到文件」，排查时容�
 > reel-kit 现状：**已做单引号转义**（`compose.mjs` 的 `buildConcatList`）。
 > 反斜杠转换未做 —— 只跑 macOS，暂不需要。
 
-## 3. concat list 的最后一帧必须重复一次
+## 3. concat list 不要重复末帧(基于 ffmpeg 7.x 实测修正)
 
 ```
 file 'frame_0000.png'
 duration 2.5
 file 'frame_0001.png'
 duration 2.5
-file 'frame_0001.png'     ← 重复最后一帧
+file 'frame_0001.png'     ← 不要再重复
 ```
 
-不重复的话，**最后一个 `duration` 会被 ffmpeg 忽略**，末镜时长变成 1 帧。
-这是 ffmpeg concat demuxer 的已知行为，不是 bug，但文档里很不显眼。
+早期文档基于旧 ffmpeg(< 4.x),认为重复末帧能让 ffmpeg 接受末行 duration。
+现行 ffmpeg (>= 4.x,实测 7.x = `libavformat 62.3.100`) 行为相反:
+**重复末行 = 多输出一整段时长**。
 
-> reel-kit 现状：**已做**。改 `compose.mjs` 时别删掉那行。
+实测对比(5 镜 2.5s,期望 12.5s):
+
+| 写法 | 实测 | 差 |
+|---|---|---|
+| 不重复末行 | 12.43s | 0.07s(末帧舍入) |
+| 重复末行,末行无 duration | 15.03s | +2.5s(多 1 镜) |
+| 重复末行,末行 `duration 0.033` | 15.03s | +2.5s(多 1 镜) |
+
+ffmpeg 文档原文:
+
+> The duration for the LAST element in the list is ignored, since it is not
+> followed by a new element to compute the duration of the LAST element.
+
+意思是:末行 duration 被忽略,且不会"补"给任何帧。**末镜时长仍由"前一行 duration"决定**(因为前一行有"下一个 file"作为参照)。
+
+> reel-kit 现状:**不重复末行**。改 `compose.mjs` 时不要重复那行。
 
 ## 4. 视频时长要比音频长一点点
 
