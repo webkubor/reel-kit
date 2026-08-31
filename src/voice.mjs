@@ -50,6 +50,51 @@ export async function probeDuration(file) {
 }
 
 /**
+ * 把一句配音按字幕段字数切分成 N 段 wav。
+ * 用于 caption-progressive 模式:长句不重读,但每段字幕对应 atrim 切出的
+ * 配音片段,听感对齐、不"断音"(每段是原 wav 的连续片段,不是重新合成)。
+ *
+ * 切分时间按字数比例估算,切完再 probe 实际时长。ffmpeg `-c copy` 切 wav
+ * 是按 sample 对齐,精度 < 50ms,对短视频可忽略。
+ *
+ * @param {string}   voiceFile     原始 wav
+ * @param {number[]} segmentChars  每段的字符数(用 [...str].length 算中文友好)
+ * @param {string}   outDir        输出目录
+ * @returns {Promise<Array<{file:string, duration:number}>>}
+ */
+export async function splitVoiceByChars(voiceFile, segmentChars, outDir) {
+  mkdirSync(outDir, { recursive: true })
+  if (!segmentChars.length) return []
+  if (segmentChars.length === 1) {
+    // 单段:直接复用,不必切
+    return [{ file: voiceFile, duration: await probeDuration(voiceFile) }]
+  }
+  const total = await probeDuration(voiceFile)
+  const totalChars = segmentChars.reduce((a, b) => a + b, 0) || 1
+  // 累积边界(前 i 段的累计时间)
+  const boundaries = [0]
+  let acc = 0
+  for (let i = 0; i < segmentChars.length - 1; i++) {
+    acc += segmentChars[i]
+    boundaries.push((acc / totalChars) * total)
+  }
+  boundaries.push(total)
+  const results = []
+  for (let i = 0; i < segmentChars.length; i++) {
+    const start = boundaries[i]
+    const end = boundaries[i + 1]
+    const out = join(outDir, `voice_seg_${String(i).padStart(4, '0')}.wav`)
+    // -ss 在 input 前是粗略(input demuxer),这里用 input 后的精确切法不可行
+    //(因为要保持 -c copy)。但 wav 容器简单,sample 对齐误差 < 50ms,够用。
+    await run('ffmpeg', ['-y', '-i', voiceFile, '-ss', start.toFixed(3), '-to', end.toFixed(3), '-c', 'copy', out],
+      { maxBuffer: 8 * 1024 * 1024 })
+    if (!existsSync(out)) throw new Error(`配音切分失败:段 ${i} 未产出文件`)
+    results.push({ file: out, duration: await probeDuration(out) })
+  }
+  return results
+}
+
+/**
  * 为每句文案生成配音。
  *
  * @returns {Promise<Array<{file:string, duration:number}>>} 与 captions 等长、同序

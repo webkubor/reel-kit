@@ -7,10 +7,15 @@
 
 ## 改代码前必须知道的三条
 
-### 1. concat 列表的最后一帧必须重复一次
+### 1. concat 列表**不要**重复末帧
 
-`src/compose.mjs` 的 `buildConcatList()` 末尾那行重复**不是笔误**。
-ffmpeg 的 concat demuxer 会忽略最后一个 `duration`，不重复的话末镜只有 1 帧。
+`src/compose.mjs` 的 `buildConcatList()` 末尾**不要**再重复最后一行。
+基于 ffmpeg 7.x 实测:重复末行反而让 ffmpeg 多输出一整段时长
+(5 镜 2.5s 期望 12.5s,重复末行实测 15.0s,差 1 镜)。
+不重复末行实测 12.4s,差 < 0.1s(末帧舍入)。
+
+这条跟早期文档描述的"必须重复"相反,改自实测。详见
+`docs/video-compositing-notes.md` 第 3 条。
 
 ### 2. 音画对齐靠 apad，不要改成算 offset
 

@@ -26,12 +26,23 @@ export function findChrome() {
   return null
 }
 
-/** 极简占位符替换。刻意不引模板引擎 —— 只有 {{key}} 一种语法，够用。 */
+/** 极简占位符替换。刻意不引模板引擎 —— 只有 {{key}} 一种语法,够用。 */
 function fill(tpl, vars) {
   return tpl.replace(/\{\{(\w+)\}\}/g, (_, k) => {
     const v = vars[k]
     return v == null ? '' : String(v)
   })
+}
+
+/**
+ * 从模板里读出 body 的 width/height,作为 viewport 尺寸。
+ * 模板作者把画布尺寸写在 body 的 CSS 里(AGENTS.md 强制约定),这里就跟着走,
+ * 无需每个模板单独配 --size。读不到时退回参数默认值。
+ */
+function readTemplateSize(tpl) {
+  const m = tpl.match(/body[\s\S]*?\{[\s\S]*?width:\s*(\d+)px[\s\S]*?height:\s*(\d+)px/)
+  if (!m) return null
+  return { width: Number(m[1]), height: Number(m[2]) }
 }
 
 /** 图片转 data URI —— 让 HTML 完全自包含，避免 file:// 的相对路径与权限问题 */
@@ -54,15 +65,17 @@ function toDataUri(file) {
  */
 export async function renderFrames({ template, shots, vars, outDir, width = 1080, height = 1920 }) {
   const chrome = findChrome()
-  if (!chrome) throw new Error('找不到本机 Chrome，设 CHROME_PATH 指向可执行文件')
+  if (!chrome) throw new Error('找不到本机 Chrome,设 CHROME_PATH 指向可执行文件')
 
   const tpl = readFileSync(template, 'utf-8')
+  // 画布尺寸优先从模板 body CSS 读,读不到再用参数默认值
+  const size = readTemplateSize(tpl) || { width, height }
   mkdirSync(outDir, { recursive: true })
 
   const browser = await chromium.launch({ executablePath: chrome, headless: true })
-  // deviceScaleFactor 保持 1：画布本身就是 1080×1920 目标分辨率，
-  // 放大截图再让 ffmpeg 缩回去只会多一次重采样，白白糊掉文字边缘。
-  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 })
+  // deviceScaleFactor 保持 1：画布本身就是 1080×1920 目标分辨率,
+  // 放大截图再让 ffmpeg 缩回去只会多一次重采样,白白糊掉文字边缘。
+  const ctx = await browser.newContext({ viewport: { width: size.width, height: size.height }, deviceScaleFactor: 1 })
   const page = await ctx.newPage()
 
   const frames = []
