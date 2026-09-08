@@ -160,6 +160,11 @@ async function cmdMake(args) {
     }
   }
 
+  // 单图模式：当只给了一张素材图（如单曲封面/主KV）而文案有多句时，自动将单图复用于所有镜头
+  if (images.length === 1 && caps.length > 1) {
+    images = Array(caps.length).fill(images[0])
+  }
+
   // 数量不等时说清楚丢了什么 —— 静默截断会让人以为片子出全了
   const n = caps.length ? Math.min(images.length, caps.length) : images.length
   if (caps.length && images.length !== caps.length) {
