@@ -1,0 +1,136 @@
+{
+  "zone_id": "4673e15ffb2cb7466713f333e90e0a05",
+  "zone_name": "webkubor.xyz",
+  "captured_at": "2026-09-14T11:25:00Z",
+  "reason": "zone 即将下线,留档",
+  "zone_meta": {
+    "id": "4673e15ffb2cb7466713f333e90e0a05",
+    "name": "webkubor.xyz",
+    "status": "active",
+    "paused": false,
+    "type": "full",
+    "development_mode": 0,
+    "name_servers": [
+      "grannbo.ns.cloudflare.com",
+      "ruben.ns.cloudflare.com"
+    ],
+    "original_name_servers": [
+      "basketball.dnspod.net",
+      "hydra.dnspod.net"
+    ],
+    "original_registrar": null,
+    "original_dnshost": null,
+    "modified_on": "2025-11-17T02:50:51.089092Z",
+    "created_on": "2025-11-17T02:08:33.194876Z",
+    "activated_on": "2025-11-17T02:50:51.089092Z",
+    "vanity_name_servers": [],
+    "vanity_name_servers_ips": null,
+    "meta": {
+      "step": 2,
+      "custom_certificate_quota": 0,
+      "page_rule_quota": 3,
+      "phishing_detected": false
+    },
+    "owner": {
+      "id": null,
+      "type": "user",
+      "email": null
+    },
+    "account": {
+      "id": "916ebb1b9f240bf4c8826021dd161692",
+      "name": "Webkubor@gmail.com's Account"
+    },
+    "tenant": {
+      "id": null,
+      "name": null
+    },
+    "tenant_unit": {
+      "id": null
+    },
+    "permissions": [
+      "#zone_settings:edit",
+      "#zone_settings:read",
+      "#dns_records:edit",
+      "#dns_records:read",
+      "#waf:read",
+      "#waf:edit",
+      "#page_shield:read",
+      "#page_shield:edit",
+      "#zone_versioning:read",
+      "#zone_versioning:edit",
+      "#zaraz:edit",
+      "#zaraz:read",
+      "#zone:read",
+      "#web3:read",
+      "#web3:edit",
+      "#healthchecks:edit",
+      "#healthchecks:read",
+      "#waitingroom:read",
+      "#waitingroom:edit",
+      "#access:edit",
+      "#access:read",
+      "#ssl:read",
+      "#zone:edit",
+      "#worker:edit",
+      "#worker:read",
+      "#ssl:edit",
+      "#logs:edit",
+      "#logs:read",
+      "#cache_purge:edit",
+      "#lb:edit",
+      "#lb:read",
+      "#app:edit",
+      "#analytics:read"
+    ],
+    "plan": {
+      "id": "0feeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "name": "Free Website",
+      "price": 0,
+      "currency": "USD",
+      "frequency": "",
+      "is_subscribed": false,
+      "can_subscribe": false,
+      "legacy_id": "free",
+      "legacy_discount": false,
+      "externally_managed": false
+    }
+  },
+  "dns_records": [
+    {
+      "id": "fb82cdfe794559e747a2f7052af2b0e9",
+      "name": "admin.webkubor.xyz",
+      "type": "CNAME",
+      "content": "spider-web-670.pages.dev",
+      "proxiable": true,
+      "proxied": true,
+      "ttl": 1,
+      "settings": {
+        "flatten_cname": false
+      },
+      "meta": {},
+      "comment": null,
+      "tags": [],
+      "created_on": "2026-04-23T11:23:44.78055Z",
+      "modified_on": "2026-04-23T11:23:44.78055Z"
+    },
+    {
+      "id": "9861083b686dc3a5c5b6489ca43319c7",
+      "name": "api.webkubor.xyz",
+      "type": "CNAME",
+      "content": "057ed3ed-39e8-406a-9695-afab43727fbd.cfargotunnel.com",
+      "proxiable": true,
+      "proxied": true,
+      "ttl": 1,
+      "settings": {
+        "flatten_cname": false
+      },
+      "meta": {},
+      "comment": null,
+      "tags": [],
+      "created_on": "2025-11-17T03:41:31.509061Z",
+      "modified_on": "2025-11-17T03:41:31.509061Z"
+    }
+  ],
+  "page_rules_before": null,
+  "account_rum_sites_count": 10
+}
