@@ -1,0 +1,24 @@
+{
+  "name": "@kubor/reel-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "reel-kit 视觉生产工作台 —— 模板浏览 / 镜头预览 / 提示词编辑",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "html2canvas": "^1.4.1",
+    "marked": "^18.0.11",
+    "vue": "^3.5.41",
+    "vue-router": "^5.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.8",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
+  }
+}
