@@ -1,0 +1,19 @@
+<svg viewBox="0 0 220 50" xmlns="http://www.w3.org/2000/svg" width="220" height="50" role="img" aria-label="reel-kit">
+  <title>reel-kit</title>
+  <!-- reel 卷轴 + 4 穿孔(浅红色,在暗底更显) -->
+  <g transform="translate(6, 6)">
+    <circle cx="19" cy="19" r="19" fill="none" stroke="#e6a5a0" stroke-width="2.5"/>
+    <circle cx="19" cy="19" r="10" fill="none" stroke="#e6a5a0" stroke-width="2"/>
+    <circle cx="19" cy="19" r="3.5" fill="#e6a5a0"/>
+    <circle cx="19" cy="4" r="1.8" fill="#e6a5a0"/>
+    <circle cx="19" cy="34" r="1.8" fill="#e6a5a0"/>
+    <circle cx="4" cy="19" r="1.8" fill="#e6a5a0"/>
+    <circle cx="34" cy="19" r="1.8" fill="#e6a5a0"/>
+  </g>
+  <!-- 文字(浅色背景用,深色模式下用这个) -->
+  <text x="50" y="30" font-size="20" font-weight="800" fill="#f0f0f0"
+        font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', sans-serif"
+        letter-spacing="-0.5">reel</text>
+  <text x="93" y="30" font-size="20" font-weight="500" fill="#e6a5a0"
+        font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', sans-serif">-kit</text>
+</svg>

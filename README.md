@@ -1,12 +1,17 @@
-<h1 align="center">🎬 reel-kit</h1>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-light.svg" />
+    <img src="docs/logo.svg" width="220" alt="reel-kit" />
+  </picture>
+</p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@kubor/reel-kit"><img src="https://img.shields.io/npm/v/@kubor/reel-kit?style=flat-square&color=cb3837&label=npm" alt="npm" /></a>
   <img src="https://img.shields.io/github/license/webkubor/reel-kit?style=flat-square&color=92a8b3" alt="License" />
   <img src="https://img.shields.io/github/stars/webkubor/reel-kit?style=flat-square&color=cc584d" alt="Stars" />
-  <img src="https://img.shields.io/badge/Node-%E2%89%A518-5fa8b2?style=flat-square" alt="Node >= 18" />
-  <img src="https://img.shields.io/badge/deps-ffmpeg%20%2B%20Chrome-A873C4?style=flat-square" alt="ffmpeg + Chrome" />
-  <img src="https://img.shields.io/badge/TTS-%E6%9C%AC%E5%9C%B0%20%C2%B7%20%E9%9B%B6%E6%88%90%E6%9C%AC-4c9a6b?style=flat-square" alt="本地 TTS 零成本" />
+  <img src="https://img.shields.io/badge/Node-%E2%89%A518-cc584d?style=flat-square" alt="Node >= 18" />
+  <img src="https://img.shields.io/badge/deps-ffmpeg%20%2B%20Chrome-cc584d?style=flat-square" alt="ffmpeg + Chrome" />
+  <img src="https://img.shields.io/badge/TTS-%E6%9C%AC%E5%9C%B0%20%C2%B7%20%E9%9B%B6%E6%88%90%E6%9C%AC-cc584d?style=flat-square" alt="本地 TTS 零成本" />
 </p>
 
 <p align="center">
@@ -39,6 +44,26 @@
 </p>
 
 ---
+
+<!-- 品牌色与排版规范(GitHub README 内联 CSS) -->
+<style>
+  :root {
+    --brand: #cc584d;        /* Reel 红,主品牌色 */
+    --brand-soft: #e6a5a0;   /* 浅红,装饰 */
+    --ink: #1f1f1f;          /* 正文 */
+    --ink-soft: #6b6b6b;     /* 副文 */
+    --line: #e8e8e8;         /* 分割线 */
+  }
+  h1, h2 { color: var(--ink); }
+  h2 { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  a { color: var(--brand); }
+  code { color: var(--brand); }
+  blockquote {
+    border-left: 3px solid var(--brand);
+    color: var(--ink-soft);
+    padding: 0 12px;
+  }
+</style>
 
 ## ⚡ 30 秒上手
 

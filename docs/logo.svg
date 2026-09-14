@@ -1,0 +1,19 @@
+<svg viewBox="0 0 220 50" xmlns="http://www.w3.org/2000/svg" width="220" height="50" role="img" aria-label="reel-kit">
+  <title>reel-kit</title>
+  <!-- reel 卷轴 + 4 穿孔(主色 Reel 红) -->
+  <g transform="translate(6, 6)">
+    <circle cx="19" cy="19" r="19" fill="none" stroke="#cc584d" stroke-width="2.5"/>
+    <circle cx="19" cy="19" r="10" fill="none" stroke="#cc584d" stroke-width="2"/>
+    <circle cx="19" cy="19" r="3.5" fill="#cc584d"/>
+    <circle cx="19" cy="4" r="1.8" fill="#cc584d"/>
+    <circle cx="19" cy="34" r="1.8" fill="#cc584d"/>
+    <circle cx="4" cy="19" r="1.8" fill="#cc584d"/>
+    <circle cx="34" cy="19" r="1.8" fill="#cc584d"/>
+  </g>
+  <!-- 文字(深色背景用) -->
+  <text x="50" y="30" font-size="20" font-weight="800" fill="#1f1f1f"
+        font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', sans-serif"
+        letter-spacing="-0.5">reel</text>
+  <text x="93" y="30" font-size="20" font-weight="500" fill="#cc584d"
+        font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', sans-serif">-kit</text>
+</svg>
