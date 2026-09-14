@@ -2,10 +2,25 @@
   "name": "@kubor/reel-kit",
   "version": "0.1.1",
   "type": "module",
-  "description": "竖版短视频合成工作台 —— 素材 + 逐句文案 + BGM，套模板出片。把一次性的 ffmpeg 命令固化成可复用流程。",
+  "description": "竖版短视频合成工作台 —— 素材 + 逐句文案 + BGM,套模板出片。把一次性的 ffmpeg 命令固化成可复用流程。",
   "bin": {
     "reel": "./bin/reel.mjs"
   },
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./templates/*": "./templates/*"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates",
+    "README.md",
+    "LICENSE",
+    "llms.txt",
+    "AGENTS.md",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "demo": "node bin/reel.mjs make --help",
     "check": "node --check bin/reel.mjs && node --check src/render.mjs && node --check src/compose.mjs && node --check src/voice.mjs && node --check src/bgm-library.mjs && node --check src/voxcraft-locate.mjs && node --check src/voxcraft-server.mjs",
@@ -31,15 +46,5 @@
     "video-generation",
     "cli",
     "content-creation"
-  ],
-  "files": [
-    "bin",
-    "src",
-    "templates",
-    "README.md",
-    "LICENSE",
-    "llms.txt",
-    "AGENTS.md",
-    "CHANGELOG.md"
   ]
 }
