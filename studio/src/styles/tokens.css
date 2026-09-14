@@ -1,0 +1,269 @@
+/**
+ * 沸雪工作台设计 token —— 黑金水墨 · 降饱和工作台版
+ *
+ * 与对外展示站 `_dashboard` 的关系：同一套骨相（墨底、金饰、雪意），
+ * 但这是**长时间盯着干活**的界面，所以三处刻意收敛：
+ *   1. 底色不用纯黑 #050505。纯黑上一切边界都会糊掉，分不出层级；
+ *      改用四级墨阶，靠明度差立结构。
+ *   2. 血红 #8b0000 从大面积背景降级为点缀。高饱和红在暗底上振动、伤眼，
+ *      只留给「危险/失败/采用」这类必须抢眼的语义。
+ *   3. 手书字体只上标题。正文用系统字 —— 见 frontend_conventions §6，
+ *      装饰性字体不该让每一行正文都替它付渲染成本。
+ *
+ * ⚠️ token 使用铁律（frontend_conventions §1）：
+ *    --ink-* 只能做背景，--text-* 只能做前景。两类永不交叉使用。
+ */
+
+/* 标题字：竹石体 3.8MB，是这批字体里最划算的一支（汉仪尚巍手书要 16MB）。
+   走 /api/asset 直接读仓库里的原文件，不在 studio 下再存一份副本。 */
+@font-face {
+  font-family: 'Zhushi';
+  src: url('/api/asset?p=_dashboard/assets/fonts/杨任东竹石体-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  /* ── 墨阶（背景专用） ───────────────────────────── */
+  --ink-0: #0b0b0d; /* 最底层 · 页面 */
+  --ink-1: #121216; /* 面板 · 侧栏 */
+  --ink-2: #1a1a1f; /* 卡片 */
+  --ink-3: #23232a; /* 输入框 · 悬浮态 */
+  --ink-4: #2e2e37; /* 激活态 · 选中行 */
+
+  /* ── 前景（文字/图标专用） ──────────────────────── */
+  --text-1: #e8e6e1; /* 正文。偏暖的宣纸白，不用纯白 —— 暗底上纯白过冲 */
+  --text-2: #a29d94; /* 次要说明 */
+  --text-3: #6b675f; /* 占位符 · 禁用 */
+
+  /* ── 金：唯一主强调色 ──────────────────────────── */
+  --gold-1: #d9bd84; /* 高亮金 · 标题/选中文字 */
+  --gold-2: #c5a059; /* 标准金 · 沿用展示站原值 */
+  --gold-3: #8f7440; /* 暗金 · 描边 */
+  --gold-wash: rgba(197, 160, 89, 0.12); /* 金色底纹 · 选中行背景 */
+
+  /* ── 语义色（点缀，不做大面积背景） ─────────────── */
+  --crimson: #a83b3b; /* 失败/危险。比展示站的 #8b0000 提亮降饱和，暗底上不振 */
+  --crimson-wash: rgba(168, 59, 59, 0.14);
+  --jade: #5f8f6a; /* 成功。青玉色，比现代荧光绿更贴武侠 */
+  --jade-wash: rgba(95, 143, 106, 0.14);
+  --azure: #5b7f9c; /* 进行中 · 信息 */
+  --azure-wash: rgba(91, 127, 156, 0.14);
+
+  /* ── 描边 ──────────────────────────────────────── */
+  --line-1: rgba(255, 255, 255, 0.07); /* 常规分隔 */
+  --line-2: rgba(255, 255, 255, 0.13); /* 卡片边框 */
+  --line-gold: rgba(197, 160, 89, 0.32);
+
+  /* ── 圆角：小而硬朗。工作台不要圆润感 ───────────── */
+  --r-1: 2px;
+  --r-2: 4px;
+  --r-3: 8px;
+
+  /* ── 间距 ─────────────────────────────────────── */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+
+  /* ── 字体 ─────────────────────────────────────── */
+  --font-title: 'Zhushi', 'Songti SC', serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans SC', sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+
+  /* ── 层级 ─────────────────────────────────────── */
+  --z-modal: 100;
+  --z-toast: 200;
+
+  --shadow-panel: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  background-color: var(--ink-0);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+
+  /* 宣纸噪点。展示站用 0.05，工作台压到 0.022 —— 够有质感，又不干扰读字 */
+  background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.022"/></svg>');
+  background-attachment: fixed;
+}
+
+/* ── 滚动条：默认的亮灰滚动条在墨底上很跳 ──────────── */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--ink-4);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold-3);
+  background-clip: padding-box;
+}
+
+/* ── 通用元件 ─────────────────────────────────── */
+
+.title-brush {
+  font-family: var(--font-title);
+  letter-spacing: 0.08em;
+  color: var(--gold-1);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: var(--ink-3);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn:hover:not(:disabled) {
+  background: var(--ink-4);
+  border-color: var(--line-gold);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--gold-wash);
+  border-color: var(--line-gold);
+  color: var(--gold-1);
+}
+.btn-primary:hover:not(:disabled) {
+  background: rgba(197, 160, 89, 0.2);
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--crimson-wash);
+  border-color: var(--crimson);
+  color: var(--crimson);
+}
+.btn-sm {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: var(--ink-3);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 13px;
+}
+.input:focus,
+.textarea:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--gold-3);
+}
+.textarea {
+  min-height: 80px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--text-3);
+}
+
+.label {
+  display: block;
+  margin-bottom: var(--sp-1);
+  color: var(--text-2);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+
+.card {
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  background: var(--ink-2);
+}
+
+.tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-1);
+  color: var(--text-2);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.tag-gold {
+  border-color: var(--line-gold);
+  background: var(--gold-wash);
+  color: var(--gold-1);
+}
+.tag-jade {
+  border-color: var(--jade);
+  background: var(--jade-wash);
+  color: var(--jade);
+}
+.tag-crimson {
+  border-color: var(--crimson);
+  background: var(--crimson-wash);
+  color: var(--crimson);
+}
+.tag-azure {
+  border-color: var(--azure);
+  background: var(--azure-wash);
+  color: var(--azure);
+}
+
+.muted {
+  color: var(--text-2);
+}
+.dim {
+  color: var(--text-3);
+}
+.mono {
+  font-family: var(--font-mono);
+}
+
+.empty {
+  padding: var(--sp-6);
+  color: var(--text-3);
+  text-align: center;
+  font-size: 12px;
+}
+
+.scroll-y {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
