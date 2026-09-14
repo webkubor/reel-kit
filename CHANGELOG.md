@@ -1,5 +1,49 @@
 # 更新日志
 
+## [0.3.0] - 2026-09-14
+
+### 重构:三合一(reel-kit 单仓统一)
+
+reel-kit 不再只是"短视频合成 CLI",而是**单仓统一入口**,覆盖三件事:
+- **推广** — `studio/` 工作台 + `prompts/agents/` 创作规范
+- **剪辑** — `@kubor/reel-kit` CLI / 库(本来的核心,未动)
+- **视频提示词模板开发** — `prompts/handdrawn/` 20 风格库 + `studio/PromptLabView` + `seasons/s1/novels/.agent-skills/` 7 个生产期 Skill
+
+### 新增目录
+
+- `studio/` — 整体迁入原 `webkubor/boiling-snow` 的 `studio/` 子项目,改名为 `@kubor/reel-studio`。Vue 3 + Vite 8 + 自带 Node 后端(Vite middleware,127.0.0.1 only)。15 个 view 覆盖镜头台 / 角色库 / 集数 / 提示词实验室 / 批处理 / 推广位。
+- `prompts/agents/` — 原 `boiling-snow/agents`,创作规范 `CREATIVE_BIBLE.md`。
+- `prompts/handdrawn/` — 从上游 `gnipbao/story-to-handdrawn-video` 拉的 20 套手绘风格配方。本地 GitLab 镜像里 `handdrawn-style-library.json` 不存在,改从 GitHub upstream 拉。
+- `seasons/s1/novels/.agent-skills/` — 7 个 Skill 配置(写手中枢/起名中枢/世界书审计/…)。Studio 工具的必需数据。
+- `pnpm-workspace.yaml` — 包含根项目 + studio 两个 workspace。
+
+### UI + CLI 双形态
+
+- **CLI**:`bin/reel.mjs`(原样,0 行为变化)
+- **UI**:`pnpm dev --filter @kubor/reel-studio` → 127.0.0.1:5273
+- 共享 `src/`:Studio 通过 `studio/server/lib/...` 直接 import 仓内核心模块,**同仓相对路径,无 monorepo 工具、无 npm link**
+
+### 修复
+
+- `html2canvas` 是 boiling-snow 原 package-lock 漏列的依赖,迁入后报 build 失败。已加到 `studio` 的 `dependencies`。
+
+### 验证
+
+- `node --check` 6 个根文件 + 8 个 studio 文件全过
+- `pnpm --filter @kubor/reel-studio build` 通过(15 个 view 编译干净)
+- `node bin/reel.mjs templates` 列出 5 个模板
+- 端到端:`sticker-promo` 出片 12.4s(精度 0.1s)
+
+### 不合并(原仓库保留)
+
+- `boiling-snow` 的 IP 内容(`seasons/s1/{bibles,cast,episodes,music,references,scripts}/`)—— 是"用例",不是"工具"
+- `boiling-snow` 的 `scripts/`(Python 自动化,跟 Node.js 不兼容)
+- `story-to-video` 的 Remotion 渲染器(技术栈不兼容,只继承风格配方)
+
+### 后续(未在本版做)
+
+- 把 GitHub 端 `webkubor/boiling-snow` 和 `webkubor/story-to-video` 标 archived,README 加迁移说明。
+
 ## [0.2.2] - 2026-08-31
 
 ### 修复:末帧不再重复(消除 2.5s 时长漂移)
