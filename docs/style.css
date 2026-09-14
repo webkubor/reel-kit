@@ -1,0 +1,151 @@
+/* reel-kit 官网样式 — 跟 README 的品牌色一致 */
+:root {
+  --brand: #cc584d;
+  --brand-soft: #e6a5a0;
+  --brand-softest: #fbe9e7;
+  --ink: #1f1f1f;
+  --ink-soft: #4a4a4a;
+  --ink-faint: #8b8b8b;
+  --bg: #ffffff;
+  --bg-soft: #faf7f6;
+  --line: #ececec;
+  --code-bg: #f6f4f3;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font: 16px/1.7 -apple-system, BlinkMacSystemFont, "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+  font: 0.92em ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace;
+  background: var(--code-bg);
+  padding: 2px 6px; border-radius: 4px;
+  color: var(--brand);
+}
+pre code { display: block; padding: 16px 20px; overflow-x: auto; }
+
+.container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+/* ───── Hero ───── */
+.hero {
+  text-align: center;
+  padding: 96px 24px 80px;
+  background: linear-gradient(180deg, var(--brand-softest) 0%, var(--bg) 100%);
+  border-bottom: 1px solid var(--line);
+}
+.hero img.logo { width: 220px; height: auto; margin-bottom: 16px; }
+.hero h1 { font-size: 36px; margin: 0 0 12px; color: var(--ink); }
+.hero p.tagline {
+  font-size: 18px; color: var(--ink-soft);
+  max-width: 640px; margin: 0 auto 32px;
+}
+.hero .install {
+  display: inline-block;
+  background: var(--ink); color: #fff;
+  padding: 14px 28px; border-radius: 8px;
+  font: 0.95em ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace;
+  margin: 0 8px 16px;
+}
+.hero .install:hover { background: var(--brand); text-decoration: none; }
+.hero .links { margin-top: 24px; }
+.hero .links a {
+  display: inline-block; margin: 0 12px;
+  color: var(--ink-soft); font-size: 14px;
+}
+.hero .links a:hover { color: var(--brand); }
+
+/* ───── 通用 section ───── */
+section { padding: 72px 0; border-bottom: 1px solid var(--line); }
+section:last-of-type { border-bottom: none; }
+h2 { font-size: 28px; margin: 0 0 16px; color: var(--ink); }
+h2 .small { font-size: 14px; color: var(--ink-faint); font-weight: 400; margin-left: 12px; }
+.section-intro {
+  font-size: 17px; color: var(--ink-soft);
+  max-width: 720px; margin: 0 0 40px;
+}
+
+/* ───── Features(三个卡片) ───── */
+.features {
+  display: grid; gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.feature {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 28px;
+  background: var(--bg);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.feature:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(204, 88, 77, 0.08);
+}
+.feature h3 {
+  margin: 0 0 8px;
+  color: var(--brand);
+  font-size: 18px;
+}
+.feature p { margin: 0; color: var(--ink-soft); font-size: 15px; }
+
+/* ───── 模板预览 grid ───── */
+.templates {
+  display: grid; gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+.template {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg);
+  text-align: center;
+}
+.template .preview {
+  aspect-ratio: 9 / 16;
+  background: linear-gradient(135deg, var(--brand-softest), #fff);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: var(--ink-faint);
+  border-bottom: 1px solid var(--line);
+}
+.template .preview.wide { aspect-ratio: 16 / 9; }
+.template .preview.square { aspect-ratio: 1 / 1; }
+.template .name {
+  padding: 14px;
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace;
+  font-size: 14px; color: var(--ink);
+}
+
+/* ───── Quick Start ───── */
+.split {
+  display: grid; gap: 32px;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 720px) { .split { grid-template-columns: 1fr; } }
+.card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+  background: var(--bg-soft);
+}
+.card h3 { margin: 0 0 12px; font-size: 17px; color: var(--ink); }
+.card .label {
+  display: inline-block; background: var(--brand);
+  color: #fff; font-size: 11px;
+  padding: 2px 8px; border-radius: 4px;
+  font-weight: 600; letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+/* ───── Footer ───── */
+footer {
+  text-align: center; padding: 48px 24px;
+  color: var(--ink-faint); font-size: 14px;
+}
+footer a { color: var(--ink-soft); }

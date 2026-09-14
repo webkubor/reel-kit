@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>reel-kit · 竖版短视频生产工作台(UI + CLI 双形态)</title>
+  <meta name="description" content="reel-kit 是单仓统一的竖版短视频生产工作台,提供 UI(Studio 工作台)+ CLI 双形态。素材 + 逐句文案 + 配音/BGM,套 HTML 模板出片。本地 TTS 零成本,5 套模板,9 种转场,覆盖推广 / 剪辑 / 模板开发三件事。">
+  <meta name="keywords" content="reel-kit, 竖版短视频, 短视频合成, 视频模板, HTML 模板, ffmpeg, 本地 TTS, Qwen3-TTS, video generation, video template, prompt template, handdrawn, Vue, Vite">
+  <meta name="author" content="webkubor">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="reel-kit · 竖版短视频生产工作台">
+  <meta property="og:description" content="UI + CLI 双形态 · 5 套 HTML 模板 · 本地 TTS 零成本 · 单仓覆盖推广/剪辑/模板开发">
+  <meta property="og:image" content="docs/preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="stylesheet" href="style.css">
+
+  <!-- 埋点占位(默认关闭;按 docs/analytics-setup.md 启用) -->
+  <!-- <script defer data-domain="webkubor.github.io" src="https://plausible.io/js/script.js"></script> -->
+</head>
+<body>
+
+  <!-- ───── Hero ───── -->
+  <header class="hero">
+    <img src="logo.svg" alt="reel-kit" class="logo">
+    <h1>竖版短视频生产工作台</h1>
+    <p class="tagline">
+      <b>UI + CLI 双形态</b>。<br>
+      素材 + 逐句文案 + 配音/BGM,套 HTML 模板出片。<br>
+      本地 TTS 零成本,5 套模板,9 种转场,覆盖推广 / 剪辑 / 模板开发。
+    </p>
+
+    <a href="https://www.npmjs.com/package/@kubor/reel-kit" class="install">npm i -g @kubor/reel-kit</a>
+
+    <div class="links">
+      <a href="https://github.com/webkubor/reel-kit">⭐ GitHub</a>
+      <a href="https://github.com/webkubor/reel-kit/blob/main/README.md">📖 文档</a>
+      <a href="https://github.com/webkubor/reel-kit/tree/main/studio">🎨 Studio</a>
+      <a href="https://github.com/webkubor/reel-kit/tree/main/prompts">✍️ 模板库</a>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- ───── Features ───── -->
+    <section>
+      <h2>三件事,一个仓库</h2>
+      <p class="section-intro">
+        reel-kit 不是一个工具,是把"短视频生产"拆成三件事,各自有模块,但共享一个仓。
+        想做哪个就打开哪个,不用切换项目。
+      </p>
+      <div class="features">
+        <div class="feature">
+          <h3>📣 推广</h3>
+          <p>Studio 工作台 + 创作规范(CREATIVE_BIBLE),把"做好一个 IP"流程化:镜头台、角色库、集数、提示词实验室、批处理、推广位。</p>
+        </div>
+        <div class="feature">
+          <h3>🎬 剪辑</h3>
+          <p>命令行一行出片:<code>reel make</code>。5 套 HTML 模板、9 种 xfade 转场、长句字幕分镜、BGM 平滑接缝、念白驱动镜头时长。</p>
+        </div>
+        <div class="feature">
+          <h3>✍️ 模板开发</h3>
+          <p>20 套手绘风格配方 + 7 个生产期 Skill(写手/起名/世界书审计),模板用 HTML/CSS 写,所见即所得,改完直接用。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───── 模板预览 ───── -->
+    <section>
+      <h2>5 套模板 <span class="small">竖版 / 方形 / 横版 / 纯文字 · 一键切换</span></h2>
+      <p class="section-intro">
+        模板是 HTML/CSS 文件,改颜色、改布局、加 logo 都直接编辑。
+        模板作者不需懂 ffmpeg。
+      </p>
+      <div class="templates">
+        <div class="template">
+          <div class="preview">1080 × 1920</div>
+          <div class="name">sticker-promo</div>
+        </div>
+        <div class="template">
+          <div class="preview">1080 × 1920</div>
+          <div class="name">music-card</div>
+        </div>
+        <div class="template">
+          <div class="preview square">1080 × 1080</div>
+          <div class="name">sticker-square</div>
+        </div>
+        <div class="template">
+          <div class="preview">1080 × 1920</div>
+          <div class="name">quote</div>
+        </div>
+        <div class="template">
+          <div class="preview wide">1920 × 1080</div>
+          <div class="name">landscape-product</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───── Quick Start ───── -->
+    <section>
+      <h2>30 秒上手</h2>
+      <p class="section-intro">两种形态,同一个引擎。命令行适合批处理和 CI,工作台适合人工调整和创作。</p>
+      <div class="split">
+        <div class="card">
+          <div class="label">CLI</div>
+          <h3>命令行一行出片</h3>
+<pre><code>npm i -g @kubor/reel-kit
+
+reel make \
+  --template sticker-promo \
+  --title "新功能" \
+  --assets ./shots \
+  --caps ./captions.txt \
+  --out out.mp4</code></pre>
+        </div>
+        <div class="card">
+          <div class="label">UI</div>
+          <h3>Studio 工作台</h3>
+<pre><code>git clone webkubor/reel-kit
+cd reel-kit
+pnpm install
+pnpm dev --filter @kubor/reel-studio
+# → http://127.0.0.1:5273</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───── 数据归属 ───── -->
+    <section>
+      <h2>本地优先,默认不上报</h2>
+      <p class="section-intro">
+        reel-kit 是 <b>本地工具</b>:素材、文案、模板、合成,全在你机器上跑。
+        CLI 工具 <b>默认不开 telemetry</b>——你的内容不会因为跑了 <code>reel make</code> 而被传到任何地方。
+        <br><br>
+        GitHub Pages 站只用作项目门面,可选集成 Plausible(隐私友好的无 cookie 埋点),见
+        <a href="analytics-setup.md">docs/analytics-setup.md</a>。
+      </p>
+    </section>
+
+  </div>
+
+  <footer>
+    <p>
+      <a href="https://github.com/webkubor/reel-kit">reel-kit</a> · MIT License
+      · <a href="https://github.com/webkubor/reel-kit/blob/main/CHANGELOG.md">更新日志</a>
+    </p>
+  </footer>
+
+</body>
+</html>

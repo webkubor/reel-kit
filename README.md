@@ -315,6 +315,24 @@ reel make ... --bgm 轻快         # 按别名取，首次自动下载并缓存�
 - **只有一个模板**：`sticker-promo`（1080×1920 竖版）。横版多镜头模板还没做。
 - **BGM 短于片长会循环**：已用 `aloop` 补满并淡出，若接缝明显请换更长的曲子。
 
+## 🌐 GitHub Pages 官网
+
+`docs/index.html` 是 reel-kit 的官方单页网站,部署到 GitHub Pages 后可在 `https://webkubor.github.io/reel-kit/` 访问。
+
+**启用方法**(30 秒):
+
+1. GitHub 仓库 → **Settings** → **Pages**
+2. **Source** 选 `Deploy from a branch`
+3. **Branch** 选 `main` · **Folder** 选 `/docs`
+4. 保存,几分钟后自动上线
+
+`docs/` 目录包含:
+
+- `index.html` — 单页官网(hero / features / 5 套模板预览 / 30 秒上手)
+- `style.css` — 主色 Reel 红 (`#cc584d`) 品牌样式
+- `logo.svg` / `logo-light.svg` — 浅色 / 深色模式 logo
+- `analytics-setup.md` — 埋点集成指南(默认关闭,需手动启用)
+
 ## 📄 License
 
 MIT
