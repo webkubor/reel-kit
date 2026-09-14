@@ -65,6 +65,19 @@
   }
 </style>
 
+
+## 缩略图/分镜帧理解（mlx-vlm-kit）
+
+本工具不含识图模型。要做缩略图质检、分镜帧内容理解、配文案，
+用本机共享的 [mlx-vlm-kit](https://github.com/webkubor/mlx-vlm-kit)（免费/离线）：
+
+```bash
+vlm describe ./ep07-thumb.jpg                 # 缩略图内容
+vlm ask frame01.png --q "这帧符合脚本第3句吗"   # 脚本对齐检查
+```
+
+Agent 工作流里也可通过 museav-mcp 调用。
+
 ## ⚡ 30 秒上手
 
 ```bash
