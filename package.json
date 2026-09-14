@@ -2,7 +2,7 @@
   "name": "@kubor/reel-kit",
   "version": "0.1.1",
   "type": "module",
-  "description": "竖版短视频合成工作台 —— 素材 + 逐句文案 + BGM,套模板出片。把一次性的 ffmpeg 命令固化成可复用流程。",
+  "description": "竖版短视频生产工作台(UI + CLI 双形态)—— 素材 + 逐句文案 + 配音/BGM,套 HTML 模板出片。Studio 工作台 + 20 套手绘风格模板库 + 本地 TTS 零成本,覆盖推广 / 剪辑 / 模板开发三件事。",
   "bin": {
     "reel": "./bin/reel.mjs"
   },
@@ -45,6 +45,13 @@
     "vertical-video",
     "video-generation",
     "cli",
-    "content-creation"
+    "content-creation",
+    "vue",
+    "vite",
+    "monorepo",
+    "html-template",
+    "video-template",
+    "prompt-template",
+    "handdrawn"
   ]
 }
