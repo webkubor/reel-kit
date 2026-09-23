@@ -1,5 +1,27 @@
 # 更新日志
 
+## [0.3.1] - 2026-09-23
+
+### 新增
+
+- **缩略图 / 分镜帧理解接入 mlx-vlm-kit** — 缩略图选帧和分镜帧内容判断改走本机共享识图 CLI(避免每仓装一遍 VLM 权重)。详见 `studio/README.md`。
+- **完整英文 README**(`README.en.md`) — GitHub 仓库首页自动识别为英文版,与中文版镜像。
+- **`pnpm pub`** — 用 `secret://npm/kubor-company-publish`(kubor 公司 NPM PAT,expiry 2026-12-20,scopes `package:write` + `org:write`)走 `cs kyvault run` 发布,密钥不落 CLI 历史。
+
+### 运维
+
+- **webkubor.xyz DNS 备份**(`docs/dns-backup/webkubor-xyz.json`) — 域名下线前存档 zone meta + 2 条 DNS 记录;`secret://cloudflare/api-token` 加了下线备注。
+- **Plausible 埋点 revert** — 改用 Cloudflare Web Analytics(10 个 RUM site 已 auto-install,免费,覆盖多站点)。`webkubor/boiling-snow`、`webkubor/story-to-video`、`webkubor/vite-plugin-agent-eyes`、`webkubor/ai-orb` 四个 GH Pages 同步清理。
+
+### 仓库归档(配套 0.3.0 三合一)
+
+- GitHub 端 `webkubor/boiling-snow` 和 `webkubor/story-to-video` 已 archived(90 天保留期),README 指引用户迁到 reel-kit。
+
+### 文档同步
+
+- `AGENTS.md` 验证脚本名:`pnpm demo` → `pnpm test`(测试套件迁到 `test` script)。
+- `README.md` studio views 数 15 → 11;补"末帧不重复(实测 ffmpeg 7.x)"警告并指向 `AGENTS.md` 第 1 条。
+
 ## [0.3.0] - 2026-09-14
 
 ### 重构:三合一(reel-kit 单仓统一)
