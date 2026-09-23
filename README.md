@@ -157,7 +157,7 @@ reel-kit/                          # @kubor/reel-kit (单仓统一)
 ├── src/                           # 视频合成核心(导出为库:import { renderFrames, compose, ... })
 ├── templates/                     # 5 套 HTML 模板(sticker-promo/square/quote/landscape/music-card)
 ├── studio/                        # @kubor/reel-studio — Vue 3 + Vite 8 可视化工作台
-│   ├── src/views/                 #   15 个 view:镜头台 / 角色库 / 集数 / 提示词实验室 / 批处理 / 推广位…
+│   ├── src/views/                 #   11 个 view:镜头台 / 角色库 / 集数 / 提示词实验室 / 批处理 / 推广位…
 │   └── server/                    #   内置 Node 后端(挂在 Vite middleware,127.0.0.1 only)
 ├── prompts/                       # 提示词模板库
 │   ├── agents/                    #   创作规范(CREATIVE_BIBLE 等)
@@ -307,7 +307,8 @@ reel make ... --bgm 轻快         # 按别名取，首次自动下载并缓存�
 **为什么用 concat demuxer 而不是 `-framerate 1/2.5`** —— 后者要求每镜等长，
 而「片尾多停一会」是很自然的需求。
 
-> ⚠️ ffmpeg 的 concat 列表**必须把最后一帧重复一次**，否则它的 duration 会被忽略。
+> ⚠️ ffmpeg 7.x 实测：**不要**重复 concat 列表的末帧（重复会让总时长多出一整镜，5 镜 × 2.5s 期望 12.5s 重复末行实测 15.0s，不重复实测 12.43s）。
+> 这条跟早期文档描述的"必须重复"相反，**改自实测**，详见 [`AGENTS.md`](AGENTS.md) 第 1 条与 [`docs/video-compositing-notes.md`](docs/video-compositing-notes.md) 第 3 条。
 
 **素材与文案数量不等时**，取较少的一方并**明确报出没用上的是哪些** ——
 静默截断会让人以为片子出全了。

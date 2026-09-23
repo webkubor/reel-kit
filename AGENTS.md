@@ -57,7 +57,7 @@
 
 ```bash
 node --check bin/reel.mjs src/*.mjs        # 语法
-pnpm demo                                  # 用 examples/ 跑一支，应无报错
+pnpm test                                  # check + lint + 模板枚举（CI 跑的就是这条）
 scorecard webkubor/reel-kit --min 5        # 仓库质检闸门
 ```
 
