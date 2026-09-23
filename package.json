@@ -26,7 +26,8 @@
     "check": "node --check bin/reel.mjs && node --check src/render.mjs && node --check src/compose.mjs && node --check src/voice.mjs && node --check src/bgm-library.mjs && node --check src/voxcraft-locate.mjs && node --check src/voxcraft-server.mjs",
     "lint": "node scripts/lint.mjs",
     "test": "pnpm check && pnpm lint && node bin/reel.mjs templates >/dev/null && echo 'ok: 语法 + lint + 模板枚举'",
-    "audit": "npx --yes github:webkubor/scorecard scorecard webkubor/reel-kit --min 5 || true"
+    "audit": "npx --yes github:webkubor/scorecard scorecard webkubor/reel-kit --min 5 || true",
+    "pub": "cs kyvault run --env TOKEN=secret://npm/kubor-company-publish -- npm publish --access public --//registry.npmjs.org/:_authToken=\"$TOKEN\""
   },
   "dependencies": {
     "playwright-core": "^1.62.1"
