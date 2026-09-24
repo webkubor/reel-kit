@@ -53,6 +53,31 @@
 它的 CLI 每次调用都重载模型，逐句起进程做 8 句就是加载 8 次，
 实测第 5 句崩在 `libc++abi: recursive_mutex lock failed`。
 
+## AI 视频生成后端选择顺序(2026-09-24 起)
+
+reel-kit 接入 AI 视频生成时,**按以下顺序自动选**(用户拍板,不要反过来):
+
+| 顺序 | 后端 | 何时用 |
+|---|---|---|
+| ① 优先 | **`MiniMax Hailuo 2.3`** | Ultra 覆盖,**5 段/天** quota。走 `connector__matrix__submit_video_generation` + `query_video_generation`,走 mcode-tools shared-broker 鉴权(无需在 kyvault 单独存 API key)。768P(6/10s)/1080P(6s),**输出无声 → 仍要叠 voxcraft 配音** |
+| ② 降级 | `museav`(用户自建业务中台) | ① quota 用完 / 调用失败时自动降级。按 token 计费,接口路径以 museav 实际为准 |
+
+**不要默认接 H3 / H3-Max** — Token Plan 不覆盖,按账户余额付费;只有用户主动要"原生音轨+愿意花钱"时才考虑,不在自动选择链里。
+
+### Quota 管理(必做)
+
+每日 quota 用本地计数文件,`~/.reel-kit/quotas.json`:
+
+```json
+{
+  "minimax-hailuo-2.3": { "date": "2026-09-24", "count": 3 }
+}
+```
+
+- 提交任务前 `+1`,超 5 段直接拒绝 + 报"quota 用完,自动降级 museav"
+- 跨日自动 reset
+- **失败/被取消的任务不消耗 quota**(Mavis H3 任务会 succeeded / failed / cancelled,Hailuo 同样语义)
+
 ## 验证改动
 
 ```bash
