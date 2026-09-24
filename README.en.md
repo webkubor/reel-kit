@@ -15,11 +15,11 @@
 </p>
 
 <p align="center">
-  <b>Vertical short-form video production studio — UI + CLI dual form</b>
+  <b>Short-form video composition engine · AI hands-off batch assembler</b>
   <br />
   Assets + per-line captions + voice-over/BGM, drop into a template, get the mp4. Layout in <b>HTML/CSS</b>, shot duration driven by <b>voice</b>, voice runs through <b>local TTS</b> at zero cost.
   <br />
-  <sub>Covers three things: <b>promo / editing / video-prompt template authoring</b> — one repo, both scriptable CLI and visual Studio</sub>
+  <sub>CLI is primary, Studio is secondary, same repo same pipeline · upstream consumes AI-generated clips (Hailuo and friends), downstream emits finished mp4</sub>
 </p>
 
 [中文](./README.md) · [Quick start](#-30-second-quick-start) · [Comparison](#-vs-other-approaches) · [Voice](#-voice) · [Repo structure](#-repo-structure-merged-2026-09)
