@@ -98,7 +98,7 @@ scorecard webkubor/reel-kit --min 5        # 仓库质检闸门
 
 ## 不做什么
 
-- **不做抠图**：那是 `museav remove-bg` 与 `wechat-sticker-submit` skill 的职责。
+- **不做抠图**：那是 `museav remove-bg` 与 `charmoji` skill 的职责。
 - **不做通用剪辑**：调色、多轨、转场请用 DaVinci Resolve。
 - **不自动装大件**：缺 voxcraft 或模型时明确报出并给命令，
   但绝不自动下载 4.2GB 的东西。

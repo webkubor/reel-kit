@@ -35,7 +35,7 @@ pnpm test          # 语法 + lint + 模板枚举
 
 ## 不接受的改动
 
-- 把抠图搬进来 —— 那是 `museav remove-bg` 与 `wechat-sticker-submit` 的职责
+- 把抠图搬进来 —— 那是 `museav remove-bg` 与 `charmoji` 的职责
 - 把 voxcraft 定位改成只判断 `which voice` —— 它的命令在 venv 里，
   那样会误判成没装，进而重复下 4.2GB 模型
 - 通用剪辑能力（调色、多轨、转场关键帧）—— 那是 DaVinci Resolve 的活
