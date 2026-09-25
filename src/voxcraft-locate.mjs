@@ -17,6 +17,13 @@ import { join } from 'node:path'
 /** 常见安装位置。按用户的目录约定，app/ 是成品应用该在的地方，排最前。 */
 const CANDIDATE_HOMES = [
   process.env.VOXCRAFT_HOME,
+  // 2026-08-30 那次改名（commit a6f6b85「仓库、目录、前端包名全部对齐 VoxFlow」）
+  // 只改了项目自己，这份候选表没跟 —— 四条路径全部落空、判定成「没装」，
+  // 然后去重装一遍 4.2GB 的模型。新名放前面，旧名保留兜底。
+  join(homedir(), 'dev/github/app/voxflow'),
+  join(homedir(), 'dev/github/webkubor/voxflow'),
+  join(homedir(), 'dev/github/voxflow'),
+  join(homedir(), 'voxflow'),
   join(homedir(), 'dev/github/app/voxcraft'),
   join(homedir(), 'dev/github/webkubor/voxcraft'),
   join(homedir(), 'dev/github/voxcraft'),
@@ -34,10 +41,18 @@ function inspect(home) {
   const bin = existsSync(venvBin) ? venvBin : null
 
   // Base 模型是克隆合成的必需项；VoiceDesign 只有做音色设计才要
-  const hasModel = existsSync(join(home, 'models/Base-1.7B'))
+  // 模型不在 repo 里，在数据目录 ~/.voxflow/ 下；且 2026-09-14 迁 MLX 之后
+  // 目录从 models/Base-1.7B 变成 models-mlx/Base-1.7B-8bit（voxflow core/paths.py
+  // 的注释原话：models/ 现在没有任何代码读它）。两处都查，旧布局留着兜底。
+  const hasModel =
+    existsSync(join(homedir(), '.voxflow/models-mlx/Base-1.7B-8bit')) ||
+    existsSync(join(home, 'models/Base-1.7B'))
 
   let personas = []
-  const pf = join(home, 'configs/personas.json')
+  // personas 同理在数据目录，不在 repo
+  const pf = existsSync(join(homedir(), '.voxflow/configs/personas.json'))
+    ? join(homedir(), '.voxflow/configs/personas.json')
+    : join(home, 'configs/personas.json')
   if (existsSync(pf)) {
     try { personas = Object.keys(JSON.parse(readFileSync(pf, 'utf-8')) || {}) } catch { /* 坏文件当没有 */ }
   }
