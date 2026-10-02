@@ -1,5 +1,20 @@
 # 更新日志
 
+## [未发布] - 2026-10-02
+
+### 移除：09-14「三合一」拷进来的三样非本仓资产
+
+`studio/`、`prompts/agents/`、`seasons/s1/novels/.agent-skills/` 三处是 2026-09-14
+从 `webkubor/boiling-snow` **物理拷入**的，但它们全是**沸雪专属**资产：
+工作台读的是沸雪的 `seasons/`（429M 在那边，本仓只有 48K 空壳）、
+`CREATIVE_BIBLE.md` 是《沸腾之雪》的创作法典、Skill 是武侠小说生产期的。
+
+**在本仓跑不起来，也从未被跑过**：`studio/` 无 `.state`（工作台跑过就会留）、
+无 README，`dist/` 停在 09-14 合并当天。工作台回到 `video/boiling-snow/studio/`。
+
+同步清掉的引用：README 中英 / AGENTS.md / docs/index.html / package.json 的
+description 与 keywords（`vue` `vite` `monorepo` 三个随工作台进来的）。
+
 ## [0.3.2] - 2026-09-24
 
 ### 定位:短视频合成引擎 · AI 无人值守的批量装配器(用户拍板)

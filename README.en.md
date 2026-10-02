@@ -19,7 +19,7 @@
   <br />
   Assets + per-line captions + voice-over/BGM, drop into a template, get the mp4. Layout in <b>HTML/CSS</b>, shot duration driven by <b>voice</b>, voice runs through <b>local TTS</b> at zero cost.
   <br />
-  <sub>CLI is primary, Studio is secondary, same repo same pipeline · upstream consumes AI-generated clips (Hailuo and friends), downstream emits finished mp4</sub>
+  <sub>CLI + library only · upstream consumes AI-generated clips (Hailuo and friends), downstream emits finished mp4</sub>
 </p>
 
 [中文](./README.md) · [Quick start](#-30-second-quick-start) · [Comparison](#-vs-other-approaches) · [Voice](#-voice) · [Repo structure](#-repo-structure-merged-2026-09)
@@ -59,8 +59,6 @@ In an agent workflow, you can also call via museav-mcp.
 reel make --template sticker-promo --title "New feature" \
   --assets ./shots --caps ./captions.txt --out out.mp4
 
-# UI: Studio workbench (local HTTP, 127.0.0.1:5273)
-pnpm dev --filter @kubor/reel-studio
 ```
 
 ```bash
@@ -119,29 +117,20 @@ Defaults to [voxcraft](https://github.com/webkubor/voxcraft) (local Qwen3-TTS) �
 ## 📦 Repo structure (after 2026-09 three-way merge)
 
 ```
-reel-kit/                          # @kubor/reel-kit (unified single repo)
+reel-kit/                          # @kubor/reel-kit
 ├── bin/                           # CLI entry (the `reel` command)
 ├── src/                           # video compositing core (also exported as a lib: import { renderFrames, compose, ... })
 ├── templates/                     # 5 HTML templates (sticker-promo/square/quote/landscape/music-card)
-├── studio/                        # @kubor/reel-studio — Vue 3 + Vite 8 visual workbench
-│   ├── src/views/                 #   11 views: shot board / character library / episodes / prompt lab / batch / promo slots …
-│   └── server/                    #   built-in Node backend (mounted as Vite middleware, 127.0.0.1 only)
-├── prompts/                       # prompt template library
-│   ├── agents/                    #   authoring specs (CREATIVE_BIBLE etc.)
-│   └── handdrawn/                 #   20 hand-drawn style recipes (inherited from story-to-handdrawn-video)
-├── seasons/                       # multi-season / multi-IP production data
-│   └── s1/novels/.agent-skills/   #   7 production-period Skill configs (writer-hub / namer-hub / worldbook-audit …)
+├── prompts/
+│   └── handdrawn/                 # 20 hand-drawn style recipes (inherited from story-to-handdrawn-video)
 ├── docs/                          # design trade-offs, compositing notes
 └── examples/                      # fully reproducible demo assets
 ```
 
-How the three things map:
+How the two things map:
 
-- **Promo** = `studio/` `EpisodesView` / `GalleryView` + `prompts/agents` authoring specs
 - **Editing** = `bin/reel.mjs` CLI + `src/` compositing engine (exported as a lib)
-- **Video-prompt template authoring** = `prompts/handdrawn/` style library + `studio/` `PromptLabView` / `AestheticView` + `seasons/s1/novels/.agent-skills/` Skill library
-
-UI and CLI share `src/`: Studio imports core modules directly via `studio/server/lib/...` (same-repo relative paths, no monorepo tooling, no npm link).
+- **Video-prompt template authoring** = `prompts/handdrawn/` style library (20 recipes)
 
 ```bash
 npm i -g @kubor/reel-kit

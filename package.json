@@ -2,7 +2,7 @@
   "name": "@kubor/reel-kit",
   "version": "0.1.1",
   "type": "module",
-  "description": "短视频合成引擎 · AI 无人值守的批量装配器。素材 + 逐句文案 + 配音/BGM,套 HTML 模板出片。CLI 主形态 + Studio 辅,同仓同一条流水线;上游消费 AI 出视频素材(Hailuo),下游吐成品 mp4。本地 TTS 零成本,5 套模板,9 种转场。",
+  "description": "短视频合成引擎 · AI 无人值守的批量装配器。素材 + 逐句文案 + 配音/BGM,套 HTML 模板出片。CLI + 库,同一条流水线;上游消费 AI 出视频素材(Hailuo),下游吐成品 mp4。本地 TTS 零成本,5 套模板,9 种转场。",
   "bin": {
     "reel": "./bin/reel.mjs"
   },
@@ -47,9 +47,6 @@
     "video-generation",
     "cli",
     "content-creation",
-    "vue",
-    "vite",
-    "monorepo",
     "html-template",
     "video-template",
     "prompt-template",

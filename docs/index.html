@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>reel-kit · 短视频合成引擎(AI 无人值守的批量装配器)</title>
-  <meta name="description" content="reel-kit 是短视频合成引擎 · AI 无人值守的批量装配器。CLI 是主形态,Studio 是辅,同仓同一条流水线。素材 + 逐句文案 + 配音/BGM,套 HTML 模板出片。本地 TTS 零成本,5 套模板,9 种转场。上游消费 AI 出视频素材(Hailuo),下游吐成品 mp4。">
+  <meta name="description" content="reel-kit 是短视频合成引擎 · AI 无人值守的批量装配器。CLI + 库,同一条流水线。素材 + 逐句文案 + 配音/BGM,套 HTML 模板出片。本地 TTS 零成本,5 套模板,9 种转场。上游消费 AI 出视频素材(Hailuo),下游吐成品 mp4。">
   <meta name="keywords" content="reel-kit, 短视频合成引擎, AI 无人值守, 批量装配器, video assembler, video composition engine, 视频模板, HTML 模板, ffmpeg, 本地 TTS, Qwen3-TTS, Hailuo, video template, prompt template, handdrawn, Vue, Vite">
   <meta name="author" content="webkubor">
 
   <meta property="og:type" content="website">
   <meta property="og:title" content="reel-kit · 短视频合成引擎 · AI 无人值守的批量装配器">
-  <meta property="og:description" content="CLI 主形态 · Studio 辅 · 同仓同一条流水线 · 上游吃 AI 出视频素材 · 下游吐成品 mp4">
+  <meta property="og:description" content="CLI + 库 · 上游吃 AI 出视频素材 · 下游吐成品 mp4">
   <meta property="og:image" content="docs/preview.png">
   <meta name="twitter:card" content="summary_large_image">
 
@@ -28,7 +28,7 @@
     <p class="tagline">
       <b>AI 无人值守的批量装配器</b>。<br>
       素材 + 逐句文案 + 配音/BGM,套 HTML 模板出片。<br>
-      CLI 是主形态,Studio 是辅,同仓同一条流水线。
+      CLI + 库,同一条流水线。
     </p>
 
     <a href="https://www.npmjs.com/package/@kubor/reel-kit" class="install">npm i -g @kubor/reel-kit</a>
@@ -36,7 +36,6 @@
     <div class="links">
       <a href="https://github.com/webkubor/reel-kit">⭐ GitHub</a>
       <a href="https://github.com/webkubor/reel-kit/blob/main/README.md">📖 文档</a>
-      <a href="https://github.com/webkubor/reel-kit/tree/main/studio">🎨 Studio</a>
       <a href="https://github.com/webkubor/reel-kit/tree/main/prompts">✍️ 模板库</a>
     </div>
   </header>
@@ -45,23 +44,19 @@
 
     <!-- ───── Features ───── -->
     <section>
-      <h2>三件事,一个仓库</h2>
+      <h2>两件事,一个仓库</h2>
       <p class="section-intro">
-        reel-kit 不是一个工具,是把"短视频生产"拆成三件事,各自有模块,但共享一个仓。
+        reel-kit 不是一个工具,是把"短视频生产"拆成两件事,各自有模块,但共享一个仓。
         想做哪个就打开哪个,不用切换项目。
       </p>
       <div class="features">
-        <div class="feature">
-          <h3>📣 推广</h3>
-          <p>Studio 工作台 + 创作规范(CREATIVE_BIBLE),把"做好一个 IP"流程化:镜头台、角色库、集数、提示词实验室、批处理、推广位。</p>
-        </div>
         <div class="feature">
           <h3>🎬 剪辑</h3>
           <p>命令行一行出片:<code>reel make</code>。5 套 HTML 模板、9 种 xfade 转场、长句字幕分镜、BGM 平滑接缝、念白驱动镜头时长。</p>
         </div>
         <div class="feature">
           <h3>✍️ 模板开发</h3>
-          <p>20 套手绘风格配方 + 7 个生产期 Skill(写手/起名/世界书审计),模板用 HTML/CSS 写,所见即所得,改完直接用。</p>
+          <p>20 套手绘风格配方,模板用 HTML/CSS 写,所见即所得,改完直接用。</p>
         </div>
       </div>
     </section>
@@ -113,15 +108,6 @@ reel make \
   --assets ./shots \
   --caps ./captions.txt \
   --out out.mp4</code></pre>
-        </div>
-        <div class="card">
-          <div class="label">UI</div>
-          <h3>Studio 工作台</h3>
-<pre><code>git clone webkubor/reel-kit
-cd reel-kit
-pnpm install
-pnpm dev --filter @kubor/reel-studio
-# → http://127.0.0.1:5273</code></pre>
         </div>
       </div>
     </section>

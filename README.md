@@ -19,7 +19,7 @@
   <br />
   素材 + 逐句文案 + 配音/BGM，套模板出片。版式用 <b>HTML/CSS</b> 写，镜头时长由<b>念白</b>决定，配音走<b>本地 TTS</b> 不花钱。
   <br />
-  <sub>CLI 是主形态,Studio 是辅,同仓同一条流水线 · 上游吃 AI 出视频素材(Hailuo 这类),下游吐成品 mp4</sub>
+  <sub>CLI + 库单形态 · 上游吃 AI 出视频素材(Hailuo 这类),下游吐成品 mp4</sub>
 </p>
 
 <p align="center">
@@ -85,8 +85,6 @@ Agent 工作流里也可通过 museav-mcp 调用。
 reel make --template sticker-promo --title "新功能" \
   --assets ./shots --caps ./captions.txt --out out.mp4
 
-# UI:Studio 工作台(本机 HTTP,127.0.0.1:5273)
-pnpm dev --filter @kubor/reel-studio
 ```
 
 ```bash
@@ -152,28 +150,19 @@ reel-kit 把那段流程固化成可复用的命令。
 ## 📦 仓库结构(2026-09 三合一后)
 
 ```
-reel-kit/                          # @kubor/reel-kit (单仓统一)
+reel-kit/                          # @kubor/reel-kit
 ├── bin/                           # CLI 入口(`reel` 命令)
 ├── src/                           # 视频合成核心(导出为库:import { renderFrames, compose, ... })
 ├── templates/                     # 5 套 HTML 模板(sticker-promo/square/quote/landscape/music-card)
-├── studio/                        # @kubor/reel-studio — Vue 3 + Vite 8 可视化工作台
-│   ├── src/views/                 #   11 个 view:镜头台 / 角色库 / 集数 / 提示词实验室 / 批处理 / 推广位…
-│   └── server/                    #   内置 Node 后端(挂在 Vite middleware,127.0.0.1 only)
-├── prompts/                       # 提示词模板库
-│   ├── agents/                    #   创作规范(CREATIVE_BIBLE 等)
-│   └── handdrawn/                 #   20 套手绘风格配方(从 story-to-handdrawn-video 上游继承)
-├── seasons/                       # 多季/多 IP 制作数据
-│   └── s1/novels/.agent-skills/   #   7 个生产期 Skill 配置(写手中枢/起名中枢/世界书审计…)
+├── prompts/
+│   └── handdrawn/                 # 20 套手绘风格配方(从 story-to-handdrawn-video 上游继承)
 ├── docs/                          # 设计取舍、合成笔记
 └── examples/                      # 完整可复现 demo 素材
 ```
 
-**三件事怎么映射**:
-- **推广** = `studio/` 的 `EpisodesView` / `GalleryView` + `prompts/agents` 创作规范
+**两件事怎么映射**:
 - **剪辑** = `bin/reel.mjs` CLI + `src/` 视频合成引擎(已暴露为库)
-- **视频提示词模板开发** = `prompts/handdrawn/` 风格库 + `studio/` 的 `PromptLabView` / `AestheticView` + `seasons/s1/novels/.agent-skills/` Skill 库
-
-UI 与 CLI 共享 `src/`:Studio 通过 `studio/server/lib/...` 直接 import 仓内核心模块(同仓相对路径,无 monorepo 工具、无 npm link)。
+- **视频提示词模板开发** = `prompts/handdrawn/` 风格库(20 套配方)
 
 ```bash
 npm i -g @kubor/reel-kit
