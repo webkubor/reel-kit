@@ -27,7 +27,7 @@
     "lint": "node scripts/lint.mjs",
     "test": "pnpm check && pnpm lint && node bin/reel.mjs templates >/dev/null && echo 'ok: 语法 + lint + 模板枚举'",
     "audit": "npx --yes github:webkubor/scorecard scorecard webkubor/reel-kit --min 5 || true",
-    "pub": "cs kyvault run --env TOKEN=secret://npm/kubor-company-publish -- npm publish --access public --//registry.npmjs.org/:_authToken=\"$TOKEN\""
+    "pub": "cs kyvault run --env TOKEN=secret://npm/kubor-company-token -- sh -c 'npm publish --access public --//registry.npmjs.org/:_authToken=\"$TOKEN\"'"
   },
   "dependencies": {
     "playwright-core": "^1.62.1"
