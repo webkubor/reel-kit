@@ -48,7 +48,7 @@ vlm describe ./ep07-thumb.jpg                       # thumbnail content
 vlm ask frame01.png --q "does this frame match script line 3"   # script alignment check
 ```
 
-In an agent workflow, you can also call via museav-mcp.
+In an agent workflow, you can also call via [cs-mcp](https://github.com/webkubor/cs-mcp).
 
 ---
 

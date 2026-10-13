@@ -76,7 +76,7 @@ vlm describe ./ep07-thumb.jpg                 # 缩略图内容
 vlm ask frame01.png --q "这帧符合脚本第3句吗"   # 脚本对齐检查
 ```
 
-Agent 工作流里也可通过 museav-mcp 调用。
+Agent 工作流里也可通过 [cs-mcp](https://github.com/webkubor/cs-mcp) 调用。
 
 ## ⚡ 30 秒上手
 
