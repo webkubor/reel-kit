@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-light.svg" />
-    <img src="docs/logo.svg" width="220" alt="reel-kit" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/webkubor/free-imgbed@main/reel-kit/logo-light.svg" />
+    <img src="https://cdn.jsdelivr.net/gh/webkubor/free-imgbed@main/reel-kit/logo.svg" width="220" alt="reel-kit" />
   </picture>
 </p>
 
@@ -31,7 +31,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/demo.gif" width="240" alt="reel-kit demo" />
+  <img src="https://cdn.jsdelivr.net/gh/webkubor/free-imgbed@main/reel-kit/demo.gif" width="240" alt="reel-kit demo" />
 </p>
 
 <p align="center">
@@ -40,7 +40,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/preview.png" width="720" alt="三帧预览" />
+  <img src="https://cdn.jsdelivr.net/gh/webkubor/free-imgbed@main/reel-kit/preview.webp" width="720" alt="三帧预览" />
 </p>
 
 ---
