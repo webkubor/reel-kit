@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/webkubor/free-imgbed@main/reel-kit/logo-light.svg" />
-    <img src="https://cdn.jsdelivr.net/gh/webkubor/free-imgbed@main/reel-kit/logo.svg" width="220" alt="reel-kit" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/webkubor/free-imgbed@main/reel-kit/mark-v3-dark.svg" />
+    <img src="https://cdn.jsdelivr.net/gh/webkubor/free-imgbed@main/reel-kit/mark-v3.svg" width="96" alt="reel-kit" />
   </picture>
 </p>
 
