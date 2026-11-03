@@ -290,6 +290,16 @@ Templates display assets as **subject images** centered. For sticker effect, ass
 - `logo.svg` / `logo-light.svg` — light / dark mode logo
 - `analytics-setup.md` — analytics integration guide (off by default, opt-in)
 
+## Star History
+
+<a href="https://www.star-history.com/#webkubor/reel-kit&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=webkubor/reel-kit&amp;type=Date&amp;theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=webkubor/reel-kit&amp;type=Date" />
+    <img alt="Star History Chart for webkubor/reel-kit" src="https://api.star-history.com/svg?repos=webkubor/reel-kit&amp;type=Date" width="100%" />
+  </picture>
+</a>
+
 ## 📄 License
 
 MIT

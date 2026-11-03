@@ -336,6 +336,16 @@ reel make ... --bgm 轻快         # 按别名取，首次自动下载并缓存�
 - `logo.svg` / `logo-light.svg` — 浅色 / 深色模式 logo
 - `analytics-setup.md` — 埋点集成指南(默认关闭,需手动启用)
 
+## Star History
+
+<a href="https://www.star-history.com/#webkubor/reel-kit&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=webkubor/reel-kit&amp;type=Date&amp;theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=webkubor/reel-kit&amp;type=Date" />
+    <img alt="Star History Chart for webkubor/reel-kit" src="https://api.star-history.com/svg?repos=webkubor/reel-kit&amp;type=Date" width="100%" />
+  </picture>
+</a>
+
 ## 📄 License
 
 MIT
