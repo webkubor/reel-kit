@@ -6,7 +6,6 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@kubor/reel-kit"><img src="https://img.shields.io/npm/v/@kubor/reel-kit?style=flat-square&color=cb3837&label=npm" alt="npm" /></a>
   <img src="https://img.shields.io/github/license/webkubor/reel-kit?style=flat-square&color=92a8b3" alt="License" />
   <img src="https://img.shields.io/github/stars/webkubor/reel-kit?style=flat-square&color=cc584d" alt="Stars" />
   <img src="https://img.shields.io/badge/Node-%E2%89%A518-cc584d?style=flat-square" alt="Node >= 18" />
@@ -62,7 +61,7 @@ reel make --template sticker-promo --title "New feature" \
 ```
 
 ```bash
-npm i -g @kubor/reel-kit          # or npx @kubor/reel-kit ...
+npm i -g github:webkubor/reel-kit   # or npx github:webkubor/reel-kit ...
 
 reel make --template sticker-promo \
   --title "reel-kit" --subtitle "Vertical short-form video studio" \
@@ -133,13 +132,13 @@ How the two things map:
 - **Video-prompt template authoring** = `prompts/handdrawn/` style library (20 recipes)
 
 ```bash
-npm i -g @kubor/reel-kit
+npm i -g github:webkubor/reel-kit
 ```
 
 Or run without installing:
 
 ```bash
-npx @kubor/reel-kit make --template sticker-promo ...
+npx github:webkubor/reel-kit make --template sticker-promo ...
 ```
 
 To edit templates or run the demo, clone the source (the `examples/` only lives in the repo, not in the npm package):

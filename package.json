@@ -1,6 +1,7 @@
 {
   "name": "@kubor/reel-kit",
   "version": "0.1.1",
+  "private": true,
   "type": "module",
   "description": "短视频合成引擎 · AI 无人值守的批量装配器。素材 + 逐句文案 + 配音/BGM,套 HTML 模板出片。CLI + 库,同一条流水线;上游消费 AI 出视频素材(Hailuo),下游吐成品 mp4。本地 TTS 零成本,5 套模板,9 种转场。",
   "bin": {
@@ -26,8 +27,7 @@
     "check": "node --check bin/reel.mjs && node --check src/render.mjs && node --check src/compose.mjs && node --check src/voice.mjs && node --check src/bgm-library.mjs && node --check src/voxcraft-locate.mjs && node --check src/voxcraft-server.mjs",
     "lint": "node scripts/lint.mjs",
     "test": "pnpm check && pnpm lint && node bin/reel.mjs templates >/dev/null && echo 'ok: 语法 + lint + 模板枚举'",
-    "audit": "npx --yes github:webkubor/scorecard scorecard webkubor/reel-kit --min 5 || true",
-    "pub": "cs kyvault run --env TOKEN=secret://npm/kubor-company-token -- sh -c 'npm publish --access public --//registry.npmjs.org/:_authToken=\"$TOKEN\"'"
+    "audit": "npx --yes github:webkubor/scorecard scorecard webkubor/reel-kit --min 5 || true"
   },
   "dependencies": {
     "playwright-core": "^1.62.1"

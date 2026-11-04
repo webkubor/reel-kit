@@ -6,7 +6,6 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@kubor/reel-kit"><img src="https://img.shields.io/npm/v/@kubor/reel-kit?style=flat-square&color=cb3837&label=npm" alt="npm" /></a>
   <img src="https://img.shields.io/github/license/webkubor/reel-kit?style=flat-square&color=92a8b3" alt="License" />
   <img src="https://img.shields.io/github/stars/webkubor/reel-kit?style=flat-square&color=cc584d" alt="Stars" />
   <img src="https://img.shields.io/badge/Node-%E2%89%A518-cc584d?style=flat-square" alt="Node >= 18" />
@@ -88,7 +87,7 @@ reel make --template sticker-promo --title "新功能" \
 ```
 
 ```bash
-npm i -g @kubor/reel-kit          # 或 npx @kubor/reel-kit ...
+npm i -g github:webkubor/reel-kit   # 或 npx github:webkubor/reel-kit ...
 
 reel make --template sticker-promo \
   --title "reel-kit" --subtitle "竖版短视频合成工作台" \
@@ -165,13 +164,13 @@ reel-kit/                          # @kubor/reel-kit
 - **视频提示词模板开发** = `prompts/handdrawn/` 风格库(20 套配方)
 
 ```bash
-npm i -g @kubor/reel-kit
+npm i -g github:webkubor/reel-kit
 ```
 
 或者不装，直接用 npx：
 
 ```bash
-npx @kubor/reel-kit make --template sticker-promo ...
+npx github:webkubor/reel-kit make --template sticker-promo ...
 ```
 
 想改模板 / 跑 demo 就 clone 源码（`examples/` 只在仓库里，不进 npm 包）：
