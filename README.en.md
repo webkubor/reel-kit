@@ -144,7 +144,7 @@ npx github:webkubor/reel-kit make --template sticker-promo ...
 To edit templates or run the demo, clone the source (the `examples/` only lives in the repo, not in the npm package):
 
 ```bash
-git clone https://github.com/webkubor/reel-kit
+git clone git@github.com:webkubor/reel-kit
 cd reel-kit && pnpm install
 npm link
 ```

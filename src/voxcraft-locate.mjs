@@ -106,7 +106,7 @@ export function locateVoxcraft() {
 export function voxcraftHint(info) {
   const lines = []
   if (!info.home) {
-    lines.push('  git clone https://github.com/webkubor/voxcraft ~/dev/github/app/voxcraft')
+    lines.push('  git clone git@github.com:webkubor/voxcraft ~/dev/github/app/voxcraft')
     lines.push('  cd ~/dev/github/app/voxcraft && ./install.sh --yes')
   } else if (!info.bin) {
     lines.push(`  cd ${info.home} && ./install.sh --yes`)

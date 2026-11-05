@@ -176,7 +176,7 @@ npx github:webkubor/reel-kit make --template sticker-promo ...
 想改模板 / 跑 demo 就 clone 源码（`examples/` 只在仓库里，不进 npm 包）：
 
 ```bash
-git clone https://github.com/webkubor/reel-kit
+git clone git@github.com:webkubor/reel-kit
 cd reel-kit && pnpm install
 npm link
 ```
