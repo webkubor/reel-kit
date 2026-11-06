@@ -25,6 +25,7 @@ import { renderFrames, findChrome } from '../src/render.mjs'
 import { compose, probeDuration } from '../src/compose.mjs'
 import { synthesizeCaptions, durationsFromVoice, splitVoiceByChars } from '../src/voice.mjs'
 import { resolveBgm, listBgm, NOT_CONFIGURED } from '../src/bgm-library.mjs'
+import { getStyle, KNOWLEDGE_STYLES } from '../src/knowledge-styles.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const TEMPLATES = join(ROOT, 'templates')
@@ -54,10 +55,13 @@ reel — 竖版短视频合成工作台
 用法:
   reel make [选项]
   reel templates
+  reel styles           # 知识短视频 44 套视觉风格库
   reel bgm              # 配乐库（别名 + 授权 + 时长）
 
 make 选项:
   --template <名>     模板名（见 reel templates），默认 sticker-promo
+  --style <名>         知识短片视觉风格（吸收自 vibe-knowledge，如 gufeng、darkmath、starfield、paper 等 44 套），自动注入推荐模板与配色
+  --source <文本>      出处与权威文献标注（如《自然》2024 /《史记》），显示在角标
   --assets <目录|文件> 素材图目录（按文件名排序）或逗号分隔的多个文件
   --caps <文件>        逐句文案，一行一句；行数决定镜头数
   --title <文本>       主标题（如专辑名）
@@ -107,7 +111,12 @@ make 选项:
 `
 
 async function cmdMake(args) {
-  const template = String(args.template || 'sticker-promo')
+  const matchedStyle = args.style ? getStyle(args.style) : null
+  if (args.style && !matchedStyle) {
+    console.warn(`⚠️  未匹配到风格 "${args.style}"，使用默认配置`)
+  }
+
+  const template = String(args.template || matchedStyle?.template || 'sticker-promo')
   const tplFile = join(TEMPLATES, `${template}.html`)
   if (!existsSync(tplFile)) {
     console.error(`❌ 没有模板 ${template}。可用: ${listTemplates().join(', ')}`)
@@ -256,9 +265,10 @@ async function cmdMake(args) {
     title: args.title || '',
     subtitle: args.subtitle || '',
     footer: args.footer || '',
-    bg: args.bg || '#ffffff',
-    accent1: args.accent1 || '#FADCE4',
-    accent2: args.accent2 || '#CFEBE0',
+    source: args.source || '',
+    bg: args.bg || matchedStyle?.bg || '#ffffff',
+    accent1: args.accent1 || matchedStyle?.accent1 || '#FADCE4',
+    accent2: args.accent2 || matchedStyle?.accent2 || '#CFEBE0',
   }
 
   const totalDur = durations.reduce((a, b) => a + b, 0)
@@ -337,6 +347,13 @@ async function main() {
   if (cmd === 'templates') {
     console.log('可用模板:')
     for (const t of listTemplates()) console.log(`  ${t}`)
+    return
+  }
+  if (cmd === 'styles') {
+    console.log('知识短视频 44 套视觉风格库（可配合 --style <名> 一键应用配色与模板）:')
+    for (const s of KNOWLEDGE_STYLES) {
+      console.log(`  ${s.key.padEnd(16)} 底色: ${s.bg}  强调: ${s.accent1} / ${s.accent2}  (推荐模板: ${s.template})`)
+    }
     return
   }
   if (cmd === 'bgm') {

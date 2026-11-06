@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 1000px; height: 1000px; background: #ffffff; display: flex; align-items: center; justify-content: center; font-family: "SF Mono", "Menlo", "Monaco", monospace; }
+  .term { width: 880px; background: #161b22; border-radius: 16px; border: 1px solid #30363d; box-shadow: 0 24px 60px rgba(0,0,0,.55); overflow: hidden; }
+  .bar { height: 44px; background: #1c2129; display: flex; align-items: center; padding: 0 18px; gap: 8px; border-bottom: 1px solid #30363d; }
+  .dot { width: 13px; height: 13px; border-radius: 50%; }
+  .r { background: #ff5f57; } .y { background: #febc2e; } .g { background: #28c840; }
+  .title { margin-left: 12px; color: #8b949e; font-size: 15px; font-family: -apple-system, sans-serif; }
+  .body { padding: 34px 38px; font-size: 21px; line-height: 2.05; color: #c9d1d9; }
+  .p { color: #7ee787; }
+  .dim { color: #8b949e; }
+  .cmd { color: #79c0ff; }
+  .alias { color: #d2a8ff; }
+  .logo { font-family: -apple-system, sans-serif; font-size: 40px; font-weight: 700; color: #e6edf3; margin-top: 26px; letter-spacing: .5px; }
+  .logo .v { color: #7ee787; }
+</style>
+</head>
+<body>
+  <div class="term">
+    <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="title">kyvault</span></div>
+    <div class="body">
+      <div><span class="p">$</span> <span class="cmd">kyvault list</span></div>
+      <div><span class="alias">openai</span> · <span class="alias">github</span> · <span class="alias">anthropic</span> · <span class="alias">mimo</span></div>
+      <br>
+      <div class="dim">Rust · AES-256-GCM · MIT · Apple Silicon 原生</div>
+      <div class="logo">🔐 ky<span class="v">vault</span></div>
+      <div class="dim">github.com/webkubor/kyvault</div>
+    </div>
+  </div>
+</body>
+</html>

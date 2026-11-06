@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 1000px; height: 1000px; background: #ffffff; display: flex; align-items: center; justify-content: center; font-family: "SF Mono", "Menlo", "Monaco", monospace; }
+  .term { width: 880px; background: #161b22; border-radius: 16px; border: 1px solid #30363d; box-shadow: 0 24px 60px rgba(0,0,0,.55); overflow: hidden; }
+  .bar { height: 44px; background: #1c2129; display: flex; align-items: center; padding: 0 18px; gap: 8px; border-bottom: 1px solid #30363d; }
+  .dot { width: 13px; height: 13px; border-radius: 50%; }
+  .r { background: #ff5f57; } .y { background: #febc2e; } .g { background: #28c840; }
+  .title { margin-left: 12px; color: #8b949e; font-size: 15px; font-family: -apple-system, sans-serif; }
+  .body { padding: 34px 38px; font-size: 21px; line-height: 2.05; color: #c9d1d9; }
+  .p { color: #7ee787; }
+  .key { color: #ff7b72; background: rgba(255,123,114,.1); padding: 2px 8px; border-radius: 6px; }
+  .dim { color: #8b949e; }
+  .warn { color: #e3b341; }
+  .ok { color: #7ee787; }
+  .cmd { color: #79c0ff; }
+  .lock { font-size: 22px; }
+</style>
+</head>
+<body>
+  <div class="term">
+    <div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="title">agent — zsh</span></div>
+    <div class="body">
+      <div><span class="p">$</span> export OPENAI_API_KEY=<span class="key">sk-live-9fKx83QaZ…</span></div>
+      <div><span class="p">$</span> <span class="cmd">agent run deploy.yml</span></div>
+      <div class="dim">…sending environment to model…</div>
+      <br>
+      <div class="warn">⚠ 明文 key 正在进入模型上下文</div>
+      <div class="warn">⚠ 已写进 shell history 与日志</div>
+    </div>
+  </div>
+</body>
+</html>

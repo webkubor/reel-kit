@@ -31,3 +31,7 @@ export { resolveBgm, listBgm, NOT_CONFIGURED } from './bgm-library.mjs'
 
 // voxcraft(本地 Qwen3-TTS)定位
 export { locateVoxcraft, voxcraftHint } from './voxcraft-locate.mjs'
+
+// 知识短片视觉系统与 44 套风格库（吸收自 vibe-knowledge）
+export { KNOWLEDGE_STYLES, getStyle } from './knowledge-styles.mjs'
+
