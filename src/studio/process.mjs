@@ -1,4 +1,7 @@
 import { spawn } from 'node:child_process'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 export function redact(text) {
   return String(text).replace(/Bearer\s+\S+/gi, 'Bearer [redacted]').replace(/\b(?:sk-|eyJ)[\w.-]{15,}/g, '[redacted]').replace(/https?:\/\/\S+/g, '[服务地址]')
@@ -43,4 +46,20 @@ export async function download(url, max = 200 * 1024 * 1024) {
     chunks.push(chunk)
   }
   return { bytes: Buffer.concat(chunks), mime: response.headers.get('content-type')?.split(';')[0] }
+}
+// ffprobe 探测素材真实尺寸/时长；失败不阻断入库（尺寸未知只是不显示）。
+export async function probeBytes(name, bytes) {
+  const dir = mkdtempSync(join(tmpdir(), 'reel-probe-'))
+  try {
+    writeFileSync(join(dir, name), bytes, { mode: 0o600 })
+    const out = await command('ffprobe', ['-v', 'error', '-print_format', 'json', '-show_streams', '-show_format', join(dir, name)], { timeout: 20000 })
+    const data = JSON.parse(out)
+    const video = (data.streams || []).find(s => s.codec_type === 'video')
+    const audio = (data.streams || []).find(s => s.codec_type === 'audio')
+    return {
+      width: video?.width, height: video?.height,
+      duration: Number(data.format?.duration) || undefined,
+      hasAudio: Boolean(audio),
+    }
+  } catch { return {} } finally { rmSync(dir, { recursive: true, force: true }) }
 }

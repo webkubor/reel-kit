@@ -6,7 +6,7 @@ const styles = {
   xiaohongshu: { tone: '亲切轻快，像向朋友分享发现，咬字清楚，有交流感，不刻意卖萌', speed: 1.15, pause: 0.2, note: '建议起点：亲切分享、节奏轻快。平台不限定声音性别或年龄。' },
   landscape: { tone: '自然清晰，节奏平稳，像在演示产品功能', speed: 1, pause: 0.35, note: '建议起点：清楚讲解，给观众观察画面的时间。' },
 }
-export function recommendationControls({ api, getState, getProjectId, optionList, message, refresh, connections, saveDraft, setMode, upload, canvas }) {
+export function recommendationControls({ api, getState, getProjectId, optionList, message, refresh, connections, saveDraft, upload, canvas }) {
   let pendingDesign, pendingTrial
   function read() {
     const result = Object.fromEntries(Object.entries(fields).map(([key, id]) => [key, $(id).value]))
@@ -42,29 +42,38 @@ export function recommendationControls({ api, getState, getProjectId, optionList
     optionList($('rec-bgm'), values, '不使用背景音乐')
     sync()
   }
-  function apply(value = {}) {
-    const s = { ...defaults, ...value }
-    for (const [key, id] of Object.entries(fields)) $(id).value = String(s[key] ?? '')
-    $('rec-bgm-gain').value = Math.round(s.bgmGain * 100)
-    sync(); canvas(s.platform)
-  }
+  let wantedPersona = ''
   function personas(provider) {
+    const preferred = $('rec-persona').value || wantedPersona
     optionList($('rec-persona'), (provider.personas || []).map(p => ({ id: p.key, name: p.name })), '请选择音色')
+    if (preferred && [...$('rec-persona').options].some(o => o.value === preferred)) $('rec-persona').value = preferred
     $('design-submit').disabled = !provider.designReady
     $('design-status').textContent = provider.designReady ? '本地模型生成，不会自动提交视频。' : '声音服务的音色设计模型未就绪，请先在声音工作台准备模型。'
     sync()
   }
-  for (const id of [...Object.values(fields), 'rec-bgm-gain']) $(id).addEventListener('change', () => { sync(); saveDraft(); $('settings-saved').textContent = '设置已修改，保存后作为本项目默认值'; if (id === 'publish-platform') canvas(read().platform) })
+  for (const id of [...Object.values(fields), 'rec-bgm-gain']) $(id).addEventListener('change', () => { if (id === 'rec-persona') wantedPersona = $(id).value; sync(); saveDraft(); $('settings-saved').textContent = '设置已修改，保存后作为本项目默认值'; if (id === 'publish-platform') canvas(read().platform) })
   $('rec-bgm-gain').addEventListener('input', sync)
   $('apply-platform-style').onclick = () => { const s = styles[read().platform]; $('rec-tone').value = s.tone; $('rec-speed').value = s.speed; $('rec-pause').value = s.pause; sync(); saveDraft() }
-  $('refresh-voices').onclick = () => connections().catch(error => message(error.message, true))
+  function apply(value = {}) {
+    const s = { ...defaults, ...value }
+    wantedPersona = s.persona || ''
+    for (const [key, id] of Object.entries(fields)) $(id).value = String(s[key] ?? '')
+    $('rec-bgm-gain').value = Math.round(s.bgmGain * 100)
+    sync(); canvas(s.platform)
+  }
+  $('preview-persona').onclick = () => {
+    const s = read()
+    if (!s.persona) return message('请先选择音色，或到声音库录制一个', true)
+    audio('rec-voice-sample', `/api/voice/sample?key=${encodeURIComponent(s.persona)}`)
+    const el = $('rec-voice-sample')
+    el.hidden = false; el.currentTime = 0
+    el.play().catch(() => message('样音暂时无法播放，可稍后重试。', true))
+  }
   $('upload-bgm').onclick = () => upload('bgm')
   $('upload-narration').onclick = () => upload('narration')
   $('save-project-settings').onclick = async () => {
     try { const result = await api('/api/project-settings', { method: 'POST', body: JSON.stringify({ projectId: getProjectId(), settings: read() }) }); const project = getState().projects.find(p => p.id === getProjectId()); project.recommendationSettings = result.settings; saveDraft(); $('settings-saved').textContent = '已保存到本项目' } catch (error) { message(error.message, true) }
   }
-  $('open-voice-design').onclick = () => { $('design-tone').value ||= styles[read().platform].tone; $('voice-design-dialog').showModal() }
-  $('clone-own-voice').onclick = () => { $('voice-design-dialog').close(); $('voice-mode').value = 'clone'; setMode('speech') }
   $('voice-design-form').onsubmit = async event => {
     event.preventDefault(); $('design-submit').disabled = true
     try {

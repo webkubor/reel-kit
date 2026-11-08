@@ -7,7 +7,7 @@ import { homedir } from 'node:os'
 import { createStore, id, now } from './store.mjs'
 import { createProviders } from './providers.mjs'
 import { exportVideo } from './export.mjs'
-import { redact, command, jsonFetch, download } from './process.mjs'
+import { redact, command, jsonFetch, download, probeBytes } from './process.mjs'
 import { projectDraft, makeRecommendation, githubRepo } from './recommendation.mjs'
 import { recommendationSettings } from './video-settings.mjs'
 
@@ -80,11 +80,17 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
         const job = store.state.jobs.find(j => j.status === 'queued')
         if (!job) break
         const progress = text => { job.message = text; job.updatedAt = now(); store.save() }
-        job.status = 'running'; progress('正在准备任务…')
+        const report = step => {
+          const steps = (job.steps || []).filter(s => s.id !== step.id)
+          steps.push(step)
+          job.steps = steps
+          job.updatedAt = now(); store.save()
+        }
+        job.status = 'running'; job.steps = []; progress('正在准备任务…')
         try {
-          const asset = job.input.kind === 'export' ? await exportFn(job.input, store, progress) : job.input.kind === 'recommendation' ? await makeRecommendation(job.input, store, backend, progress) : await backend.generate(job.input, progress)
+          const asset = job.input.kind === 'export' ? await exportFn(job.input, store, progress) : job.input.kind === 'recommendation' ? await makeRecommendation(job.input, store, backend, progress, report) : await backend.generate(job.input, progress)
           job.assetId = asset?.id; job.status = 'succeeded'; progress('已完成，结果保存在本地项目中')
-        } catch (error) { job.status = 'failed'; job.error = redact(error.message); progress('执行失败；输入已保留') }
+        } catch (error) { job.status = 'failed'; job.error = redact(error.message); progress('执行失败；输入已保留，可查看步骤定位问题') }
       }
     } finally { worker = false }
   }
@@ -106,6 +112,15 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
         const { bytes } = await download(`${process.env.REEL_VOXFLOW_URL || 'http://127.0.0.1:8866'}/api/persona-audio?key=${encodeURIComponent(key)}`, 20 * 1024 * 1024)
         res.writeHead(200, { 'content-type': 'audio/wav', 'content-length': bytes.length }); return res.end(bytes)
       }
+      if (req.method === 'GET' && path === '/api/voices') {
+        const provider = await backend.status()
+        const voices = (provider.voice?.personas || []).map(p => ({ persona: p.key, name: p.name, hasSample: p.hasSample !== false, hints: [], note: '' }))
+        for (const local of store.state.voices || []) {
+          const match = voices.find(v => v.persona === local.persona)
+          if (match) { match.hints = local.hints || []; match.note = local.note || '' } else voices.push({ persona: local.persona, name: local.persona, hasSample: false, hints: local.hints || [], note: local.note || '' })
+        }
+        return json(res, 200, { voices, voiceReady: Boolean(provider.voice?.ready), designReady: Boolean(provider.voice?.designReady) })
+      }
       if (req.method === 'GET' && path === '/api/voice/tasks') {
         const data = await jsonFetch((process.env.REEL_VOXFLOW_URL || 'http://127.0.0.1:8866') + '/api/tasks')
         return json(res, 200, (data.tasks || []).filter(t => t.status === 'done' && t.result?.url?.startsWith('/api/audio/')).map(t => ({ id: t.id, name: t.result.filename || '声音作品', text: t.result.text || '', persona: t.result.persona || '' })).slice(0, 100))
@@ -126,28 +141,46 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
       }
       if (req.method === 'POST') {
         if (req.headers['x-reel-action'] !== 'studio') fail('缺少工作台操作标记', 403)
-        if (path === '/api/recording') {
-          const projectId = url.searchParams.get('projectId'); store.project(projectId)
+        if (path === '/api/voice/record') {
+          // 录音是全局配置：直接登记为 VoxFlow 音色，所有项目共用，不挂在单个项目下。
           const bytes = await body(req, 20 * 1024 * 1024)
           if (!bytes.length) fail('录音为空')
+          const name = (url.searchParams.get('name') || '').trim().slice(0, 40) || '我的声音'
+          const instruction = (url.searchParams.get('instruction') || '').trim().slice(0, 300) || '本人真实录音，自然清晰'
           const dir = mkdtempSync(join(tmpdir(), 'reel-recording-'))
           try {
             const source = join(dir, 'recording'); const wav = join(dir, 'recording.wav')
             writeFileSync(source, bytes, { mode: 0o600 })
             await command('ffmpeg', ['-v', 'error', '-i', source, '-ac', '1', '-ar', '24000', wav], { timeout: 60000 })
-            const asset = store.addAsset(projectId, '我的声音 · 录音样本.wav', 'audio/wav', readFileSync(wav), { source: '录音', tag: '我的声音' })
-            return json(res, 201, store.publicAsset(asset))
+            const form = new FormData()
+            const key = `reel-rec-${Date.now().toString(36)}`
+            form.set('key', key); form.set('name', name); form.set('instruction', instruction)
+            form.set('audio', new Blob([readFileSync(wav)], { type: 'audio/wav' }), 'recording.wav')
+            await jsonFetch(`${process.env.REEL_VOXFLOW_URL || 'http://127.0.0.1:8866'}/api/personas/add`, { method: 'POST', body: form, signal: AbortSignal.timeout(120000) })
+            return json(res, 201, { persona: key, name })
           } finally { rmSync(dir, { recursive: true, force: true }) }
         }
         if (path === '/api/assets') {
           const projectId = url.searchParams.get('projectId'); store.project(projectId)
           const bytes = await body(req, 100 * 1024 * 1024)
           if (!bytes.length) fail('不能上传空文件')
-          const asset = store.addAsset(projectId, url.searchParams.get('name') || '素材', req.headers['content-type']?.split(';')[0], bytes, { source: 'upload' })
+          const asset = store.addAsset(projectId, url.searchParams.get('name') || '素材', req.headers['content-type']?.split(';')[0], bytes, { source: 'upload', origin: 'import', engine: '导入素材' })
+          const probe = await probeBytes(asset.file, bytes)
+          Object.assign(asset, probe); store.save()
           return json(res, 201, store.publicAsset(asset))
         }
         let input
         try { input = JSON.parse((await body(req)).toString()) } catch (error) { if (error.status) throw error; fail('无效 JSON') }
+        if (path === '/api/voice/hints') {
+          // 平台适配标记（全局）：某个音色适合哪些发布平台，方便选声音时判断。
+          const persona = String(input.persona || '').slice(0, 200)
+          if (!persona) fail('请指定音色')
+          const hints = Array.isArray(input.hints) ? input.hints.filter(h => ['channels', 'xiaohongshu', 'landscape'].includes(h)) : []
+          const record = store.state.voices.find(v => v.persona === persona)
+          if (record) { record.hints = hints; record.note = String(input.note || '').slice(0, 200) } else store.state.voices.push({ persona, hints, note: String(input.note || '').slice(0, 200) })
+          store.save()
+          return json(res, 200, { persona, hints })
+        }
         if (path === '/api/project-settings') {
           const project = store.project(input.projectId)
           const keys = ['platform', 'voiceSource', 'persona', 'tone', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit']
@@ -165,7 +198,9 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
           const task = (data.tasks || []).find(t => t.id === input.taskId && t.status === 'done' && t.result?.url?.startsWith('/api/audio/'))
           if (!task) fail('声音作品不存在或尚未完成')
           const { bytes } = await download(new URL(task.result.url, base))
-          const asset = store.addAsset(input.projectId, task.result.filename || '声音作品.wav', 'audio/wav', bytes, { source: 'VoxFlow', prompt: task.result.text || '', persona: task.result.persona || '', sourceTaskId: task.id })
+          const asset = store.addAsset(input.projectId, task.result.filename || '声音作品.wav', 'audio/wav', bytes, { source: 'VoxFlow', origin: 'ai', engine: 'VoxFlow 本地语音', prompt: task.result.text || '', persona: task.result.persona || '', sourceTaskId: task.id })
+          const probe = await probeBytes(asset.file, bytes)
+          Object.assign(asset, probe); store.save()
           return json(res, 201, store.publicAsset(asset))
         }
         if (path === '/api/recommendation/draft') {
@@ -188,7 +223,7 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
         fail('接口不存在', 404)
       }
       if (req.method !== 'GET') fail('方法不支持', 405)
-      const files = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/recommendation-controls.js': ['recommendation-controls.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] }
+      const files = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/recommendation-controls.js': ['recommendation-controls.js', 'text/javascript'], '/voice-library.js': ['voice-library.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] }
       const entry = files[path]
       if (!entry) fail('页面不存在', 404)
       res.setHeader('content-type', `${entry[1]}; charset=utf-8`); res.end(readFileSync(join(web, entry[0])))

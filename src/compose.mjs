@@ -142,7 +142,8 @@ export async function compose({ frames, durations, bgm, voiceClips, out, fps = 3
   }
 
   args.push(
-    '-vsync', 'cfr', '-r', String(fps),
+    // ffmpeg 5.x 起 -vsync 已弃用、9.0 移除，改用等价的 -fps_mode
+    '-fps_mode', 'cfr', '-r', String(fps),
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '20',
     // yuv420p + even 尺寸：不加这两条，某些播放器与微信/小红书转码会拒或出绿边
     '-pix_fmt', 'yuv420p',

@@ -56,6 +56,7 @@ export async function exportVideo(input, store, progress) {
       throw new Error('导出文件缺少视频、配音或有效时长，请检查素材后重试')
     }
     const bytes = readFileSync(out)
-    return store.addAsset(input.projectId, `${input.title || '成片'}.mp4`, 'video/mp4', bytes, { source: 'reel-kit', exported: true })
+    const video = probe.streams.find(s => s.codec_type === 'video')
+    return store.addAsset(input.projectId, `${input.title || '成片'}.mp4`, 'video/mp4', bytes, { source: 'reel-kit', origin: 'code', engine: '本地合成（ffmpeg）', exported: true, width: video?.width, height: video?.height, duration: Number(probe.format?.duration) || undefined, hasAudio: probe.streams.some(s => s.codec_type === 'audio') })
   } finally { rmSync(temp, { recursive: true, force: true }) }
 }

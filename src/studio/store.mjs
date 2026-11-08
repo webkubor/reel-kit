@@ -7,7 +7,8 @@ export const now = () => new Date().toISOString()
 export function createStore(root) {
   mkdirSync(join(root, 'media'), { recursive: true, mode: 0o700 })
   const file = join(root, 'studio.json')
-  const state = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { projects: [], assets: [], jobs: [] }
+  const state = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { projects: [], assets: [], jobs: [], voices: [] }
+  if (!state.voices) state.voices = []
   const save = () => {
     writeFileSync(`${file}.tmp`, JSON.stringify(state, null, 2), { mode: 0o600 })
     renameSync(`${file}.tmp`, file)

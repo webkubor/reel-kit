@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
 import { randomUUID } from 'node:crypto'
-import { command, available, jsonFetch, download } from './process.mjs'
+import { command, available, jsonFetch, download, probeBytes } from './process.mjs'
 
 const H3_BASE = 'https://api.minimaxi.com'
 export function h3Body(input, referenceUrl) {
@@ -65,7 +65,8 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
         const stdout = await command('museav', args, { timeout: 900000 })
         progress('正在下载图片到本地…')
         const { bytes, mime } = await download(outputUrl(stdout))
-        return store.addAsset(input.projectId, 'MuseAV 图片', mime || 'image/png', bytes, { source: 'MuseAV', prompt: input.prompt })
+        const probe = await probeBytes('image', bytes)
+        return store.addAsset(input.projectId, 'MuseAV 图片', mime || 'image/png', bytes, { source: 'MuseAV', origin: 'ai', engine: 'MuseAV 生图', prompt: input.prompt, ...probe })
       }
       if (input.kind === 'video') {
         const profile = profiles.find(p => p.id === (input.profile || 'primary'))
@@ -92,7 +93,8 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
             if (!url) throw new Error(`H3 任务 ${taskId} 已完成，但未返回下载地址`)
             progress('H3 已完成，正在下载视频…')
             const { bytes } = await download(url)
-            return store.addAsset(input.projectId, 'H3 视频.mp4', 'video/mp4', bytes, { source: 'MiniMax H3', upstreamTaskId: String(taskId), prompt: input.prompt, profile: profile.id })
+            const probe = await probeBytes('video.mp4', bytes)
+            return store.addAsset(input.projectId, 'H3 视频.mp4', 'video/mp4', bytes, { source: 'MiniMax H3', origin: 'ai', engine: 'MiniMax H3 视频', upstreamTaskId: String(taskId), prompt: input.prompt, profile: profile.id, ...probe })
           }
         }
         throw new Error(`H3 任务 ${taskId} 仍在处理中，已停止轮询；请核对上游后再操作`)
@@ -125,7 +127,8 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
             const result = task.result
             if (!result?.url?.startsWith('/api/audio/')) throw new Error('VoxFlow 未返回音频文件')
             const { bytes } = await download(new URL(result.url, voiceBase))
-            return store.addAsset(input.projectId, designing ? `${input.voiceName} · 样音.wav` : `配音 · ${input.prompt.slice(0, 16)}.wav`, 'audio/wav', bytes, { source: 'VoxFlow', prompt: input.prompt, persona: result.persona_key || persona, tone: input.tone || '', voiceName: input.voiceName || '' })
+            const probe = await probeBytes('voice.wav', bytes)
+            return store.addAsset(input.projectId, designing ? `${input.voiceName} · 样音.wav` : `配音 · ${input.prompt.slice(0, 16)}.wav`, 'audio/wav', bytes, { source: 'VoxFlow', origin: 'ai', engine: 'VoxFlow 本地语音', prompt: input.prompt, persona: result.persona_key || persona, tone: input.tone || '', voiceName: input.voiceName || '', ...probe })
           }
         }
         throw new Error('语音生成超时，请检查 VoxFlow 任务列表')

@@ -1,10 +1,12 @@
 const $ = id => document.getElementById(id)
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 import { recommendationControls } from '/recommendation-controls.js'
+import { voiceLibrary } from '/voice-library.js'
 let state = { projects: [], assets: [], jobs: [], templates: [] }, providers = {}, mode = 'video', filter = 'all'
 let projectId = localStorage.getItem('reel-project'), previewId, selected = [], lastAssets = '', lastJobs = '', lastProjects = '', uploadTarget
 const kinds = { video: '视频', image: '图片', speech: '配音', clone: '克隆配音', export: '合成', recommendation: '项目推荐' }
 const labels = { queued: '排队中', running: '进行中', succeeded: '已完成', failed: '失败', interrupted: '已中断' }
+const origins = { ai: 'AI 生成', code: '本地制作', import: '导入素材', record: '我的录音' }
 const examples = {
   video: '写实时尚棚拍，一镜到底，9:16竖屏。浅灰白无缝摄影棚，高调柔光。一位20多岁的成年东亚女性模特，长直黑发，酒红色方领针织上衣、白色短裙与白色高跟凉鞋。她从画面右后方自然走向中央，短暂停步，一手扶腰，转头后看向镜头；随后缓慢走近，轻轻歪头，露出克制自信的微笑。固定正面机位，人物走近使全身景自然变为半身。动作符合重力，脚掌真实接地，人物、服装、首饰保持一致，无切镜、无文字、无水印。',
   image: '写实时尚摄影，全身构图，9:16竖幅。浅灰白色无缝摄影棚，大面积柔光。20多岁成年东亚女性模特，长直黑发，酒红色方领针织上衣、白色短裙和白色高跟凉鞋，自然站姿，一手轻扶腰侧。清冷柔和的商业摄影质感，保留细腻皮肤纹理，画面干净，无文字、无水印。',
@@ -55,10 +57,20 @@ function renderAssets() {
   lastAssets = key
   $('asset-count').textContent = assets.length
   const visible = assets.filter(a => filter === 'all' || a.mime.startsWith(filter + '/'))
-  $('assets').innerHTML = visible.length ? visible.map(a => `<article class="asset-card ${selected.includes(a.id) ? 'selected' : ''}"><button class="asset-open" data-preview="${a.id}" aria-label="预览 ${escape(a.name)}">${a.mime.startsWith('image/') ? `<img src="${a.url}" alt="${escape(a.name)}" loading="lazy">` : a.mime.startsWith('video/') ? `<video src="${a.url}#t=0.1" preload="metadata" muted playsinline></video>` : '<span class="audio-symbol">≋</span>'}</button>${(mode === 'export' && !a.mime.startsWith('audio/') || mode === 'recommendation' && a.mime.startsWith('image/')) ? `<input class="asset-check" type="checkbox" data-select="${a.id}" aria-label="选择 ${escape(a.name)}" ${selected.includes(a.id) ? 'checked' : ''}>` : ''}<div class="asset-info"><strong>${escape(a.name)}</strong><span>${escape(a.source)} · ${new Date(a.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span></div></article>`).join('') : `<button type="button" class="library-empty" id="empty-upload"><span class="plus">＋</span><span>${assets.length ? '这个分类还没有素材' : '导入你的第一份素材'}<small>图片、视频、声音，或从上方开始生成</small></span></button>`
+  $('assets').innerHTML = visible.length ? visible.map(a => `<article class="asset-card ${selected.includes(a.id) ? 'selected' : ''}"><button class="asset-open" data-preview="${a.id}" aria-label="预览 ${escape(a.name)}">${a.mime.startsWith('image/') ? `<img src="${a.url}" alt="${escape(a.name)}" loading="lazy">` : a.mime.startsWith('video/') ? `<video src="${a.url}#t=0.1" preload="metadata" muted playsinline></video>` : '<span class="audio-symbol">≋</span>'}</button>${(mode === 'export' && !a.mime.startsWith('audio/') || mode === 'recommendation' && a.mime.startsWith('image/')) ? `<input class="asset-check" type="checkbox" data-select="${a.id}" aria-label="选择 ${escape(a.name)}" ${selected.includes(a.id) ? 'checked' : ''}>` : ''}<div class="asset-info"><strong>${escape(a.name)}</strong><span>${escape(a.source)} · ${new Date(a.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>${assetMeta(a) ? `<span class="asset-meta">${assetMeta(a)}</span>` : ''}</div></article>`).join('') : `<button type="button" class="library-empty" id="empty-upload"><span class="plus">＋</span><span>${assets.length ? '这个分类还没有素材' : '导入你的第一份素材'}<small>图片、视频、声音，或从上方开始生成</small></span></button>`
   $('export-order').innerHTML = selected.map((id, i) => `<li>${escape(assets.find(a => a.id === id)?.name)}${i ? `<button type="button" data-up="${id}">↑ 上移</button>` : ''}<button type="button" data-remove="${id}">移除</button></li>`).join('')
   renderOptions()
   rec?.renderAssets()
+}
+function assetMeta(a) {
+  return [origins[a.origin], a.width && a.height ? `${a.width}×${a.height}` : '', a.duration ? `${Number(a.duration).toFixed(1)}s` : ''].filter(Boolean).join(' · ')
+}
+function renderStep(step, index) {
+  const asset = step.assetId && state.assets.find(a => a.id === step.assetId)
+  const action = asset ? `<button type="button" class="text-button" data-preview="${asset.id}">${asset.mime.startsWith('audio/') ? '▶ 试听' : asset.mime.startsWith('video/') ? '▶ 播放' : '查看图片'}</button>` : ''
+  const fix = step.status === 'failed' ? `<button type="button" class="text-button step-fix" data-fix="${step.id.startsWith('voice') ? 'voice' : step.id.startsWith('frames') ? 'scenes' : 'generate'}">去修改 →</button>` : ''
+  const detail = [step.engine, step.detail, step.error && `⚠ ${step.error}`].filter(Boolean).join(' · ')
+  return `<li class="step-row ${step.status}"><span class="step-num">${index + 1}</span><span class="origin-badge ${step.origin || 'code'}">${origins[step.origin] || '本地制作'}</span><div class="step-main"><strong>${escape(step.label)}${step.reused ? ' · 复用已生成' : ''}</strong>${detail ? `<span class="step-detail">${escape(detail)}</span>` : ''}</div>${action}${step.ms != null ? `<span class="step-ms">${(step.ms / 1000).toFixed(1)}s</span>` : ''}${fix}</li>`
 }
 function renderJobs() {
   const jobs = state.jobs.filter(j => j.projectId === projectId).toReversed()
@@ -67,7 +79,11 @@ function renderJobs() {
   const previousIds = new Set(JSON.parse(lastJobs || '[]').filter(j => j.status === 'succeeded').map(j => j.id))
   lastJobs = key
   $('job-count').textContent = jobs.length ? `${jobs.length} 次记录` : ''
-  $('jobs').innerHTML = jobs.length ? jobs.map(j => `<article class="job-row"><span class="job-kind">${kinds[j.input.kind]}</span><div><p class="job-prompt" title="${escape(j.input.prompt || j.input.title)}">${escape(j.input.prompt || j.input.title || '合成出片')}</p><p class="job-detail">${escape(j.error || j.message)}</p></div><span class="job-state ${j.status}">${labels[j.status]}</span><button class="text-button" data-reuse="${j.id}">复用参数 ↗</button></article>`).join('') : '<p class="empty-history">还没有生成记录。每次提交的参数与结果都会保留。</p>'
+  $('jobs').innerHTML = jobs.length ? jobs.map(j => {
+    const steps = j.steps || []
+    const timeline = steps.length ? `<details class="job-steps"${j.status === 'failed' ? ' open' : ''}><summary>制作过程 · ${steps.length} 步${j.status === 'running' ? ' · 进行中' : ''}</summary><ol>${steps.map(renderStep).join('')}</ol></details>` : ''
+    return `<article class="job-item"><div class="job-row"><span class="job-kind">${kinds[j.input.kind]}</span><div><p class="job-prompt" title="${escape(j.input.prompt || j.input.title)}">${escape(j.input.prompt || j.input.title || '合成出片')}</p><p class="job-detail">${escape(j.error || j.message)}</p></div><span class="job-state ${j.status}">${labels[j.status]}</span><button class="text-button" data-reuse="${j.id}">复用参数 ↗</button></div>${timeline}</article>`
+  }).join('') : '<p class="empty-history">还没有生成记录。每次提交的参数与结果都会保留。</p>'
   const latest = jobs.find(j => j.status === 'succeeded' && !previousIds.has(j.id))
   if (latest?.assetId) showPreview(latest.assetId)
 }
@@ -77,7 +93,8 @@ function showPreview(id) {
   previewId = id
   $('preview').innerHTML = asset.mime.startsWith('image/') ? `<img src="${asset.url}" alt="${escape(asset.name)}">` : asset.mime.startsWith('video/') ? `<video src="${asset.url}" controls playsinline preload="metadata"></video>` : `<div class="audio-preview"><span class="audio-symbol">≋</span><audio src="${asset.url}" controls preload="metadata"></audio></div>`
   $('preview-name').textContent = asset.name
-  $('preview-meta').textContent = `${asset.source} · 本地素材`
+  const dims = [asset.width && asset.height ? `${asset.width}×${asset.height}` : '', asset.duration ? `${Number(asset.duration).toFixed(1)} 秒` : ''].filter(Boolean).join(' · ')
+  $('preview-meta').textContent = [origins[asset.origin] || asset.source, dims].filter(Boolean).join(' · ')
   $('download').hidden = false; $('download').href = asset.url + '?download=1'
 }
 async function refresh() {
@@ -147,33 +164,10 @@ const rec = recommendationControls({
   getState: () => state,
   getProjectId: () => projectId,
   saveDraft: () => { saveDraft(); saveRecommendation() },
-  setMode,
   upload: target => { uploadTarget = target; $('file-input').click() },
   canvas: platform => { $('preview').classList.toggle('landscape', platform === 'landscape'); $('preview').classList.toggle('portrait', platform !== 'landscape') },
 })
-let recorder, recordStream, recordTimer
-$('record-voice').onclick = async () => {
-  if (recorder && recorder.state === 'recording') { recorder.stop(); return }
-  try {
-    recordStream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    recorder = new MediaRecorder(recordStream)
-    const chunks = [], recordingProject = projectId
-    recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data) }
-    recorder.onstop = async () => {
-      clearTimeout(recordTimer); recordStream.getTracks().forEach(track => track.stop())
-      $('record-voice').textContent = '● 录制我的声音'; $('record-status').textContent = '正在保存录音…'
-      try {
-        const response = await fetch(`/api/recording?projectId=${encodeURIComponent(recordingProject)}`, { method: 'POST', headers: { 'X-Reel-Action': 'studio', 'Content-Type': recorder.mimeType }, body: new Blob(chunks, { type: recorder.mimeType }) })
-        const asset = await response.json(); if (!response.ok) throw new Error(asset.error || '录音保存失败')
-        await refresh()
-        if (projectId === recordingProject) { $('reference').value = asset.id; $('voice-name').value = '我的声音' }
-        $('record-status').textContent = '已保存为「我的声音」样本'; message('录音样本已加入项目，填写配音文字后即可创建音色并生成配音。')
-      } catch (error) { $('record-status').textContent = '保存失败'; message(error.message, true) }
-    }
-    recorder.start(); $('record-voice').textContent = '■ 结束录音'; $('record-status').textContent = '正在录音，最长 90 秒'
-    recordTimer = setTimeout(() => { if (recorder.state === 'recording') recorder.stop() }, 90000)
-  } catch (error) { recordStream?.getTracks().forEach(track => track.stop()); message('无法录音，请检查浏览器麦克风权限。' + error.message, true) }
-}
+const library = voiceLibrary({ api, message, refresh, connections })
 $('load-voice-work').onclick = async () => {
   try { const tasks = await api('/api/voice/tasks'); optionList($('voice-work'), tasks.map(t => ({ id: t.id, name: `${t.name} · ${t.text.slice(0, 25)}` })), '选择声音作品'); message(`找到 ${tasks.length} 条声音作品。`) } catch (error) { message(error.message, true) }
 }
@@ -239,6 +233,15 @@ $('generate-form').onsubmit = async event => {
   } catch (error) { message(error.message, true) } finally { $('generate').disabled = false }
 }
 $('jobs').onclick = event => {
+  const preview = event.target.closest('[data-preview]')
+  if (preview) { showPreview(preview.dataset.preview); document.querySelector('.preview-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return }
+  const fix = event.target.closest('[data-fix]')?.dataset.fix
+  if (fix) {
+    if (mode !== 'recommendation') setMode('recommendation')
+    const target = { voice: 'rec-voice-source', scenes: 'repo-captions', generate: 'generate' }[fix] || 'generate'
+    $(target).scrollIntoView({ block: 'center', behavior: 'smooth' })
+    return
+  }
   const id = event.target.closest('[data-reuse]')?.dataset.reuse
   const job = state.jobs.find(j => j.id === id); if (!job) return
   setMode(job.input.kind === 'clone' ? 'speech' : job.input.kind)
