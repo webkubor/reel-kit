@@ -151,7 +151,13 @@ function setMode(next) {
   $('ratio').querySelector('[value="1:1"]').disabled = exporting
   if (exporting && $('ratio').value === '1:1') $('ratio').value = '9:16'
   $('generate-label').textContent = { recommendation: '生成项目推荐视频', video: '生成视频', image: '生成图片', speech: clone ? '克隆并生成配音' : '生成配音', export: '合成并导出' }[mode]
-  $('generation-note').textContent = recommending ? '复用已选配音，未选择的分镜才生成新配音。' : voice ? '使用本机 VoxFlow 模型；首次生成可能需要加载。' : exporting ? '选中的素材按顺序导出；原始素材会保留。' : '每次提交生成一个版本，使用所选账户的额度。'
+  $('generation-note').textContent = recommending
+    ? '本次制作全程本地完成：仓库信息经 GitHub API 读取，配音用本机 VoxFlow，渲染与合成在本机执行，不调用付费模型。'
+    : voice ? '使用本机 VoxFlow 模型，本地推理不产生模型费用；首次生成可能需要加载。'
+    : exporting ? '选中的素材按顺序导出；原始素材会保留。'
+    : mode === 'video' ? '将调用 MiniMax H3 视频模型，按所选账户额度计费；能否调用以接口返回为准。'
+    : mode === 'image' ? '将调用 MuseAV 生图，按账户额度计费；参考图会上传至 MuseAV。'
+    : '每次提交生成一个版本，使用所选账户的额度。'
   if (recommending) loadRecommendation()
   else $('preview').classList.remove('portrait', 'landscape')
   $('use-example').textContent = voice ? '↗ 试试一段旁白' : '↗ 试试时尚棚拍'
