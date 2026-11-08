@@ -45,10 +45,5 @@ jobs:
 
       - name: README 里的命令与 CLI 实际参数是否一致
         run: |
-          node bin/reel.mjs make --help > /tmp/help.txt 2>&1 || true
-          fail=0
-          # 只取代码块里的长选项；正文的 Markdown 分隔线 --- 会被误判成参数
-          for opt in $(grep -oE '(^|[[:space:]])--[a-z][a-z-]+' README.md | tr -d ' ' | sort -u); do
-            grep -q -- "$opt" /tmp/help.txt || { echo "❌ README 写了 $opt，但 --help 里没有"; fail=1; }
-          done
-          exit $fail
+          node --test test/readme-cli.test.mjs
+          node scripts/check-readme-cli.mjs
