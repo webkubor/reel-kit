@@ -1,6 +1,5 @@
 import http from 'node:http'
-import { createReadStream, statSync, readFileSync, readdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { createReadStream, statSync, readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
@@ -10,6 +9,7 @@ import { exportVideo } from './export.mjs'
 import { redact, command, jsonFetch, download, probeBytes } from './process.mjs'
 import { projectDraft, makeRecommendation, githubRepo } from './recommendation.mjs'
 import { recommendationSettings } from './video-settings.mjs'
+import { initializeWorkflow, snapshotSop, workflowAction } from './workflow.mjs'
 
 const web = fileURLToPath(new URL('../../studio/', import.meta.url))
 const templates = fileURLToPath(new URL('../../templates/', import.meta.url))
@@ -50,7 +50,7 @@ function validate(input, store) {
     githubRepo(value.repoUrl)
     if (typeof value.title !== 'string' || !value.title.trim() || value.title.length > 100) fail('项目标题须为 1–100 字')
     const lines = typeof value.captions === 'string' ? value.captions.split('\n').map(s => s.trim()).filter(Boolean) : []
-    if (!lines.length || lines.length > 8 || lines.some(s => s.length > 150)) fail('旁白须为 1–8 行，每行不超过 150 字')
+    if (!lines.length || lines.length > 8 || lines.some(s => s.length > 80)) fail('旁白须为 1–8 行，每行不超过 80 字；过长的旁白请拆分为多镜')
     const settings = recommendationSettings(value)
     value.ratio = settings.ratio
     value.voiceSource = settings.voiceSource
@@ -70,6 +70,8 @@ function validate(input, store) {
 }
 export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homedir(), '.reel-kit', 'studio'), providers, exportFn = exportVideo } = {}) {
   const store = createStore(root)
+  initializeWorkflow(store.state)
+  store.save()
   const backend = providers || createProviders(store)
   let worker = false
   const pump = async () => {
@@ -141,25 +143,7 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
       }
       if (req.method === 'POST') {
         if (req.headers['x-reel-action'] !== 'studio') fail('缺少工作台操作标记', 403)
-        if (path === '/api/voice/record') {
-          // 录音是全局配置：直接登记为 VoxFlow 音色，所有项目共用，不挂在单个项目下。
-          const bytes = await body(req, 20 * 1024 * 1024)
-          if (!bytes.length) fail('录音为空')
-          const name = (url.searchParams.get('name') || '').trim().slice(0, 40) || '我的声音'
-          const instruction = (url.searchParams.get('instruction') || '').trim().slice(0, 300) || '本人真实录音，自然清晰'
-          const dir = mkdtempSync(join(tmpdir(), 'reel-recording-'))
-          try {
-            const source = join(dir, 'recording'); const wav = join(dir, 'recording.wav')
-            writeFileSync(source, bytes, { mode: 0o600 })
-            await command('ffmpeg', ['-v', 'error', '-i', source, '-ac', '1', '-ar', '24000', wav], { timeout: 60000 })
-            const form = new FormData()
-            const key = `reel-rec-${Date.now().toString(36)}`
-            form.set('key', key); form.set('name', name); form.set('instruction', instruction)
-            form.set('audio', new Blob([readFileSync(wav)], { type: 'audio/wav' }), 'recording.wav')
-            await jsonFetch(`${process.env.REEL_VOXFLOW_URL || 'http://127.0.0.1:8866'}/api/personas/add`, { method: 'POST', body: form, signal: AbortSignal.timeout(120000) })
-            return json(res, 201, { persona: key, name })
-          } finally { rmSync(dir, { recursive: true, force: true }) }
-        }
+        if (path === '/api/voice/record') fail('当前声音服务无法保存录音对应的参考文本，录音克隆暂不可用；可先使用已有音色。', 503)
         if (path === '/api/assets') {
           const projectId = url.searchParams.get('projectId'); store.project(projectId)
           const bytes = await body(req, 100 * 1024 * 1024)
@@ -181,6 +165,36 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
           store.save()
           return json(res, 200, { persona, hints })
         }
+        if (path === '/api/workflow/select-sop') {
+          const project = store.project(input.projectId)
+          const version = store.state.sopVersions.find(v => v.id === input.sopVersionId && v.pipeline === 'github-recommend')
+          if (!version) fail('制作方法不存在')
+          project.sopVersionId = version.id; store.save()
+          return json(res, 200, version)
+        }
+        if (path === '/api/workflow/quality') {
+          const project = store.project(input.projectId)
+          const job = store.state.jobs.find(j => j.id === input.jobId && j.projectId === project.id && j.input.kind === 'recommendation')
+          if (!job || job.status !== 'succeeded' || !job.assetId) fail('请先选择已生成的推荐视频')
+          const asset = store.asset(job.assetId, project.id)
+          const expected = recommendationSettings(job.input)
+          const info = JSON.parse(await command('ffprobe', ['-v', 'error', '-print_format', 'json', '-show_streams', '-show_format', store.path(asset)], { timeout: 30000 }))
+          const video = (info.streams || []).find(s => s.codec_type === 'video')
+          const audio = (info.streams || []).some(s => s.codec_type === 'audio')
+          let decodable = true
+          try { await command('ffmpeg', ['-v', 'error', '-xerror', '-i', store.path(asset), '-f', 'null', '-'], { timeout: 120000 }) } catch { decodable = false }
+          const duration = Number(info.format?.duration) || 0
+          const checks = [
+            { label: '画幅与尺寸', value: video ? `${video.width}×${video.height}` : '无视频流', passed: video?.width === expected.width && video?.height === expected.height },
+            { label: '视频时长', value: `${duration.toFixed(1)} 秒`, passed: duration > 0 },
+            { label: '音轨', value: audio ? '存在' : '缺失', passed: audio },
+            { label: '完整解码', value: decodable ? '通过' : '失败', passed: decodable },
+          ]
+          job.quality = { checks, passed: checks.every(c => c.passed), checkedAt: now(), assetId: asset.id }
+          delete job.approval; store.save()
+          return json(res, 200, job.quality)
+        }
+        if (path.startsWith('/api/workflow/')) return json(res, 200, workflowAction(store, path.slice('/api/workflow/'.length), input))
         if (path === '/api/project-settings') {
           const project = store.project(input.projectId)
           const keys = ['platform', 'voiceSource', 'persona', 'tone', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit']
@@ -217,13 +231,14 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
           const value = validate(input, store)
           if (store.state.jobs.filter(j => ['queued', 'running'].includes(j.status)).length >= 10) fail('队列已满，请等待当前任务完成', 429)
           const job = { id: id(), projectId: value.projectId, input: value, status: 'queued', createdAt: now(), updatedAt: now(), message: '等待执行' }
+          if (value.kind === 'recommendation') job.sopSnapshot = snapshotSop(store.state, store.project(value.projectId), value)
           store.state.jobs.push(job); store.save(); setImmediate(pump)
           return json(res, 202, job)
         }
         fail('接口不存在', 404)
       }
       if (req.method !== 'GET') fail('方法不支持', 405)
-      const files = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/recommendation-controls.js': ['recommendation-controls.js', 'text/javascript'], '/voice-library.js': ['voice-library.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] }
+      const files = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/recommendation-controls.js': ['recommendation-controls.js', 'text/javascript'], '/voice-library.js': ['voice-library.js', 'text/javascript'], '/workflow-panel.js': ['workflow-panel.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] }
       const entry = files[path]
       if (!entry) fail('页面不存在', 404)
       res.setHeader('content-type', `${entry[1]}; charset=utf-8`); res.end(readFileSync(join(web, entry[0])))

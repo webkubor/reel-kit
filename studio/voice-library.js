@@ -13,7 +13,9 @@ export function voiceLibrary({ api, message, connections, refresh }) {
   async function load() {
     try { voices = (await api('/api/voices')).voices; render() } catch (error) { message(error.message, true) }
   }
-  $('open-voice-library').onclick = () => { $('voice-library-dialog').showModal(); load() }
+  const openLibrary = () => { $('voice-library-dialog').showModal(); load() }
+  $('open-voice-library').onclick = openLibrary
+  $('sidebar-voice-library').onclick = openLibrary
   $('library-refresh').onclick = load
   $('library-sample').addEventListener('error', () => message('这份样音暂时无法播放，可稍后重试。', true))
   $('voice-library-list').onclick = async event => {
@@ -33,7 +35,7 @@ export function voiceLibrary({ api, message, connections, refresh }) {
     const hints = (voice.hints || []).includes(chip.dataset.hint) ? voice.hints.filter(h => h !== chip.dataset.hint) : [...(voice.hints || []), chip.dataset.hint]
     try {
       await api('/api/voice/hints', { method: 'POST', body: JSON.stringify({ persona: voice.persona, hints, note: voice.note || '' }) })
-      voice.hints = hints; render(); message('平台标记已保存，选音色时会看到这个提示。')
+      voice.hints = hints; render(); message('平台标记已保存，可在声音库查看。')
     } catch (error) { message(error.message, true) }
   }
   $('open-voice-design').onclick = () => $('voice-design-dialog').showModal()

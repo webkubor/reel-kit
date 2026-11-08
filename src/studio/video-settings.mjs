@@ -12,8 +12,8 @@ export function recommendationSettings(input) {
   if (!Number.isFinite(bgmGain) || bgmGain < 0 || bgmGain > 0.5) throw new Error('BGM 音量范围为 0–50%')
   const voiceSource = input.voiceSource || 'scenes'
   if (!['tts', 'scenes', 'audio'].includes(voiceSource)) throw new Error('请选择旁白来源')
-  if (!['cover', 'contain'].includes(input.imageFit || 'cover')) throw new Error('请选择画面填充方式')
-  return { platform, ...platforms[platform], speed, pause, bgmGain, voiceSource, imageFit: input.imageFit || 'cover' }
+  if (!['cover', 'contain'].includes(input.imageFit || 'contain')) throw new Error('请选择画面填充方式')
+  return { platform, ...platforms[platform], speed, pause, bgmGain, voiceSource, imageFit: input.imageFit || 'contain' }
 }
 export function reusableVoice(asset, input, line) {
   return asset?.mime?.startsWith('audio/') && asset.persona === input.persona && asset.prompt === line && (asset.tone || '') === (input.tone || '')

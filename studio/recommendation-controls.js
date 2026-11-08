@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id)
-const defaults = { platform: 'channels', voiceSource: 'tts', persona: '', tone: '', speed: 1, pause: 0.35, bgmId: '', bgmGain: 0.12, narrationId: '', imageFit: 'cover' }
+const defaults = { platform: 'channels', voiceSource: 'tts', persona: '', tone: '', speed: 1, pause: 0.35, bgmId: '', bgmGain: 0.12, narrationId: '', imageFit: 'contain' }
 const fields = { platform: 'publish-platform', voiceSource: 'rec-voice-source', persona: 'rec-persona', tone: 'rec-tone', speed: 'rec-speed', pause: 'rec-pause', bgmId: 'rec-bgm', narrationId: 'rec-narration', imageFit: 'image-fit' }
 const styles = {
   channels: { tone: '自然清晰，温和可信，像面对面分享经验，不使用夸张播音腔', speed: 1, pause: 0.35, note: '建议起点：清晰、自然、留出停顿。最终以你的试听判断为准。' },
@@ -44,8 +44,11 @@ export function recommendationControls({ api, getState, getProjectId, optionList
   }
   let wantedPersona = ''
   function personas(provider) {
+    const list = provider.personas || []
     const preferred = $('rec-persona').value || wantedPersona
-    optionList($('rec-persona'), (provider.personas || []).map(p => ({ id: p.key, name: p.name })), '请选择音色')
+    optionList($('rec-persona'), list.map(p => ({ id: p.key, name: p.name })), list.length ? '请选择音色' : '音色加载中…')
+    // 列表没到之前不让选，否则会把「没选上」当成「用户没选」
+    $('rec-persona').disabled = !list.length
     if (preferred && [...$('rec-persona').options].some(o => o.value === preferred)) $('rec-persona').value = preferred
     $('design-submit').disabled = !provider.designReady
     $('design-status').textContent = provider.designReady ? '本地模型生成，不会自动提交视频。' : '声音服务的音色设计模型未就绪，请先在声音工作台准备模型。'

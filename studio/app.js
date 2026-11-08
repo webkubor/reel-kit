@@ -2,9 +2,10 @@ const $ = id => document.getElementById(id)
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 import { recommendationControls } from '/recommendation-controls.js'
 import { voiceLibrary } from '/voice-library.js'
+import { workflowPanel } from '/workflow-panel.js'
 let state = { projects: [], assets: [], jobs: [], templates: [] }, providers = {}, mode = 'video', filter = 'all'
 let projectId = localStorage.getItem('reel-project'), previewId, selected = [], lastAssets = '', lastJobs = '', lastProjects = '', uploadTarget
-const kinds = { video: '视频', image: '图片', speech: '配音', clone: '克隆配音', export: '合成', recommendation: '项目推荐' }
+const kinds = { video: '视频', image: '图片', speech: '配音', clone: '克隆配音', 'voice-design': '新建音色', recommendation: '项目推荐', export: '合成' }
 const labels = { queued: '排队中', running: '进行中', succeeded: '已完成', failed: '失败', interrupted: '已中断' }
 const origins = { ai: 'AI 生成', code: '本地制作', import: '导入素材', record: '我的录音' }
 const examples = {
@@ -37,6 +38,13 @@ function renderOptions() {
   if (!$('template').value) $('template').value = 'sticker-promo'
 }
 function renderProjects() {
+  // 当前项目被删除后要落到一个真实存在的项目上，否则草稿、素材与设置都会指向空项目
+  if (state.projects.length && !state.projects.some(p => p.id === projectId)) {
+    projectId = state.projects[0].id
+    localStorage.setItem('reel-project', projectId)
+    selected = []; previewId = null; loadDraft()
+    if (mode === 'recommendation') loadRecommendation()
+  }
   const key = JSON.stringify([state.projects, projectId])
   if (key === lastProjects) return
   lastProjects = key
@@ -49,6 +57,7 @@ function switchProject(next) {
   if (!next || next === projectId) return
   if (mode === 'recommendation') saveRecommendation()
   saveDraft(); projectId = next; localStorage.setItem('reel-project', projectId); selected = []; previewId = null; loadDraft(); if (mode === 'recommendation') loadRecommendation(); renderProjects(); renderAssets(); lastJobs = ''; renderJobs()
+  workflow.render()
   const asset = currentAssets().at(-1); if (asset) showPreview(asset.id)
   else { $('preview').innerHTML = '<div class="preview-empty"><h3>这个项目的第一帧，等你创造</h3><p>生成或导入素材后，在这里预览。</p></div>'; $('download').hidden = true; $('preview-name').textContent = '还没有选中素材' }
 }
@@ -93,9 +102,14 @@ function showPreview(id) {
   const asset = state.assets.find(a => a.id === id)
   if (!asset) return
   previewId = id
+  if (asset.mime.startsWith('video/') && asset.width && asset.height) {
+    $('preview').classList.toggle('portrait', asset.height > asset.width)
+    $('preview').classList.toggle('landscape', asset.width >= asset.height)
+    $('preview').style.aspectRatio = `${asset.width} / ${asset.height}`
+  } else { $('preview').style.aspectRatio = '' }
   $('preview').innerHTML = asset.mime.startsWith('image/') ? `<img src="${asset.url}" alt="${escape(asset.name)}">` : asset.mime.startsWith('video/') ? `<video src="${asset.url}" controls playsinline preload="metadata"></video>` : `<div class="audio-preview"><span class="audio-symbol">≋</span><audio src="${asset.url}" controls preload="metadata"></audio></div>`
   $('preview-name').textContent = asset.name
-  const dims = [asset.width && asset.height ? `${asset.width}×${asset.height}` : '', asset.duration ? `${Number(asset.duration).toFixed(1)} 秒` : ''].filter(Boolean).join(' · ')
+  const dims = [asset.width && asset.height ? `${asset.width}×${asset.height}` : '', asset.duration ? `${Number(asset.duration).toFixed(1)} 秒` : '', asset.hasAudio === true ? '含音轨' : asset.hasAudio === false ? '无音轨' : ''].filter(Boolean).join(' · ')
   $('preview-meta').textContent = [origins[asset.origin] || asset.source, dims].filter(Boolean).join(' · ')
   $('download').hidden = false; $('download').href = asset.url + '?download=1'
 }
@@ -106,6 +120,8 @@ async function refresh() {
   if (!state.projects.some(p => p.id === projectId)) projectId = state.projects[0]?.id
   renderProjects(); renderAssets(); renderJobs()
   rec?.jobs()
+  const workflowKey = JSON.stringify([projectId, state.jobs.filter(j => j.projectId === projectId && j.input.kind === 'recommendation' && j.status === 'succeeded').map(j => j.id)])
+  if (workflowKey !== lastWorkflowKey) { lastWorkflowKey = workflowKey; workflow.render() }
 }
 async function connections() {
   providers = await api('/api/providers')
@@ -167,8 +183,10 @@ const rec = recommendationControls({
   getProjectId: () => projectId,
   saveDraft: () => { saveDraft(); saveRecommendation() },
   upload: target => { uploadTarget = target; $('file-input').click() },
-  canvas: platform => { $('preview').classList.toggle('landscape', platform === 'landscape'); $('preview').classList.toggle('portrait', platform !== 'landscape') },
+  canvas: platform => { $('preview').style.aspectRatio = ''; $('preview').classList.toggle('landscape', platform === 'landscape'); $('preview').classList.toggle('portrait', platform !== 'landscape') },
 })
+let lastWorkflowKey = ''
+const workflow = workflowPanel({ api, getState: () => state, getProjectId: () => projectId, refresh, message, applyVersion: version => { rec.apply({ ...rec.read(), ...version.settings }); saveRecommendation() } })
 const library = voiceLibrary({ api, message, refresh, connections })
 $('load-voice-work').onclick = async () => {
   try { const tasks = await api('/api/voice/tasks'); optionList($('voice-work'), tasks.map(t => ({ id: t.id, name: `${t.name} · ${t.text.slice(0, 25)}` })), '选择声音作品'); message(`找到 ${tasks.length} 条声音作品。`) } catch (error) { message(error.message, true) }
@@ -191,6 +209,15 @@ $('read-repo').onclick = async () => {
 }
 $('prompt').addEventListener('input', () => { saveDraft(); $('char-count').textContent = `${$('prompt').value.length} 字` })
 $('use-example').onclick = () => { $('prompt').value = examples[mode] || ''; $('prompt').dispatchEvent(new Event('input')) }
+$('step-prepare').onclick = () => setMode('recommendation')
+$('start-github').onclick = async () => {
+  const button = $('start-github'); button.disabled = true
+  try {
+    const project = await api('/api/projects', { method: 'POST', body: JSON.stringify({ name: `GitHub 推荐 · ${new Date().toLocaleDateString('zh-CN')}` }) })
+    await refresh(); switchProject(project.id); setMode('recommendation')
+    $('repo-url').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('repo-url').focus({ preventScroll: true })
+  } catch (error) { message(error.message, true) } finally { button.disabled = false }
+}
 document.querySelectorAll('[data-mode]').forEach(button => button.onclick = () => setMode(button.dataset.mode))
 document.querySelectorAll('[data-filter]').forEach(button => button.onclick = () => { filter = button.dataset.filter; document.querySelectorAll('[data-filter]').forEach(b => b.classList.toggle('active', b === button)); renderAssets() })
 $('voice-mode').onchange = () => setMode('speech')

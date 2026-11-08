@@ -1,6 +1,4 @@
-import { readFileSync } from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
-import { randomUUID } from 'node:crypto'
 import { command, available, jsonFetch, download, probeBytes } from './process.mjs'
 
 const H3_BASE = 'https://api.minimaxi.com'
@@ -102,16 +100,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
       if (['speech', 'clone', 'voice-design'].includes(input.kind)) {
         if (input.prompt.length > 400) throw new Error('VoxFlow 单次配音上限 400 字，请分段生成')
         let persona = input.persona
-        if (input.kind === 'clone') {
-          const asset = store.asset(input.referenceId, input.projectId)
-          if (!asset.mime.startsWith('audio/')) throw new Error('声音克隆需要参考音频')
-          persona = `reel-${randomUUID()}`
-          const form = new FormData()
-          form.set('key', persona); form.set('name', input.voiceName || 'Reel 音色')
-          form.set('audio', new Blob([readFileSync(store.path(asset))], { type: asset.mime }), asset.file)
-          progress('正在从参考音频建立新音色…')
-          await jsonFetch(voiceBase + '/api/personas/add', { method: 'POST', body: form, signal: AbortSignal.timeout(120000) })
-        }
+        if (input.kind === 'clone') throw new Error('当前声音服务无法保存克隆所需的参考文本，参考音频克隆暂不可用；可选择已有音色')
         const designing = input.kind === 'voice-design'
         if (!designing && !persona) throw new Error('请选择已有音色，或创建新音色')
         progress(designing ? '正在设计音色，首次生成需要加载模型…' : 'VoxFlow 正在合成配音…')

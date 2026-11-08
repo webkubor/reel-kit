@@ -82,3 +82,11 @@ test('rejects fractional duration and path injection before submitting paid job'
   const state = await (await request('/api/state')).json()
   assert.equal(state.jobs.length, 0)
 })
+
+test('recording does not create an unusable global voice without reference text support', async t => {
+  const { base, request } = await fixture(t)
+  const response = await fetch(`${base}/api/voice/record`, { method: 'POST', headers: { 'X-Reel-Action': 'studio', 'Content-Type': 'audio/wav' }, body: Buffer.from('test recording') })
+  assert.equal(response.status, 503)
+  assert.match((await response.json()).error, /参考文本/)
+  assert.deepEqual((await (await request('/api/state')).json()).voices, [])
+})

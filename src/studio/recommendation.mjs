@@ -24,10 +24,10 @@ export async function projectDraft(url, projectId, store) {
   const repo = githubRepo(url)
   const [info, file, tree] = await Promise.all([gh(`repos/${repo}`), gh(`repos/${repo}/readme`), gh(`repos/${repo}/git/trees/HEAD?recursive=1`)])
   const text = Buffer.from(file.content || '', 'base64').toString('utf8')
-  const short = value => value.split(/[。！？]/).find(Boolean)?.slice(0, 90) || ''
+  const short = value => value.split(/[。！？]/).find(Boolean)?.slice(0, 80) || ''
   const lines = text.split(/\r?\n/).filter(line => /^-\s+\*\*/.test(line)).map(clean).map(short).filter(line => line.length >= 8).slice(0, 4)
   const summary = short(clean((info.description || '').split(' / ')[0]))
-  const captions = [summary || `这是开源项目 ${info.name}。`, ...lines, `想了解更多，可以访问 GitHub 上的 ${repo}。`].slice(0, 6)
+  const captions = [summary || `这是开源项目 ${info.name.slice(0, 55)}。`, ...lines, '想了解更多，请访问项目主页。'].slice(0, 6)
   const candidates = (tree.tree || []).filter(x => x.type === 'blob' && /\.(png|jpe?g|webp)$/i.test(x.path) && x.size > 1000 && x.size < 500000 && /(?:showcase|screenshots|preview)/i.test(x.path)).sort((a, b) => Number(/showcase|preview/i.test(b.path)) - Number(/showcase|preview/i.test(a.path))).slice(0, 4)
   const images = []
   for (const item of candidates) {
@@ -44,7 +44,7 @@ export async function projectDraft(url, projectId, store) {
 }
 export async function makeRecommendation(input, store, backend, progress, report = () => {}) {
   const lines = input.captions.split('\n').map(s => s.trim()).filter(Boolean)
-  if (!lines.length || lines.length > 8 || lines.some(s => s.length > 150)) throw new Error('请填写 1–8 行旁白，每行不超过 150 字')
+  if (!lines.length || lines.length > 8 || lines.some(s => s.length > 80)) throw new Error('请填写 1–8 行旁白，每行不超过 80 字；过长的旁白请拆分为多镜')
   if (!input.assetIds.length) throw new Error('请先读取项目并选择至少一张项目画面')
   const images = input.assetIds.map(id => store.asset(id, input.projectId))
   if (images.some(a => !a.mime.startsWith('image/'))) throw new Error('项目画面必须是图片')
@@ -83,11 +83,16 @@ export async function makeRecommendation(input, store, backend, progress, report
           return { _file: file, _duration: await probeDuration(file), detail: `${i === 0 ? '开头' : `${Math.round(offset - (end - offset))}s 起`}切分 · ${lines[i].slice(0, 36)}` }
         }
         let asset = input.voiceIds[i] ? store.asset(input.voiceIds[i], input.projectId) : null
-        let reused = Boolean(asset && reusableVoice(asset, input, lines[i]))
+        const chosen = Boolean(asset)
+        let reused = false
         let generated = false
         // scenes 模式：用户逐句指定了音频就直接用；tts 模式：音色/文案/表达不匹配的旧配音失效，找匹配的或重新生成。
-        if (settings.voiceSource === 'tts' && !reused) {
-          asset = store.state.assets.find(a => a.projectId === input.projectId && reusableVoice(a, input, lines[i]))
+        if (settings.voiceSource === 'tts') {
+          if (asset && !reusableVoice(asset, input, lines[i])) asset = null
+          if (!asset) {
+            const match = store.state.assets.find(a => a.projectId === input.projectId && reusableVoice(a, input, lines[i]))
+            if (match) { asset = match; reused = true }
+          }
         }
         if (!asset) {
           asset = await backend.generate({ kind: 'speech', projectId: input.projectId, persona: input.persona, prompt: lines[i], tone: input.tone || '' }, () => {})
@@ -102,7 +107,8 @@ export async function makeRecommendation(input, store, backend, progress, report
           await command('ffmpeg', ['-v', 'error', '-i', file, '-af', `atempo=${settings.speed}`, adjusted])
           file = adjusted
         }
-        return { _file: file, _duration: await probeDuration(file), assetId: asset.id, reused, detail: `${reused ? '复用已生成' : generated ? '新生成' : '使用所选素材'} · ${lines[i].slice(0, 40)}` }
+        const source = generated ? '新生成' : reused ? '复用已生成' : chosen ? '使用所选素材' : '新生成'
+        return { _file: file, _duration: await probeDuration(file), assetId: asset.id, reused, origin: asset.origin || (asset.source === 'VoxFlow' ? 'ai' : 'import'), engine: asset.engine || (asset.source === 'VoxFlow' ? 'VoxFlow 本地语音' : '所选声音素材'), detail: `${source} · ${lines[i].slice(0, 40)}` }
       })
       voiceClips.push({ file: meta._file, duration: meta._duration })
     }
@@ -113,13 +119,13 @@ export async function makeRecommendation(input, store, backend, progress, report
     progress('正在混合旁白与 BGM，合成成片…')
     const out = join(temp, 'recommendation.mp4')
     const bgm = input.bgmId ? store.asset(input.bgmId, input.projectId) : undefined
-    await step({ id: 'compose', label: '合成成片', origin: 'code', engine: 'ffmpeg 合成', detail: `${bgm ? `BGM《${bgm.name}》音量 ${Math.round(settings.bgmGain * 100)}% · ` : '无 BGM · '}${settings.width}×${settings.height}` }, async () => {
+    const { _duration: outputDuration } = await step({ id: 'compose', label: '合成成片', origin: 'code', engine: 'ffmpeg 合成', detail: `${bgm ? `BGM《${bgm.name}》音量 ${Math.round(settings.bgmGain * 100)}% · ` : '无 BGM · '}${settings.width}×${settings.height}` }, async () => {
       await compose({ frames, durations, voiceClips, bgm: bgm && store.path(bgm), bgmGain: settings.bgmGain, bgmCrossfade: 0, out })
       const result = await command('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', out])
       const probe = JSON.parse(result), video = probe.streams?.find(s => s.codec_type === 'video')
       if (!probe.streams?.some(s => s.codec_type === 'audio') || !(Number(probe.format?.duration) > 1) || video?.width !== settings.width || video?.height !== settings.height) throw new Error('导出文件的画幅、音轨或时长校验失败')
-      return { detail: `成片 ${Math.round(Number(probe.format.duration) * 10) / 10}s · ${video.width}×${video.height}${bgm ? ' · 含 BGM' : ''}` }
+      return { _duration: Number(probe.format.duration), detail: `成片 ${Math.round(Number(probe.format.duration) * 10) / 10}s · ${video.width}×${video.height}${bgm ? ' · 含 BGM' : ''}` }
     })
-    return store.addAsset(input.projectId, `${input.title} · ${settings.name}.mp4`, 'video/mp4', readFileSync(out), { source: 'GitHub 项目推荐', origin: 'code', engine: '本地合成（渲染 + ffmpeg）', repoUrl: input.repoUrl, platform: settings.platform, width: settings.width, height: settings.height, ratio: settings.ratio, settings })
+    return store.addAsset(input.projectId, `${input.title} · ${settings.name}.mp4`, 'video/mp4', readFileSync(out), { source: 'GitHub 项目推荐', origin: 'code', engine: '本地合成（渲染 + ffmpeg）', repoUrl: input.repoUrl, platform: settings.platform, width: settings.width, height: settings.height, ratio: settings.ratio, duration: outputDuration, hasAudio: true, settings })
   } finally { rmSync(temp, { recursive: true, force: true }) }
 }
