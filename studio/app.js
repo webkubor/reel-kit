@@ -42,6 +42,8 @@ function renderProjects() {
   lastProjects = key
   $('projects').innerHTML = state.projects.map(p => `<button class="project-button ${p.id === projectId ? 'active' : ''}" data-project="${p.id}" title="${escape(p.name)}"><span class="folder">▱</span><span>${escape(p.name)}</span></button>`).join('')
   optionList($('active-project'), state.projects.map(p => ({ id: p.id, name: p.name })), '')
+  // 下拉必须反映当前项目：新建项目后 projectId 已变，optionList 只会保留旧值
+  $('active-project').value = projectId
 }
 function switchProject(next) {
   if (!next || next === projectId) return
