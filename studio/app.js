@@ -263,6 +263,7 @@ $('generate-form').onsubmit = async event => {
   event.preventDefault(); $('generate').disabled = true
   try {
     const job = { projectId, kind: mode === 'speech' ? $('voice-mode').value : mode, prompt: $('prompt').value, ratio: $('ratio').value, duration: Number($('duration').value), resolution: $('resolution').value, profile: $('profile').value || 'primary', referenceId: $('reference').value || undefined, persona: $('persona').value || undefined, voiceName: $('voice-name').value, assetIds: selected, audioId: $('audio').value || undefined, template: $('template').value, title: $('export-title').value, captions: $('captions').value }
+    if (job.kind === 'clone') { job.persona = undefined; job.referenceText = $('reference-text').value }
     if (mode === 'recommendation') Object.assign(job, { repoUrl: $('repo-url').value, title: $('repo-title').value, captions: $('repo-captions').value, assetIds: selected, voiceIds: [...$('scene-voices').querySelectorAll('select')].map(el => el.value) }, rec.read())
     await api('/api/jobs', { method: 'POST', body: JSON.stringify(job) }); message('任务已加入队列，完成后会出现在素材库。'); await refresh()
   } catch (error) { message(error.message, true) } finally { $('generate').disabled = false }
@@ -280,7 +281,7 @@ $('jobs').onclick = event => {
   const id = event.target.closest('[data-reuse]')?.dataset.reuse
   const job = state.jobs.find(j => j.id === id); if (!job) return
   setMode(job.input.kind === 'clone' ? 'speech' : job.input.kind)
-  if (job.input.kind === 'clone') { $('voice-mode').value = 'clone'; setMode('speech') }
+  if (job.input.kind === 'clone') { $('voice-mode').value = job.input.persona ? 'speech' : 'clone'; $('voice-name').value = job.input.voiceName || ''; $('reference-text').value = job.input.referenceText || ''; setMode('speech') }
   $('prompt').value = job.input.prompt || ''; $('prompt').dispatchEvent(new Event('input'))
   for (const key of ['ratio', 'duration', 'resolution', 'profile', 'persona', 'template', 'captions']) if (job.input[key]) $(key).value = job.input[key]
   $('reference').value = job.input.referenceId || ''; $('audio').value = job.input.audioId || ''; $('export-title').value = job.input.title || ''

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { command, available, jsonFetch, download, probeBytes } from './process.mjs'
 
@@ -28,7 +30,23 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
     if (result.base_resp?.status_code) throw new Error(`MiniMax 拒绝请求（${result.base_resp.status_code}）：${result.base_resp.status_msg || '请核对权限或额度'}`)
     return result
   }
+  const registerVoice = async ({ bytes, mime, name, referenceText, instruction = '' }) => {
+    if (!name?.trim() || name.length > 80 || !referenceText?.trim() || referenceText.length > 1000) throw new Error('请填写音色名称（最多 80 字）与录音原文（最多 1000 字）')
+    const types = { 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/ogg': 'ogg', 'audio/webm': 'webm', 'audio/flac': 'flac', 'audio/aac': 'aac' }
+    const ext = types[mime?.split(';')[0]]
+    if (!ext || !bytes.length || bytes.length > 20 * 1024 * 1024) throw new Error('请选择有效的音频文件（最多 20 MB）')
+    const info = await jsonFetch(voiceBase + '/api/personas')
+    if (!info.capabilities?.reference_text_registration) throw new Error('请将 VoxFlow 升级至支持录音原文注册的版本（0.10.1 或更新），然后重启服务')
+    const form = new FormData()
+    form.set('key', 'reel_' + randomUUID().replaceAll('-', ''))
+    form.set('name', name.trim()); form.set('ref_text', referenceText.trim()); form.set('instruction', instruction)
+    form.set('audio', new Blob([bytes], { type: mime }), `reference.${ext}`)
+    const result = await jsonFetch(voiceBase + '/api/personas/add', { method: 'POST', body: form })
+    if (!result.ok || !result.key || result.ref_text !== referenceText.trim()) throw new Error('VoxFlow 未确认完整的音色与原文，请检查声音库后再操作')
+    return { persona: result.key, name: result.name }
+  }
   return {
+    registerVoice,
     async status() {
       const [museav, ffmpeg, voice] = await Promise.all([
         available('museav'), available('ffmpeg'),
@@ -47,7 +65,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
       return {
         video: { ready: profiles.some(p => p.key), label: 'MiniMax H3 · 直连', note: '密钥配置不代表额度已验证；提交按所选账户计费', profiles: quotas },
         image: { ready: museav, label: 'MuseAV · 图片生成', note: museav ? '复用本机 CLI 登录态' : '请安装并登录 museav CLI' },
-        voice: { ready: Boolean(voice?.[0]?.base_model), label: 'VoxFlow · 本地语音', note: voice ? (voice[0].base_model ? '本地模型已就绪' : '服务在线，Base 模型未就绪') : '未连接：启动 VoxFlow 服务后刷新', designReady: Boolean(voice?.[0]?.design_model), personas },
+        voice: { ready: Boolean(voice?.[0]?.base_model), label: 'VoxFlow · 本地语音', note: voice ? (voice[0].base_model ? '本地模型已就绪' : '服务在线，Base 模型未就绪') : '未连接：启动 VoxFlow 服务后刷新', designReady: Boolean(voice?.[0]?.design_model), recordingReady: Boolean(voice?.[1]?.capabilities?.reference_text_registration), version: voice?.[1]?.version || 'unknown', personas },
         export: { ready: ffmpeg, label: 'reel-kit · 合成', note: ffmpeg ? 'FFmpeg 已就绪' : '请安装 FFmpeg' },
       }
     },
@@ -100,7 +118,14 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
       if (['speech', 'clone', 'voice-design'].includes(input.kind)) {
         if (input.prompt.length > 400) throw new Error('VoxFlow 单次配音上限 400 字，请分段生成')
         let persona = input.persona
-        if (input.kind === 'clone') throw new Error('当前声音服务无法保存克隆所需的参考文本，参考音频克隆暂不可用；可选择已有音色')
+        if (input.kind === 'clone' && !persona) {
+          const asset = store.asset(input.referenceId, input.projectId)
+          progress('正在把参考音频与原文保存到全局声音库…')
+          const registered = await registerVoice({ bytes: readFileSync(store.path(asset)), mime: asset.mime, name: input.voiceName, referenceText: input.referenceText })
+          persona = registered.persona
+          // Persist the key before synthesis so retrying a failed job reuses the voice.
+          input.persona = persona; store.save()
+        }
         const designing = input.kind === 'voice-design'
         if (!designing && !persona) throw new Error('请选择已有音色，或创建新音色')
         progress(designing ? '正在设计音色，首次生成需要加载模型…' : 'VoxFlow 正在合成配音…')

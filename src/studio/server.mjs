@@ -121,7 +121,7 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
           const match = voices.find(v => v.persona === local.persona)
           if (match) { match.hints = local.hints || []; match.note = local.note || '' } else voices.push({ persona: local.persona, name: local.persona, hasSample: false, hints: local.hints || [], note: local.note || '' })
         }
-        return json(res, 200, { voices, voiceReady: Boolean(provider.voice?.ready), designReady: Boolean(provider.voice?.designReady) })
+        return json(res, 200, { voices, voiceReady: Boolean(provider.voice?.ready), recordingReady: Boolean(provider.voice?.recordingReady), designReady: Boolean(provider.voice?.designReady) })
       }
       if (req.method === 'GET' && path === '/api/voice/tasks') {
         const data = await jsonFetch((process.env.REEL_VOXFLOW_URL || 'http://127.0.0.1:8866') + '/api/tasks')
@@ -143,7 +143,16 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
       }
       if (req.method === 'POST') {
         if (req.headers['x-reel-action'] !== 'studio') fail('缺少工作台操作标记', 403)
-        if (path === '/api/voice/record') fail('当前声音服务无法保存录音对应的参考文本，录音克隆暂不可用；可先使用已有音色。', 503)
+        if (path === '/api/voice/record') {
+          const name = url.searchParams.get('name')?.trim()
+          const referenceText = url.searchParams.get('referenceText')?.trim()
+          if (!name || name.length > 80 || !referenceText || referenceText.length > 1000) fail('请填写音色名称与录音原文')
+          if (!backend.registerVoice) fail('声音服务不支持注册，请升级 VoxFlow', 503)
+          const registered = await backend.registerVoice({ bytes: await body(req, 20 * 1024 * 1024), mime: req.headers['content-type'], name, referenceText, instruction: (url.searchParams.get('instruction') || '').slice(0, 500) })
+          store.state.voices.push({ persona: registered.persona, name: registered.name, hints: [], note: (url.searchParams.get('instruction') || '').slice(0, 200), origin: url.searchParams.get('source') === 'record' ? 'record' : 'import', createdAt: now() })
+          store.save()
+          return json(res, 201, registered)
+        }
         if (path === '/api/assets') {
           const projectId = url.searchParams.get('projectId'); store.project(projectId)
           const bytes = await body(req, 100 * 1024 * 1024)

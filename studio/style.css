@@ -53,6 +53,11 @@ dialog{border:1px solid var(--line);border-radius:12px;padding:28px;width:min(50
 #voice-library-list{margin:14px 0 10px;max-height:44vh;overflow:auto}
 #voice-library-dialog .field{margin-top:14px}
 #library-record-note{margin-top:8px}
+.voice-record-actions{flex-wrap:wrap}
+#library-record-status{flex-basis:100%;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+#library-record-preview{width:100%;margin:12px 0}
+#library-save-voice{width:100%}
+@media(max-width:500px){.voice-row{flex-wrap:wrap}.voice-row .voice-hints{flex-basis:100%;padding-left:46px}}
 .library-actions{margin-top:16px}
 .library-actions .primary{width:auto;margin-top:0}
 @media(max-width:800px){.origin-legend{display:none}.step-main{min-width:0;flex-basis:100%}.voice-hints{flex-wrap:wrap}}

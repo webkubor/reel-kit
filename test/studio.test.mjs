@@ -8,9 +8,9 @@ import { createStudio } from '../src/studio/server.mjs'
 import { createStore } from '../src/studio/store.mjs'
 import { h3Body } from '../src/studio/providers.mjs'
 
-async function fixture(t, generate = async () => { throw new Error('provider offline') }) {
+async function fixture(t, generate = async () => { throw new Error('provider offline') }, extraProviders = {}) {
   const root = mkdtempSync(join(tmpdir(), 'reel-studio-test-'))
-  const app = createStudio({ root, providers: { status: async () => ({ image: { ready: true } }), generate } })
+  const app = createStudio({ root, providers: { status: async () => ({ image: { ready: true } }), generate, ...extraProviders } })
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve))
   t.after(async () => { app.server.closeAllConnections(); await new Promise(resolve => app.server.close(resolve)); rmSync(root, { recursive: true, force: true }) })
   const base = `http://127.0.0.1:${app.server.address().port}`
@@ -83,10 +83,31 @@ test('rejects fractional duration and path injection before submitting paid job'
   assert.equal(state.jobs.length, 0)
 })
 
-test('recording does not create an unusable global voice without reference text support', async t => {
+test('recording rejects missing transcript before saving a global voice', async t => {
   const { base, request } = await fixture(t)
   const response = await fetch(`${base}/api/voice/record`, { method: 'POST', headers: { 'X-Reel-Action': 'studio', 'Content-Type': 'audio/wav' }, body: Buffer.from('test recording') })
-  assert.equal(response.status, 503)
-  assert.match((await response.json()).error, /参考文本/)
+  assert.equal(response.status, 400)
+  assert.match((await response.json()).error, /录音原文/)
   assert.deepEqual((await (await request('/api/state')).json()).voices, [])
+})
+
+test('voice registration passes the exact transcript and persists globally only after success', async t => {
+  let submitted
+  const { base, request } = await fixture(t, undefined, { registerVoice: async input => {
+    submitted = input
+    if (input.name === 'fail') throw new Error('invalid audio')
+    return { persona: 'voice-new', name: input.name }
+  } })
+  const post = name => fetch(`${base}/api/voice/record?` + new URLSearchParams({ name, referenceText: '完整录音原文', source: 'record' }), { method: 'POST', headers: { 'X-Reel-Action': 'studio', 'Content-Type': 'audio/webm' }, body: Buffer.from('fixture-audio') })
+  assert.equal((await post('fail')).status, 400)
+  assert.equal((await (await request('/api/state')).json()).voices.length, 0)
+  assert.equal((await post('My voice')).status, 201)
+  assert.equal(submitted.referenceText, '完整录音原文')
+  assert.equal(submitted.bytes.toString(), 'fixture-audio')
+  assert.equal(submitted.mime, 'audio/webm')
+  const voices = (await (await request('/api/state')).json()).voices
+  assert.equal(voices[0].persona, 'voice-new')
+  assert.equal(voices[0].origin, 'record')
+  await request('/api/projects', { name: 'Another project' })
+  assert.deepEqual((await (await request('/api/state')).json()).voices, voices)
 })
