@@ -53,6 +53,7 @@ const HELP = `
 reel — 竖版短视频合成工作台
 
 用法:
+  reel studio           # 本地可视化工作台，默认 http://127.0.0.1:4390
   reel make [选项]
   reel templates
   reel styles           # 知识短视频 44 套视觉风格库
@@ -344,6 +345,13 @@ async function main() {
   const args = parseArgs(argv.slice(1))
 
   if (!cmd || cmd === 'help' || args.help || args.h) { console.log(HELP); return }
+  if (cmd === 'studio') {
+    const { startStudio } = await import('../src/studio/server.mjs')
+    const port = Number(args.port || process.env.REEL_STUDIO_PORT || 4390)
+    if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('工作台端口须为 1024–65535')
+    startStudio({ port })
+    return
+  }
   if (cmd === 'templates') {
     console.log('可用模板:')
     for (const t of listTemplates()) console.log(`  ${t}`)

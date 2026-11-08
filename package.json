@@ -15,6 +15,7 @@
   "files": [
     "bin",
     "src",
+    "studio",
     "templates",
     "docs",
     "prompts",
@@ -25,6 +26,8 @@
     "CHANGELOG.md"
   ],
   "scripts": {
+    "studio": "node bin/reel.mjs studio",
+    "test:studio": "node --test test/studio*.test.mjs",
     "demo": "node bin/reel.mjs make --help",
     "check": "node --check bin/reel.mjs && node --check src/render.mjs && node --check src/compose.mjs && node --check src/voice.mjs && node --check src/bgm-library.mjs && node --check src/voxcraft-locate.mjs && node --check src/voxcraft-server.mjs && node --check src/knowledge-styles.mjs",
     "lint": "node scripts/lint.mjs",

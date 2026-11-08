@@ -29,16 +29,8 @@ const TRANSITIONS = {
   'zoom-in': 'zoomin',
 }
 
-/*
- * ffmpeg concat 列表不再重复末帧。
- *
- * 历史:旧版 ffmpeg 忽略末行 duration,需要重复末帧"骗"它生效。
- * 现行 ffmpeg (>= 4.x,实测 7.x) 行为相反:末行 duration 被忽略是默认行为
- * (忽略 = 不算那一行),但**重复末行**反而会让 ffmpeg 多输出一整段时长
- * (实测 5 镜 2.5s 期望 12.5s,重复末行 = 15.0s,差 1 镜)。
- *
- * 5 镜 2.5s 不重复末行实测 12.43s,差 < 0.1s(末帧舍入),可接受。
- * 拆配音后末镜用 --last-shot 单独配时长,逻辑保持一致。
+/* concat demuxer 需要末帧之后的时间戳才能呈现最后一镜的时长。
+ * 重复末帧提供该时间戳，输出端再用总时长截断，避免额外延长。
  */
 function buildConcatList(frames, durations) {
   const lines = []
@@ -46,6 +38,7 @@ function buildConcatList(frames, durations) {
     lines.push(`file '${f.replace(/'/g, "'\\''")}'`)
     lines.push(`duration ${durations[i]}`)
   })
+  lines.push(`file '${frames.at(-1).replace(/'/g, "'\\''")}'`)
   return lines.join('\n') + '\n'
 }
 
@@ -154,7 +147,7 @@ export async function compose({ frames, durations, bgm, voiceClips, out, fps = 3
     // yuv420p + even 尺寸：不加这两条，某些播放器与微信/小红书转码会拒或出绿边
     '-pix_fmt', 'yuv420p',
     '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
-    '-movflags', '+faststart',
+    '-movflags', '+faststart', '-t', String(total + 1 / fps),
     out,
   )
 

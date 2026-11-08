@@ -18,7 +18,7 @@
   <br />
   素材 + 逐句文案 + 配音/BGM，套模板出片。版式用 <b>HTML/CSS</b> 写，镜头时长由<b>念白</b>决定，配音走<b>本地 TTS</b> 不花钱。
   <br />
-  <sub>CLI + 库单形态 · 上游吃 AI 出视频素材(Hailuo 这类),下游吐成品 mp4</sub>
+  <sub>CLI + 库 + 本地可视化工作台 · 生成素材、组织项目并合成 MP4</sub>
 </p>
 
 <p align="center">
@@ -76,6 +76,18 @@ vlm ask frame01.png --q "这帧符合脚本第3句吗"   # 脚本对齐检查
 ```
 
 Agent 工作流里也可通过 [cs-mcp](https://github.com/webkubor/cs-mcp) 调用。
+
+## 本地可视化工作台
+
+运行 `npm run studio`，打开 <http://127.0.0.1:4390>。工作台支持项目和素材管理、MuseAV 图片生成、MiniMax H3 视频生成、VoxFlow 配音及声音克隆、图片或视频合成导出。项目和生成的素材保存在 `~/.reel-kit/studio/`。
+
+图片生成需要安装并登录 `museav`；语音功能需要启动本机 VoxFlow 服务；合成需要 FFmpeg 和 Chrome。视频使用 MiniMax 的视频 API：启动时通过凭据管理工具注入 `MINIMAX_API_KEY`，可额外注入 `MINIMAX_API_KEY_2` 供第二账户选择。密钥不应写入项目文件。视频生成会消耗账户额度，能否调用以实际权限及接口返回为准。
+
+例如，本机 Kyvault 已保存主账户时可运行：
+
+```bash
+kyvault run --env MINIMAX_API_KEY=secret://minimax/api-key -- reel studio
+```
 
 ## ⚡ 30 秒上手
 
