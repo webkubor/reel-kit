@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 )
@@ -53,6 +54,16 @@ func stub(t *testing.T, jobs []map[string]any) *httptest.Server {
 	mux.HandleFunc("/api/bgm", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{"items": []map[string]any{}, "configured": true})
 	})
+	mux.HandleFunc("/api/projects", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"id": "p2", "name": "新项目"})
+	})
+	mux.HandleFunc("/api/recommendation/draft", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"title":    "测试项目标题",
+			"captions": []string{"这是第一句", "这是第二句"},
+			"images":   []map[string]any{{"id": "img1"}},
+		})
+	})
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 	return server
@@ -63,6 +74,9 @@ func newApp(t *testing.T, base string) *App {
 	t.Helper()
 	a := New(Options{BaseURL: base})
 	a.refresh()
+	// refresh 的结果排在 pending 里，等渲染时才落到状态上。
+	// 测试里没有帧循环，手动排一次。
+	a.drainPending()
 	return a
 }
 
@@ -92,6 +106,29 @@ func Test通道未就绪时写明原因(t *testing.T) {
 	tt.Frame()
 	if !tt.HasText("MuseAV 中台（未就绪）") {
 		t.Errorf("未就绪的通道没有被标出来，实际文字：%q", tt.Texts())
+	}
+}
+
+// Test选过的值不在选项里时不被静默换掉
+//
+// 通道换了、上游把模型下架了，都会出现「当前值不在选项里」。
+// 这时候悄悄换成第一项 = 替用户换了供应商或模型，用户点了才知道。
+func Test选过的值不在选项里时不被静默换掉(t *testing.T) {
+	server := stub(t, nil)
+	a := newApp(t, server.URL)
+	a.mode = ModeVideo
+	a.backend = "museav"
+	// 用户之前选过「Seedance 2.0」，现在上游只提供「Seedance 2.0 Mini」
+	a.model = "Seedance 2.0"
+
+	tt := ui.NewTester(a.View, 1280, 840)
+	tt.Frame()
+
+	if a.model != "Seedance 2.0" {
+		t.Errorf("不在选项里的值被静默换掉了：%s", a.model)
+	}
+	if !tt.HasText("Seedance 2.0（当前不可选）") {
+		t.Errorf("当前不可选的值没有被标出来，实际文字：%q", tt.Texts())
 	}
 }
 
@@ -172,5 +209,32 @@ func Test通道选择不会被静默换掉(t *testing.T) {
 	a.ensureBackend()
 	if a.backend == "gone" {
 		t.Fatalf("通道不存在时没有换一条可用的：%s", a.backend)
+	}
+}
+
+func Test按钮交互不发生死锁(t *testing.T) {
+	server := stub(t, nil)
+	a := newApp(t, server.URL)
+	tt := ui.NewTester(a.View, 1280, 840)
+	tt.Frame()
+
+	// 1. 点击「新建项目」，断言能够正常调度后台网络请求而不卡死主线程
+	if err := tt.Click("新建项目"); err != nil {
+		t.Fatalf("点击「新建项目」失败：%v", err)
+	}
+
+	// 2. 填入仓库地址后，点击「读取项目」
+	a.repoURL = "https://github.com/egoist/mygo"
+	tt.Frame()
+	if err := tt.Click("读取项目"); err != nil {
+		t.Fatalf("点击「读取项目」失败：%v", err)
+	}
+
+	// 等待后台请求完成
+	time.Sleep(100 * time.Millisecond)
+	tt.Frame()
+
+	if a.recTitle != "测试项目标题" {
+		t.Errorf("草稿标题未按预期填入：%s", a.recTitle)
 	}
 }

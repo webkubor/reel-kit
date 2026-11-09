@@ -19,21 +19,34 @@ type choice struct{ id, label string }
 // 用户看不出是「没选」还是「坏了」。所以「由通道决定」这类选择
 // 必须是一个真实的选项；当前值为空时落到第一项，并写回状态，
 // 这样界面显示的就是将要提交的值。
+//
+// 当前值是「非空但不在选项里」时**不能**悄悄换成第一项 —— 那等于替用户
+// 换供应商或换模型，用户点了才知道。这种情况把原值保留成一个标注过的选项，
+// 让用户自己决定换不换。
 func (a *App) pick(c *ui.Context, label, help string, choices []choice, current string, set func(string)) {
 	if len(choices) == 0 {
 		return
 	}
 	options := make([]string, len(choices))
 	selected := ""
+	found := false
 	for i, ch := range choices {
 		options[i] = ch.label
 		if ch.id == current {
 			selected = ch.label
+			found = true
 		}
 	}
-	if selected == "" {
-		selected = choices[0].label
-		set(choices[0].id)
+	if !found {
+		if current == "" {
+			// 从没选过：落到第一项并写回，界面显示的就是将要提交的值
+			selected = choices[0].label
+			set(choices[0].id)
+		} else {
+			// 选过但当前选项里没有（通道换了、上游下架了）：原值留着并标注
+			options = append(options, current+"（当前不可选）")
+			selected = options[len(options)-1]
+		}
 	}
 	a.kit.Field(c, label, help, func() {
 		if a.kit.Select(c, &selected, options, "").FillWidth().Changed() {
@@ -239,11 +252,11 @@ func (a *App) viewRecommendationComposer(c *ui.Context) {
 		a.kit.Input(c, &a.repoURL, "https://github.com/owner/repo")
 	})
 	ui.Row(c).Gap(design.SpaceSM).Children(func() {
-		button := kitButton(a.kit, c, kit.ButtonSecondary, "读取项目", a.busy || a.repoURL == "")
+		button := kitButton(a.kit, c, kit.ButtonSecondary, "读取项目", a.busy.Load() || a.repoURL == "")
 		if button.Clicked() {
 			a.readRepoDraft()
 		}
-		if a.busy {
+		if a.busy.Load() {
 			a.kit.Hint(c, "正在读取…")
 		}
 	})
@@ -265,6 +278,7 @@ func (a *App) viewRecommendationComposer(c *ui.Context) {
 			a.recRatio = "9:16"
 		}
 	})
+	a.viewChannelPicker(c)
 	a.viewModelPicker(c)
 	a.viewBGMPicker(c)
 	a.viewStoryboardImages(c)
@@ -279,12 +293,12 @@ func (a *App) viewBGMPicker(c *ui.Context) {
 			if item.License != "" {
 				label += "（" + item.License + "）"
 			}
-			choices = append(choices, choice{item.Alias, label})
+			choices = append(choices, choice{"r2:" + item.Alias, label})
 		}
 	}
 	for _, asset := range a.ProjectAssets() {
 		if strings.HasPrefix(asset.Mime, "audio/") {
-			choices = append(choices, choice{asset.ID, "本地：" + asset.Name})
+			choices = append(choices, choice{"asset:" + asset.ID, "本地：" + asset.Name})
 		}
 	}
 	if len(choices) == 1 && a.bgm == nil {
@@ -379,7 +393,7 @@ func (a *App) viewQuality(c *ui.Context) {
 		return
 	}
 	if job.Quality == nil {
-		button := kitButton(a.kit, c, kit.ButtonSecondary, "自动检查成片", a.busy)
+		button := kitButton(a.kit, c, kit.ButtonSecondary, "自动检查成片", a.busy.Load())
 		if button.Clicked() {
 			a.runQuality(job.ID)
 		}
@@ -437,7 +451,7 @@ func (a *App) viewReview(c *ui.Context) {
 			a.reviewChecks[key] = checked
 		}
 	}
-	button := kitButton(a.kit, c, kit.ButtonSecondary, "确认审片通过", a.busy)
+	button := kitButton(a.kit, c, kit.ButtonSecondary, "确认审片通过", a.busy.Load())
 	if button.Clicked() {
 		a.approveReview(job.ID)
 	}
@@ -460,7 +474,7 @@ func (a *App) viewPublish(c *ui.Context) {
 	a.kit.Field(c, "发布链接", "", func() {
 		a.kit.Input(c, &a.pubURL, "https://")
 	})
-	button := kitButton(a.kit, c, kit.ButtonSecondary, "记录发布", a.busy || a.pubURL == "")
+	button := kitButton(a.kit, c, kit.ButtonSecondary, "记录发布", a.busy.Load() || a.pubURL == "")
 	if button.Clicked() {
 		a.savePublish(job.ID)
 	}
@@ -489,7 +503,7 @@ func (a *App) viewPerformance(c *ui.Context) {
 			a.kit.Input(c, &a.perfSaves, "收藏")
 		})
 	})
-	button := kitButton(a.kit, c, kit.ButtonSecondary, "回填表现", a.busy)
+	button := kitButton(a.kit, c, kit.ButtonSecondary, "回填表现", a.busy.Load())
 	if button.Clicked() {
 		a.savePerformance(job.ID)
 	}
@@ -516,11 +530,11 @@ func (a *App) viewRetrospective(c *ui.Context) {
 		a.kit.TextArea(c, &a.reviewChanges, "例：分镜第一句换成「把 X 变成 Y」", 60)
 	})
 	ui.Row(c).Gap(design.SpaceSM).Children(func() {
-		button := kitButton(a.kit, c, kit.ButtonSecondary, "记录复盘并生成新方法", a.busy)
+		button := kitButton(a.kit, c, kit.ButtonSecondary, "记录复盘并生成新方法", a.busy.Load())
 		if button.Clicked() {
 			a.saveReview(job.ID)
 		}
-		remake := kitButton(a.kit, c, kit.ButtonPrimary, "按新方法再做一条", a.busy)
+		remake := kitButton(a.kit, c, kit.ButtonPrimary, "按新方法再做一条", a.busy.Load())
 		if remake.Clicked() {
 			a.remakeJob(job.ID)
 		}
