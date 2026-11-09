@@ -143,6 +143,10 @@ kyvault run --env MINIMAX_API_KEY=secret://minimax/api-key -- reel studio
 curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v0.2.3/install.sh | sh
 ```
 
+Windows（x64，未做代码签名，首次运行被 SmartScreen 拦一下选「仍要运行」）：下载
+`reel-studio-0.2.3-windows-amd64.tar.gz` 解压，把 `Reel Studio.exe` 和它旁边的
+`backend/` `bin/` `chrome/` `museav/` 资源目录保持在同一层目录再双击。
+
 应用里左栏是**视频流水线**，不是平铺的菜单；点进一条流水线，中间是它的生成配置
 （脚本 / 声音 / 画面 / 版式 / 画幅 / 配乐 / 输出），右栏是这条流水线跑出来的视频
 （条数、进度、每条背后的配置，可以按同一份配置再生成一条，也可以找一条对比）。
