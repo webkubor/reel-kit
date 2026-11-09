@@ -107,6 +107,106 @@ func (a *App) submitTalk() {
 	}()
 }
 
+// submitProduct 提交一条人物商品介绍视频。
+//
+// 与口播共用同一套底座（一句一镜 → 本机配音 → 渲染画面帧 → 合成），
+// 差别是内容口径：这里先说清楚「这是谁/这是什么」，再说卖点。
+func (a *App) submitProduct() {
+	if strings.TrimSpace(a.prodTitle) == "" {
+		a.fail("先填产品或人物名称")
+		return
+	}
+	if a.prodPersona == "" {
+		a.fail("先选一个音色")
+		return
+	}
+	lines := splitLines(a.prodCaptions)
+	if len(lines) == 0 || len(lines) > 8 {
+		a.fail("介绍词要 1–8 行，一行一镜")
+		return
+	}
+	for _, line := range lines {
+		if len([]rune(line)) > 80 {
+			a.fail("有一行超过 80 字，请拆成多镜")
+			return
+		}
+	}
+	ratio := a.prodRatio
+	if ratio != "16:9" {
+		ratio = "9:16"
+	}
+	input := map[string]any{
+		"projectId":    a.projectID,
+		"kind":         "product",
+		"title":        strings.TrimSpace(a.prodTitle),
+		"captions":     a.prodCaptions,
+		"subtitle":     a.prodSubtitle,
+		"footer":       a.prodFooter,
+		"persona":      a.prodPersona,
+		"voiceBackend": "voxflow",
+		"ratio":        ratio,
+	}
+	if len(a.prodImages) > 0 {
+		input["assetIds"] = a.prodImages
+	}
+	if a.prodTone != "" {
+		input["tone"] = a.prodTone
+	}
+	if a.prodPause != "" {
+		pause, err := parseNumberIn("镜间停顿", a.prodPause, 0, 2)
+		if err != nil {
+			a.fail(err.Error())
+			return
+		}
+		input["pause"] = pause
+	}
+	if a.prodBGMGain != "" {
+		gain, err := parseNumberIn("BGM 音量", a.prodBGMGain, 0, 100)
+		if err != nil {
+			a.fail(err.Error())
+			return
+		}
+		input["bgmGain"] = gain / 100
+	}
+	bgmChoice := a.prodBGM
+	projectID := a.projectID
+	persona := a.prodPersona
+	a.busy.Store(true)
+	a.mutate(func() {
+		a.notice = ""
+	})
+	go func() {
+		client := studioapi.New(a.opts.BaseURL)
+		if bgmChoice != "" {
+			bgmID, err := resolveBGM(client, projectID, bgmChoice)
+			if err != nil {
+				a.busy.Store(false)
+				a.mutate(func() {
+					a.notice = "取配乐失败：" + err.Error()
+					a.noticeErr = true
+				})
+				a.refresh()
+				return
+			}
+			input["bgmId"] = bgmID
+		}
+		job, err := client.SubmitJob(input)
+		a.busy.Store(false)
+		a.mutate(func() {
+			if err != nil {
+				a.notice = err.Error()
+				a.noticeErr = true
+				a.logf("提交人物商品介绍任务失败：%s", err.Error())
+			} else {
+				a.notice = "已提交人物商品介绍任务：" + job.ID
+				a.noticeErr = false
+				a.logf("已提交人物商品介绍任务 %s（%d 镜 · 音色 %s · %s）", job.ID, len(lines), persona, ratio)
+			}
+		})
+		a.refresh()
+	}()
+}
+
 // readRepoDraft 读 GitHub 仓库，把标题与分镜填进表单。
 //
 // 草稿只是初稿：它来自 README 与接口截图，可能说得不对，

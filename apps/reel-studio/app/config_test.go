@@ -99,6 +99,35 @@ func Test配置回填覆盖每一条流水线的新字段(t *testing.T) {
 	if a.recBGMGain != "20" {
 		t.Errorf("音量没有按百分比回填：%q", a.recBGMGain)
 	}
+
+	// 人物商品介绍：名称、介绍词、片尾、画幅、画面都要回填
+	a.applyConfig("product", map[string]any{
+		"kind": "product", "title": "产品名称", "subtitle": "一句话卖点",
+		"captions": "第一句\n第二句", "footer": "片尾一句",
+		"persona": "demo_narrator", "ratio": "16:9", "pause": 0.5,
+		"bgmGain": 0.15, "assetIds": []any{"a5", "a6"},
+	}, "j11")
+	if a.prodTitle != "产品名称" {
+		t.Errorf("名称没有回填：%q", a.prodTitle)
+	}
+	if a.prodSubtitle != "一句话卖点" {
+		t.Errorf("卖点没有回填：%q", a.prodSubtitle)
+	}
+	if a.prodFooter != "片尾一句" {
+		t.Errorf("片尾没有回填：%q", a.prodFooter)
+	}
+	if a.prodRatio != "16:9" {
+		t.Errorf("画幅没有回填：%q", a.prodRatio)
+	}
+	if a.prodPause != "0.5" {
+		t.Errorf("镜间停顿没有回填：%q", a.prodPause)
+	}
+	if len(a.prodImages) != 2 || !a.prodSelected["a5"] {
+		t.Errorf("产品画面没有回填：%v", a.prodImages)
+	}
+	if a.prodBGMGain != "15" {
+		t.Errorf("音量没有按百分比回填：%q", a.prodBGMGain)
+	}
 }
 
 // Test数字填错时拦住

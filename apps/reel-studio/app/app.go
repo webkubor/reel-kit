@@ -129,6 +129,20 @@ type App struct {
 	talkBGM      string
 	talkBGMGain  string
 
+	// 人物商品介绍
+	prodTitle    string
+	prodSubtitle string
+	prodCaptions string
+	prodFooter   string
+	prodPersona  string
+	prodTone     string
+	prodPause    string
+	prodRatio    string
+	prodImages   []string
+	prodSelected map[string]bool
+	prodBGM      string
+	prodBGMGain  string
+
 	// 右栏选中的视频与对比对象。
 	selectedJobID string
 	compareJobID  string
@@ -205,11 +219,15 @@ func New(opts Options) *App {
 		recBGMGain:     "12",
 		talkPause:      "0.45",
 		talkBGMGain:    "12",
+		prodRatio:      "9:16",
+		prodPause:      "0.45",
+		prodBGMGain:    "12",
 		libKind:        "video",
 		expTemplate:    "sticker-promo",
 		reviewChecks:   map[string]bool{},
 		recSelected:    map[string]bool{},
 		talkSelected:   map[string]bool{},
+		prodSelected:   map[string]bool{},
 		talkStyle:      "paper",
 		backendProc:    backend,
 		backendState:   BackendStatus{State: "starting", Note: "正在连接…"},
@@ -917,7 +935,7 @@ func (a *App) viewComposer(c *ui.Context) {
 				case ModeGenerate:
 					a.viewGenerateComposer(c)
 				case ModeProduct:
-					a.kit.Empty(c, "人物商品介绍还没开放", "样例还在验证，先用知识口播或项目推荐出片", nil)
+					a.viewProductComposer(c)
 				}
 			})
 		})
@@ -979,6 +997,9 @@ func (a *App) viewSubmit(c *ui.Context) {
 	case ModeTalk:
 		label = "生成口播视频"
 		disabled = a.busy.Load() || a.talkTitle == "" || a.talkCaptions == "" || a.talkPersona == ""
+	case ModeProduct:
+		label = "生成介绍视频"
+		disabled = a.busy.Load() || a.prodTitle == "" || a.prodCaptions == "" || a.prodPersona == ""
 	case ModeExport:
 		label = "合成视频"
 		disabled = a.busy.Load() || len(a.assetIDs) == 0
@@ -1002,8 +1023,11 @@ func (a *App) viewSubmit(c *ui.Context) {
 	if a.mode == ModeTalk {
 		a.kit.Hint(c, "逐句用本机 VoxFlow 配音，画面与合成都在本机执行，不产生模型费用。")
 	}
+	if a.mode == ModeProduct {
+		a.kit.Hint(c, "逐句用本机 VoxFlow 配音，画面与合成都在本机执行，不产生模型费用。")
+	}
 	if channel != nil && !channel.Ready && a.mode != ModeRecommend && a.mode != ModeTalk &&
-		a.mode != ModeExport && a.mode != ModeLibrary {
+		a.mode != ModeProduct && a.mode != ModeExport && a.mode != ModeLibrary {
 		a.kit.Hint(c, "所选通道未就绪："+channel.Note)
 	}
 	if a.projectID == "" {
@@ -1023,7 +1047,7 @@ func (a *App) viewRight(c *ui.Context) {
 		ui.Scroll(c).FillWidth().Grow(1).MinHeight(0).Children(func() {
 			ui.Column(c).FillWidth().Gap(design.SpaceLG).Children(func() {
 				switch a.mode {
-				case ModeTalk, ModeRecommend, ModeExport:
+				case ModeTalk, ModeRecommend, ModeExport, ModeProduct:
 					// 流水线这一屏：这条流水线跑出来的视频（条数、进度、配置）。
 					a.viewPipelinePanel(c)
 				case ModeLibrary, ModeGenerate:
@@ -1118,6 +1142,10 @@ func (a *App) submit() {
 	}
 	if a.mode == ModeTalk {
 		a.submitTalk()
+		return
+	}
+	if a.mode == ModeProduct {
+		a.submitProduct()
 		return
 	}
 	if a.mode == ModeExport {
@@ -1400,6 +1428,8 @@ func (a *App) kind() string {
 		return "talk"
 	case ModeExport:
 		return "export"
+	case ModeProduct:
+		return "product"
 	case ModeGenerate:
 		return a.libKind
 	default:
@@ -1419,6 +1449,10 @@ func kindLabel(kind any) string {
 		return "导出"
 	case "recommendation":
 		return "项目推荐视频"
+	case "talk":
+		return "口播视频"
+	case "product":
+		return "人物商品介绍视频"
 	}
 	return "生成"
 }

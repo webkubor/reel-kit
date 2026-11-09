@@ -44,6 +44,9 @@ export function fill(tpl, vars) {
 export function frameVars(vars = {}, size = {}, shot = {}) {
   return {
     ...vars,
+    // 单镜可以覆盖模板级变量：比如每一镜的字幕字号按长度单独定，
+    // 长的那句小一号，短的那句大一号，不必整条片子一个字号。
+    ...(shot.vars || {}),
     width: vars.width ?? size.width,
     height: vars.height ?? size.height,
     caption: shot.caption ?? '',
@@ -114,6 +117,7 @@ export async function renderFrames({ template, shots, vars, outDir, width = 1080
       const html = fill(tpl, frameVars(vars, size, {
         caption: shot.caption,
         image: shot.image ? toDataUri(shot.image) : '',
+        vars: shot.vars,
       }))
       await page.setContent(html, { waitUntil: 'load' })
       // 等字体与图片解码落定，否则偶发截到文字未上屏的空帧

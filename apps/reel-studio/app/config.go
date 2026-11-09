@@ -96,6 +96,22 @@ func configFields(kind string) []configField {
 			{partFormat, "ratio", "画幅"},
 			{partFormat, "duration", "每镜时长"},
 		}
+	case "product":
+		return []configField{
+			{partScript, "title", "产品或人物名称"},
+			{partScript, "captions", "介绍词"},
+			{partScript, "subtitle", "一句话卖点"},
+			{partScript, "footer", "片尾一句"},
+			{partVoice, "persona", "音色"},
+			{partVoice, "voiceBackend", "配音引擎"},
+			{partVoice, "tone", "语气"},
+			{partVoice, "pause", "镜间停顿"},
+			{partVisual, "assetIds", "产品画面"},
+			{partLayout, "template", "版式"},
+			{partFormat, "ratio", "画幅"},
+			{partMusic, "bgmId", "背景音乐"},
+			{partMusic, "bgmGain", "BGM 音量"},
+		}
 	}
 	return nil
 }
@@ -435,6 +451,27 @@ func (a *App) applyConfig(kind string, input map[string]any, jobID string) {
 		if a.expTemplate == "" {
 			a.expTemplate = "sticker-promo"
 		}
+	case "product":
+		a.prodTitle = str("title")
+		a.prodSubtitle = str("subtitle")
+		a.prodCaptions = str("captions")
+		a.prodFooter = str("footer")
+		a.prodPersona = str("persona")
+		a.prodTone = str("tone")
+		a.prodPause = num("pause", a.prodPause)
+		a.prodRatio = str("ratio")
+		if a.prodRatio == "" {
+			a.prodRatio = "9:16"
+		}
+		if v, ok := input["bgmGain"]; ok && v != nil {
+			a.prodBGMGain = gainPercent(v)
+		}
+		a.prodImages = ids("assetIds")
+		a.prodSelected = make(map[string]bool)
+		for _, id := range a.prodImages {
+			a.prodSelected[id] = true
+		}
+		a.prodBGM = a.bgmChoiceFor(str("bgmId"))
 	}
 	a.adjustingJobID = jobID
 }

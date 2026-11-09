@@ -9,6 +9,7 @@ import { exportVideo } from './export.mjs'
 import { redact, command, jsonFetch, download, probeBytes } from './process.mjs'
 import { projectDraft, makeRecommendation, githubRepo } from './recommendation.mjs'
 import { makeTalkVideo, TALK_TEMPLATES } from './talk.mjs'
+import { makeProductVideo, PRODUCT_LAYOUTS } from './product.mjs'
 import { KNOWLEDGE_STYLES } from '../knowledge-styles.mjs'
 import { recommendationSettings } from './video-settings.mjs'
 import { listBgm, resolveBgmEntry, bgmConfigured } from '../bgm-library.mjs'
@@ -32,11 +33,11 @@ async function body(req, max = 1000000) {
 function json(res, code, value) { res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(value)) }
 function validate(input, store) {
   store.project(input.projectId)
-  if (!['image', 'video', 'speech', 'clone', 'voice-design', 'export', 'recommendation', 'talk'].includes(input.kind)) fail('任务类型不支持')
+  if (!['image', 'video', 'speech', 'clone', 'voice-design', 'export', 'recommendation', 'talk', 'product'].includes(input.kind)) fail('任务类型不支持')
   const allowed = ['kind', 'projectId', 'prompt', 'ratio', 'duration', 'resolution', 'assetIds', 'audioId', 'referenceId', 'persona', 'referenceText', 'voiceName', 'template', 'captions', 'title', 'profile', 'repoUrl', 'voiceIds', 'platform', 'voiceSource', 'tone', 'emotion', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit', 'backend', 'model', 'voiceId', 'style', 'voiceBackend', 'voiceModel', 'subtitle', 'source', 'footer']
   const value = Object.fromEntries(allowed.filter(k => input[k] !== undefined).map(k => [k, input[k]]))
   if (typeof value.prompt !== 'string' || !value.prompt.trim() || value.prompt.length > 10000) {
-    if (!['export', 'recommendation', 'talk'].includes(value.kind)) fail('请输入 1–10000 字的提示词或配音文字')
+    if (!['export', 'recommendation', 'talk', 'product'].includes(value.kind)) fail('请输入 1–10000 字的提示词或配音文字')
   }
   value.ratio = value.ratio || '9:16'
   if (!['9:16', '16:9', '1:1'].includes(value.ratio)) fail('不支持的画幅')
@@ -91,6 +92,19 @@ function validate(input, store) {
     value.voiceBackend = value.voiceBackend || 'voxflow'
     if (!['voxflow', 'minimax'].includes(value.voiceBackend)) fail('语音通道不支持')
   }
+  if (value.kind === 'product') {
+    // 人物商品介绍：一句一镜，版式随画幅走（竖版出镜、横版左图右文）
+    const lines = typeof value.captions === 'string' ? value.captions.split('\n').map(s => s.trim()).filter(Boolean) : []
+    if (!lines.length || lines.length > 8 || lines.some(s => s.length > 80)) fail('介绍词须为 1–8 行，每行不超过 80 字；过长的句子请拆成多镜')
+    if (typeof value.title !== 'string' || !value.title.trim() || value.title.length > 60) fail('请填写产品或人物名称（1–60 字）')
+    if (!PRODUCT_LAYOUTS[value.ratio]) value.ratio = '9:16'
+    value.template = PRODUCT_LAYOUTS[value.ratio].template
+    for (const id of value.assetIds) if (!store.asset(id, value.projectId).mime.startsWith('image/')) fail('产品或人物画面必须是图片')
+    if (value.bgmId && !store.asset(value.bgmId, value.projectId).mime.startsWith('audio/')) fail('BGM 须选择音频素材')
+    if (!value.persona && !value.voiceId) fail('请选择音色')
+    value.voiceBackend = value.voiceBackend || 'voxflow'
+    if (!['voxflow', 'minimax'].includes(value.voiceBackend)) fail('语音通道不支持')
+  }
   value.template = value.template || 'sticker-promo'
   if (!templateNames.includes(value.template)) fail('模板不存在')
   if (value.kind === 'export' && !['9:16', '16:9'].includes(value.ratio)) fail('导出支持竖屏或横屏')
@@ -128,7 +142,7 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
         }
         job.status = 'running'; job.steps = []; progress('正在准备任务…')
         try {
-          const asset = job.input.kind === 'export' ? await exportFn(job.input, store, progress) : job.input.kind === 'recommendation' ? await makeRecommendation(job.input, store, backend, progress, report) : job.input.kind === 'talk' ? await makeTalkVideo(job.input, store, backend, progress, report) : await backend.generate(job.input, progress)
+          const asset = job.input.kind === 'export' ? await exportFn(job.input, store, progress) : job.input.kind === 'recommendation' ? await makeRecommendation(job.input, store, backend, progress, report) : job.input.kind === 'talk' ? await makeTalkVideo(job.input, store, backend, progress, report) : job.input.kind === 'product' ? await makeProductVideo(job.input, store, backend, progress, report) : await backend.generate(job.input, progress)
           job.assetId = asset?.id; job.status = 'succeeded'; progress('已完成，结果保存在本地项目中')
         } catch (error) { job.status = 'failed'; job.error = redact(error.message); progress('执行失败；输入已保留，可查看步骤定位问题') }
       }
