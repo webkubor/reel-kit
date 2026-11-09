@@ -2,12 +2,15 @@
 # 发桌面版：把 mygo build 出来的产物整理成一份可发布的清单并传上 GitHub。
 #
 #   scripts/publish-desktop-release.sh app-v0.2.3 --notes /tmp/notes.md
+#   scripts/publish-desktop-release.sh app-v0.2.3 --dry-run    # 只检查不发布
 #
-# 它替你做三件容易漏的事：
-#   1. 按清单把该发的归档找齐，缺一个就停。
-#   2. 发之前用公钥把每个归档的 Ed25519 签名验一遍。
-#   3. 把所有产物的校验和写进 SHA256SUMS（扁平文件名，跟发布页上的
-#      资产名一一对应，用户下完就能 shasum -c 验）。
+# 它替你做四件容易漏的事：
+#   1. 版本与 tag 对不上就停：tag 必须是 mygo.json 里版本号加 tagPrefix，
+#      清单里的版本号也必须等于当前版本（旧构建留下的清单不许混进去）。
+#   2. 按清单把该发的归档找齐，缺一个就停，并验一遍每个归档的 Ed25519 签名。
+#   3. 同一个产物只发一次：清单点名的东西不再被后面的通配符重复收集。
+#   4. 把所有产物的校验和写进 SHA256SUMS，文件名用发布页上的扁平名字，
+#      用户下完就能 shasum -c 验。
 #
 # 需要：gh 已登录；签名私钥在发版那一步用 kyvault 注入（见 README）。
 set -euo pipefail
@@ -19,6 +22,7 @@ cd "$APP"
 tag="${1:-}"
 notes=""
 skip_build=""
+dry_run=""
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--notes)
@@ -29,13 +33,17 @@ while [ $# -gt 0 ]; do
 		skip_build=1
 		shift
 		;;
+	--dry-run)
+		dry_run=1
+		shift
+		;;
 	*)
 		shift
 		;;
 	esac
 done
 [ -n "$tag" ] || {
-	echo "用法: scripts/publish-desktop-release.sh <tag> [--notes 文件] [--skip-build]" >&2
+	echo "用法: scripts/publish-desktop-release.sh <tag> [--notes 文件] [--skip-build] [--dry-run]" >&2
 	exit 2
 }
 
@@ -43,6 +51,13 @@ version="$(python3 -c "import json;print(json.load(open('mygo.json'))['version']
 pubkey="$(python3 -c "import json;print(json.load(open('mygo.json'))['updates']['publicKey'])")"
 repo="$(python3 -c "import json;print(json.load(open('mygo.json'))['updates']['github'])")"
 prefix="$(python3 -c "import json;print(json.load(open('mygo.json'))['updates']['tagPrefix'])")"
+
+# tag 必须跟版本号对上，发错 tag 的版本号比漏发更麻烦。
+want_tag="$prefix$version"
+if [ "$tag" != "$want_tag" ]; then
+	echo "tag 应为 $want_tag（mygo.json 版本 $version），收到的是 $tag" >&2
+	exit 2
+fi
 
 if [ -z "$skip_build" ]; then
 	echo "== 构建 $version"
@@ -52,8 +67,58 @@ if [ -z "$skip_build" ]; then
 		env GOTOOLCHAIN=go1.27.3 "$(command -v mygo || echo "$HOME/go/bin/mygo")" build -platform windows/amd64 -skip-installer
 fi
 
-assets=()
-sign() { # 验一个归档的签名：manifest 的 signature 覆盖归档的 SHA-256 摘要
+# 收集产物：名字（发布页上的名字）、本地路径、签名（清单里才有）。
+# 只认带清单的构建目录，清单版本必须等于当前版本。
+python3 - "$version" >/tmp/reel-studio-assets.tsv <<'PY'
+import glob, json, os, sys
+
+version = sys.argv[1]
+rows = []
+seen = {}
+
+
+def add(name, path, sig=""):
+    if name in seen:
+        if seen[name] != path:
+            print("产物名冲突：%s 同时指向 %s 和 %s" % (name, seen[name], path), file=sys.stderr)
+            sys.exit(3)
+        return
+    seen[name] = path
+    rows.append((name, path, sig))
+
+
+for d in sorted(glob.glob("build/*")):
+    if not os.path.isdir(d):
+        continue
+    manifest = os.path.join(d, "update-%s.json" % os.path.basename(d))
+    if not os.path.isfile(manifest):
+        continue
+    m = json.load(open(manifest))
+    if m.get("version") != version:
+        print("%s 里的版本是 %s，不是 %s（旧构建留下的？）" % (manifest, m.get("version"), version), file=sys.stderr)
+        sys.exit(4)
+    items = [(m["url"].rsplit("/", 1)[1], m["signature"])]
+    for dlt in m.get("deltas", []):
+        items.append((dlt["url"].rsplit("/", 1)[1], dlt["signature"]))
+    for name, sig in items:
+        path = os.path.join(d, name)
+        if not os.path.isfile(path):
+            print("缺产物 %s" % path, file=sys.stderr)
+            sys.exit(5)
+        add(name, path, sig)
+    add(os.path.basename(manifest), manifest)
+    # 安装脚本与磁盘镜像：按名字收，不写死构建目录名。
+    for extra in sorted(glob.glob(os.path.join(d, "install.sh"))):
+        add(os.path.basename(extra), extra)
+    for extra in sorted(glob.glob(os.path.join(d, "*.dmg"))):
+        if version in os.path.basename(extra):
+            add(os.path.basename(extra), extra)
+
+for name, path, sig in rows:
+    print("%s\t%s\t%s" % (name, path, sig))
+PY
+
+sign() { # 验一个归档的签名：清单里的 signature 覆盖归档的 SHA-256 摘要
 	local file="$1" sig="$2" work
 	work="$(mktemp -d)"
 	printf '%s' "$sig" | base64 -D >"$work/sig.bin"
@@ -71,7 +136,7 @@ print('-----END PUBLIC KEY-----')
 	openssl dgst -sha256 -binary <"$file" >"$work/digest.bin"
 	if openssl pkeyutl -verify -pubin -inkey "$work/pub.pem" -rawin \
 		-in "$work/digest.bin" -sigfile "$work/sig.bin" >/dev/null 2>&1; then
-		echo "  签名通过 $file"
+		echo "  签名通过 $(basename "$file")"
 	else
 		echo "  签名不通过 $file" >&2
 		rm -rf "$work"
@@ -80,52 +145,41 @@ print('-----END PUBLIC KEY-----')
 	rm -rf "$work"
 }
 
-for dir in build/*/; do
-	target="$(basename "$dir")"
-	manifest="$dir/update-$target.json"
-	[ -f "$manifest" ] || continue
-	echo "== $target"
-	assets+=("$manifest")
-	# 归档清单里点名的每个文件都要在，并验签
-	python3 - "$manifest" <<'PY' >"$dir/.assets.list"
-import json, sys
-m = json.load(open(sys.argv[1]))
-print(m["url"].rsplit("/", 1)[1])
-for d in m.get("deltas", []):
-    print(d["url"].rsplit("/", 1)[1])
-PY
-	while read -r name; do
-		[ -n "$name" ] || continue
-		[ -f "$dir/$name" ] || {
-			echo "  缺产物 $dir/$name" >&2
-			exit 1
-		}
-		sig="$(python3 -c "
-import json,sys
-m=json.load(open('$manifest'))
-names=[m['url'].rsplit('/',1)[1]]+[d['url'].rsplit('/',1)[1] for d in m.get('deltas',[])]
-sigs=[m['signature']]+[d['signature'] for d in m.get('deltas',[])]
-print(dict(zip(names,sigs))['$name'])")"
-		sign "$dir/$name" "$sig"
-		assets+=("$dir/$name")
-	done <"$dir/.assets.list"
-	rm -f "$dir/.assets.list"
-done
-
-# 非 mac 目标的归档（Windows 等）也一并带上
-for f in build/windows-amd64/*.tar.gz build/windows-amd64/*.exe build/windows-amd64/*.json; do
-	[ -f "$f" ] || continue
-	assets+=("$f")
-done
-[ -f build/darwin-arm64/install.sh ] && assets+=(build/darwin-arm64/install.sh)
-for f in build/darwin-arm64/*.dmg; do
-	[ -f "$f" ] || continue
-	assets+=("$f")
-done
+echo "== 验签"
+while IFS=$'\t' read -r name path sig; do
+	[ -n "${sig:-}" ] || continue
+	sign "$path" "$sig"
+done </tmp/reel-studio-assets.tsv
 
 echo "== 校验和"
-(cd build && shasum -a 256 $(cd .. && printf '%s\n' "${assets[@]}" | sed 's#^build/##') >SHA256SUMS)
+# 文件名用发布页上的扁平名字，用户下完 shasum -c SHA256SUMS 就能验。
+: >build/SHA256SUMS
+while IFS=$'\t' read -r name path sig; do
+	sum="$(shasum -a 256 "$path" | awk '{print $1}')"
+	printf '%s  %s\n' "$sum" "$name" >>build/SHA256SUMS
+done </tmp/reel-studio-assets.tsv
+
+assets=()
+while IFS=$'\t' read -r name path sig; do
+	assets+=("$path")
+done </tmp/reel-studio-assets.tsv
 assets+=(build/SHA256SUMS)
+
+echo "== 待发布产物"
+while IFS=$'\t' read -r name path sig; do
+	echo "  $name"
+done </tmp/reel-studio-assets.tsv
+echo "  SHA256SUMS"
+
+if [ -n "$dry_run" ]; then
+	echo "== 只检查不发布"
+	exit 0
+fi
+
+if gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
+	echo "发布 $tag 已经存在，先处理掉它再发" >&2
+	exit 6
+fi
 
 echo "== 发布 $tag"
 gh release create "$tag" --repo "$repo" --title "Reel Studio $version" \

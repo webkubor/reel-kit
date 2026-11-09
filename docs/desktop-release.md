@@ -52,8 +52,12 @@ openssl pkeyutl -verify -pubin -inkey pub.pem -rawin -in digest.bin -sigfile sig
 scripts/publish-desktop-release.sh app-v0.2.3 --notes /tmp/notes.md
 ```
 
+先加 `--dry-run` 跑一遍，只检查不发布：tag 与 `mygo.json` 的版本对不上、
+清单里的版本是旧的、产物缺失、签名不通过，任何一条都会当场停。
+
 它会：按清单把归档找齐（缺一个就停）→ 逐个归档验签 → 生成扁平文件名的
-`SHA256SUMS` → `gh release create` 传全部产物。
+`SHA256SUMS` → `gh release create` 传全部产物。同名产物只发一次
+（清单点名的东西不会再被通配符重复收集）。
 
 ### 清单的名字与安装脚本要对得上
 
@@ -90,6 +94,25 @@ curl -fsSLO https://github.com/webkubor/reel-kit/releases/download/<tag>/update-
    直接从 `main` 的 `docs/` 目录发的，push 后等一两分钟再看。Pages 偶尔并发
    构建失败（`Page build failed`），重新触发一次构建即可。
 7. **CI**：`gh run list` 看 `check` 与 `desktop` 两个 job 都绿。
+8. **自动更新链路**（发增量包的那一版必做）：签名对了不等于装得上，
+   要拿发布页上的旧归档 + 增量包真的走一遍生产代码：
+
+   - 用发布页清单里的公钥验增量包的签名（验的是**增量包 SHA-256 的摘要**）；
+   - `internal/update.ApplyDelta` 把旧应用还原成新版，逐文件比对 SHA-256；
+   - 走生产同一条路径 `installUpdate` 把装着旧版的 `.app` 原地换成新版，
+     核对换完之后的版本号。
+
+   MyGo 的 `internal/update` 是内部包，只能在它的模块副本里写测试：
+
+   ```bash
+   cp -R "$(go env GOPATH)/pkg/mod/github.com/egoist/mygo@"* /tmp/mygo-src
+   chmod -R u+w /tmp/mygo-src
+   cd /tmp/mygo-src && GOTOOLCHAIN=go1.27.3 go test -run TestPublishedInstall .
+   ```
+
+   2026-11-09 用发布页上的 0.2.2 归档与 0.2.3 增量包跑过：6056 个文件逐个
+   SHA-256 一致，原地升级后应用包变成 0.2.3，升级后的应用仍能出一条
+   1080×1920 的竖版视频。
 
 ## 四、发版后
 
