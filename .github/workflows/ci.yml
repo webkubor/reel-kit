@@ -47,3 +47,19 @@ jobs:
         run: |
           node --test test/readme-cli.test.mjs
           node scripts/check-readme-cli.mjs
+
+  # 桌面端是 Go 原生界面：它的交互测试（版式几何、配置回填、对比选择器、
+  # 截图走查）不开窗口就能跑，值得在 CI 里当门禁。
+  desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache-dependency-path: apps/reel-studio/go.sum
+      - name: 桌面端构建与测试
+        working-directory: apps/reel-studio
+        run: |
+          go build ./...
+          go test ./...
