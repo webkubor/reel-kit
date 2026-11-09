@@ -1,0 +1,17 @@
+{
+  "name": "Reel Studio",
+  "slug": "reel-studio",
+  "identifier": "online.webkubor.reelstudio",
+  "version": "0.1.0",
+  "publisher": "webkubor",
+  "description": "本地视频工作台",
+  "out": "build",
+  "main": ".",
+  "windows": {
+    "displayName": "Reel Studio",
+    "installDirName": "ReelStudio"
+  },
+  "macos": {
+    "dmgTitle": "Reel Studio"
+  }
+}
