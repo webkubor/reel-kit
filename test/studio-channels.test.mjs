@@ -178,4 +178,8 @@ test('语音状态：没配密钥时说清楚去哪配，别只让人去启动 V
   assert.match(minimax.note, /密钥/)
   // 总体状态也别只指向 VoxFlow：Windows 用户根本没装它
   assert.match(state.voice.note, /云端配音/)
+
+  const voxflow = state.voice.channels.find(c => c.id === 'voxflow')
+  // 服务压根没连上时，别说「服务在线」——Windows 用户根本没装它
+  assert.match(voxflow.note, /没连上本机语音服务/)
 })

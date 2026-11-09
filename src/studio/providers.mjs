@@ -524,7 +524,11 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
           version: voice?.[1]?.version || 'unknown',
           personas,
           channels: [
-            channel('voxflow', 'VoxFlow · 本地', voiceLocalReady, voiceLocalReady ? '本地模型已就绪，本地推理不产生模型费用' : '服务在线，Base 模型未就绪', {
+            channel('voxflow', 'VoxFlow · 本地', voiceLocalReady, voiceLocalReady
+              ? '本地模型已就绪，本地推理不产生模型费用'
+              : voice
+                ? '服务在线，Base 模型未就绪'
+                : '没连上本机语音服务：启动 VoxFlow 服务后刷新', {
               voices: personas.map(p => ({ id: p.key, name: p.name })),
             }),
             channel('minimax', 'MiniMax TTS', minimaxReady, minimaxReady
