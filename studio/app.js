@@ -5,7 +5,7 @@ import { voiceLibrary } from '/voice-library.js'
 import { workflowPanel } from '/workflow-panel.js'
 let state = { projects: [], assets: [], jobs: [], templates: [] }, providers = {}, mode = 'video', filter = 'all'
 let projectId = localStorage.getItem('reel-project'), previewId, selected = [], lastAssets = '', lastJobs = '', lastProjects = '', uploadTarget
-const kinds = { video: '视频', image: '图片', speech: '配音', clone: '克隆配音', 'voice-design': '新建音色', recommendation: '项目推荐', export: '合成' }
+const kinds = { video: '视频', image: '图片', speech: '配音', clone: '克隆配音', 'voice-design': '新建音色', recommendation: '项目推荐', talk: '口播视频', export: '合成' }
 const labels = { queued: '排队中', running: '进行中', succeeded: '已完成', failed: '失败', interrupted: '已中断' }
 const origins = { ai: 'AI 生成', code: '本地制作', import: '导入素材', record: '我的录音' }
 const examples = {
@@ -68,7 +68,7 @@ function renderAssets() {
   lastAssets = key
   $('asset-count').textContent = assets.length
   const visible = assets.filter(a => filter === 'all' || a.mime.startsWith(filter + '/'))
-  $('assets').innerHTML = visible.length ? visible.map(a => `<article class="asset-card ${selected.includes(a.id) ? 'selected' : ''}"><button class="asset-open" data-preview="${a.id}" aria-label="预览 ${escape(a.name)}">${a.mime.startsWith('image/') ? `<img src="${a.url}" alt="${escape(a.name)}" loading="lazy">` : a.mime.startsWith('video/') ? `<video src="${a.url}#t=0.1" preload="metadata" muted playsinline></video>` : '<span class="audio-symbol">≋</span>'}</button>${(mode === 'export' && !a.mime.startsWith('audio/') || mode === 'recommendation' && a.mime.startsWith('image/')) ? `<input class="asset-check" type="checkbox" data-select="${a.id}" aria-label="选择 ${escape(a.name)}" ${selected.includes(a.id) ? 'checked' : ''}>` : ''}<div class="asset-info"><strong>${escape(a.name)}</strong><span>${escape(a.source)} · ${new Date(a.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>${assetMeta(a) ? `<span class="asset-meta">${assetMeta(a)}</span>` : ''}</div></article>`).join('') : `<button type="button" class="library-empty" id="empty-upload"><span class="plus">＋</span><span>${assets.length ? '这个分类还没有素材' : '导入你的第一份素材'}<small>图片、视频、声音，或从上方开始生成</small></span></button>`
+  $('assets').innerHTML = visible.length ? visible.map(a => `<article class="asset-card ${selected.includes(a.id) ? 'selected' : ''}"><button class="asset-open" data-preview="${a.id}" aria-label="预览 ${escape(a.name)}">${a.mime.startsWith('image/') ? `<img src="${a.url}" alt="${escape(a.name)}" loading="lazy">` : a.mime.startsWith('video/') ? `<video src="${a.url}#t=0.1" preload="metadata" muted playsinline></video>` : '<span class="audio-symbol">≋</span>'}</button>${(mode === 'export' && !a.mime.startsWith('audio/') || mode === 'recommendation' && a.mime.startsWith('image/') || mode === 'talk' && a.mime.startsWith('image/')) ? `<input class="asset-check" type="checkbox" data-select="${a.id}" aria-label="选择 ${escape(a.name)}" ${selected.includes(a.id) ? 'checked' : ''}>` : ''}<div class="asset-info"><strong>${escape(a.name)}</strong><span>${escape(a.source)} · ${new Date(a.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>${assetMeta(a) ? `<span class="asset-meta">${assetMeta(a)}</span>` : ''}</div></article>`).join('') : `<button type="button" class="library-empty" id="empty-upload"><span class="plus">＋</span><span>${assets.length ? '这个分类还没有素材' : '导入你的第一份素材'}<small>图片、视频、声音，或从上方开始生成</small></span></button>`
   $('export-order').innerHTML = selected.map((id, i) => `<li>${escape(assets.find(a => a.id === id)?.name)}${i ? `<button type="button" data-up="${id}">↑ 上移</button>` : ''}<button type="button" data-remove="${id}">移除</button></li>`).join('')
   renderOptions()
   rec?.renderAssets()
@@ -124,6 +124,8 @@ async function refresh() {
   if (!state.projects.some(p => p.id === projectId)) projectId = state.projects[0]?.id
   renderProjects(); renderAssets(); renderJobs()
   rec?.jobs()
+  // 口播的音色与 BGM 列表跟着项目走：素材变了要跟着变
+  if (mode === 'talk') loadTalkOptions()
   const workflowKey = JSON.stringify([projectId, state.jobs.filter(j => j.projectId === projectId && j.input.kind === 'recommendation' && j.status === 'succeeded').map(j => j.id)])
   if (workflowKey !== lastWorkflowKey) { lastWorkflowKey = workflowKey; workflow.render() }
 }
@@ -331,6 +333,7 @@ function applyModelLimits() {
 function generationNote() {
   const channel = currentChannel()
   if (mode === 'recommendation') return '仓库信息经 GitHub API 读取，渲染与合成在本机执行；旁白按上面选定的通道生成。'
+  if (mode === 'talk') return '逐句用本机 VoxFlow 生成旁白，渲染与合成在本机执行；不产生模型费用，视频与素材留在本地项目里。'
   if (mode === 'export') return '选中的素材按顺序导出；原始素材会保留。'
   const label = channel?.label || '所选通道'
   if (mode === 'speech') return channel?.id === 'minimax'
@@ -371,23 +374,23 @@ function channelCaption() {
 }
 function setMode(next) {
   saveDraft(); mode = next; loadDraft()
-  const voice = mode === 'speech', exporting = mode === 'export', recommending = mode === 'recommendation', clone = voice && $('voice-mode').value === 'clone'
+  const voice = mode === 'speech', exporting = mode === 'export', recommending = mode === 'recommendation', talking = mode === 'talk', clone = voice && $('voice-mode').value === 'clone'
   document.querySelectorAll('[data-mode]').forEach(button => button.setAttribute('aria-selected', String(button.dataset.mode === mode)))
-  const titles = { recommendation: ['从项目到视频', '输入 GitHub 地址 · 编辑分镜并生成旁白', 'PROJECT'], video: ['描述你的镜头', 'MiniMax H3 · 让文字与参考图成为动态画面', 'H3'], image: ['创造第一帧', 'MuseAV · 生成图片，再把它交给视频模型', 'IMAGE'], speech: ['让故事有声音', 'VoxFlow · 本地生成与参考音频克隆', 'VOICE'], export: ['把素材变成作品', 'reel-kit · 按选择顺序合成，导出到本地', 'EXPORT'] }
+  const titles = { recommendation: ['从项目到视频', '输入 GitHub 地址 · 编辑分镜并生成旁白', 'PROJECT'], talk: ['把想法讲清楚', '逐句配音 · 知识口播流水线', 'TALK'], video: ['描述你的镜头', 'MiniMax H3 · 让文字与参考图成为动态画面', 'H3'], image: ['创造第一帧', 'MuseAV · 生成图片，再把它交给视频模型', 'IMAGE'], speech: ['让故事有声音', 'VoxFlow · 本地生成与参考音频克隆', 'VOICE'], export: ['把素材变成作品', 'reel-kit · 按选择顺序合成，导出到本地', 'EXPORT'] }
   const [title, subtitle, badge] = titles[mode]
   $('mode-title').textContent = title; $('mode-subtitle').textContent = subtitle; $('engine-badge').textContent = badge
-  $('prompt-group').hidden = exporting || recommending; $('export-fields').hidden = !exporting; $('recommendation-fields').hidden = !recommending
+  $('prompt-group').hidden = exporting || recommending || talking; $('export-fields').hidden = !exporting; $('recommendation-fields').hidden = !recommending; $('talk-fields').hidden = !talking
   $('prompt-label').textContent = voice ? '配音文字' : '创作描述'
   $('prompt').placeholder = voice ? '输入你想让声音读出的文字。' : '主体是谁？发生在哪里？镜头如何移动？\n\n试着描述光线、动作和你想留下的情绪。'
   $('voice-work-field').hidden = !voice && !recommending
   $('voice-mode-field').hidden = !voice; $('persona-field').hidden = !voice || clone; $('voice-name-field').hidden = !clone
-  $('reference-field').hidden = recommending || exporting || (voice && !clone)
+  $('reference-field').hidden = recommending || exporting || talking || (voice && !clone)
   $('reference-help').textContent = clone ? '使用你拥有或获授权的音频，清晰单人语音更适合克隆。处理在本地完成。' : '选择项目中的图片。参考图会上传至所选通道供模型读取。'
-  $('ratio-field').hidden = voice || recommending; $('duration-field').hidden = voice || recommending || mode === 'image'
+  $('ratio-field').hidden = voice || recommending || talking; $('duration-field').hidden = voice || recommending || talking || mode === 'image'
   $('duration').min = exporting ? 1 : 4; $('duration').max = exporting ? 30 : 15
   $('ratio').querySelector('[value="1:1"]').disabled = exporting
   if (exporting && $('ratio').value === '1:1') $('ratio').value = '9:16'
-  $('generate-label').textContent = { recommendation: '生成项目推荐视频', video: '生成视频', image: '生成图片', speech: clone ? '克隆并生成配音' : '生成配音', export: '合成并导出' }[mode]
+  $('generate-label').textContent = { recommendation: '生成项目推荐视频', talk: '生成口播视频', video: '生成视频', image: '生成图片', speech: clone ? '克隆并生成配音' : '生成配音', export: '合成并导出' }[mode]
   syncBackend()
   // 本地音色只对 VoxFlow 通道有效；云端 TTS 用独立的音色选择
   const channel = currentChannel()
@@ -396,7 +399,43 @@ function setMode(next) {
   if (recommending) loadRecommendation()
   else $('preview').classList.remove('portrait', 'landscape')
   $('use-example').textContent = voice ? '↗ 试试一段旁白' : '↗ 试试时尚棚拍'
+  if (talking) loadTalkOptions()
   renderAssets(); renderOptions()
+}
+const TALK_EXAMPLE = [
+  '做短视频，先把信息讲清楚。',
+  '一条视频解决一个问题，观众更容易记住。',
+  '写好开头、例子和结论，再动手制作。',
+].join('\n')
+let talkStyles = [], talkStyleReady = false
+async function loadTalkOptions() {
+  // 风格与版式：一次性取回，之后本地切换
+  if (!talkStyles.length) {
+    try {
+      const data = await api('/api/styles')
+      talkStyles = data.styles || []
+      optionList($('talk-style'), talkStyles.map(s => ({ id: s.key, name: s.name || s.key })))
+      const labels = { 'knowledge-paper': '纸本水墨', 'knowledge-dark': '暗场剪报', 'knowledge-gufeng': '古风卷轴', quote: '金句卡' }
+      optionList($('talk-template'), (data.templates || []).map(id => ({ id, name: labels[id] || id })))
+      // 默认用水墨纸本：白底黑字，字幕最易读。首次进入才定，之后沿用用户选择。
+      if (!talkStyleReady) { $('talk-style').value = talkStyles.find(s => s.key === 'paper')?.key || talkStyles[0]?.key || ''; talkStyleReady = true }
+      // 版式跟着风格走（用户手动改过版式就不动）
+      const style = talkStyles.find(s => s.key === $('talk-style').value)
+      if (style && !$('talk-template').dataset.touched) $('talk-template').value = style.template
+    } catch (error) { message(error.message, true) }
+  }
+  // 音色来自本机 VoxFlow 的人物库；连接状态没拉过就先拉一次
+  if (!providers.voice) { try { await connections() } catch { /* 拿不到连接状态就先用空列表 */ } }
+  optionList($('talk-persona'), (providers.voice?.personas || []).map(p => ({ id: p.key, name: p.name || p.key })), '选择音色')
+  // 背景音乐：项目里的音频素材
+  optionList($('talk-bgm'), currentAssets().filter(a => a.mime.startsWith('audio/')).map(a => ({ id: a.id, name: a.name })), '不使用背景音乐')
+  updateTalkCount()
+}
+function updateTalkCount() {
+  const lines = $('talk-captions').value.split('\n').map(s => s.trim()).filter(Boolean)
+  const over = lines.filter(s => s.length > 80).length
+  $('talk-shot-count').textContent = over ? `${lines.length} 镜 · ${over} 行超长` : `${lines.length} 镜`
+  $('talk-chars').textContent = `${$('talk-captions').value.length} 字`
 }
 function saveRecommendation() {
   if (!projectId) return
@@ -526,6 +565,22 @@ $('start-github').onclick = async () => {
   } catch (error) { message(error.message, true) } finally { button.disabled = false }
 }
 document.querySelectorAll('[data-mode]').forEach(button => button.onclick = () => setMode(button.dataset.mode))
+$('talk-example').onclick = () => { $('talk-captions').value = TALK_EXAMPLE; $('talk-title').value = $('talk-title').value || '把一个观点讲清楚的三个动作'; updateTalkCount() }
+$('talk-captions').addEventListener('input', updateTalkCount)
+$('talk-style').addEventListener('change', () => {
+  // 风格自带推荐版式；用户没手动改过版式时跟着风格走
+  const style = talkStyles.find(s => s.key === $('talk-style').value)
+  if (style && !$('talk-template').dataset.touched) $('talk-template').value = style.template
+})
+$('talk-template').addEventListener('change', () => { $('talk-template').dataset.touched = '1' })
+$('start-talk').onclick = async () => {
+  const button = $('start-talk'); button.disabled = true
+  try {
+    const project = await api('/api/projects', { method: 'POST', body: JSON.stringify({ name: `知识口播 · ${new Date().toLocaleDateString('zh-CN')}` }) })
+    await refresh(); switchProject(project.id); setMode('talk')
+    $('talk-title').focus({ preventScroll: true }); $('talk-title').scrollIntoView({ behavior: 'smooth', block: 'center' })
+  } catch (error) { message(error.message, true) } finally { button.disabled = false }
+}
 document.querySelectorAll('[data-filter]').forEach(button => button.onclick = () => { filter = button.dataset.filter; document.querySelectorAll('[data-filter]').forEach(b => b.classList.toggle('active', b === button)); renderAssets() })
 $('backfill-assets').onclick = async () => {
   try {
@@ -661,6 +716,13 @@ $('generate-form').onsubmit = async event => {
     const job = { projectId, kind: mode === 'speech' ? $('voice-mode').value : mode, prompt: $('prompt').value, ratio: $('ratio').value, duration: Number($('duration').value), resolution: $('resolution').value, profile: $('profile').value || 'primary', backend: currentChannel()?.id, model: currentModel(), voiceId: currentVoiceId(), referenceId: $('reference').value || undefined, persona: currentChannel()?.id === 'voxflow' ? ($('persona').value || undefined) : undefined, voiceName: $('voice-name').value, assetIds: selected, audioId: $('audio').value || undefined, template: $('template').value, title: $('export-title').value, captions: $('captions').value }
     if (job.kind === 'clone') { job.persona = undefined; job.referenceText = $('reference-text').value }
     if (mode === 'recommendation') Object.assign(job, { repoUrl: $('repo-url').value, title: $('repo-title').value, captions: $('repo-captions').value, assetIds: selected, voiceIds: [...$('scene-voices').querySelectorAll('select')].map(el => el.value) }, rec.read(), { backend: currentChannel()?.id, model: currentModel(), voiceId: currentVoiceId(), profile: voiceState.profile || job.profile })
+    if (mode === 'talk') Object.assign(job, {
+      kind: 'talk', title: $('talk-title').value.trim(), captions: $('talk-captions').value,
+      subtitle: $('talk-subtitle').value.trim(), style: $('talk-style').value, template: $('talk-template').value,
+      persona: $('talk-persona').value || undefined, tone: $('talk-tone').value.trim(),
+      voiceBackend: 'voxflow', bgmId: $('talk-bgm').value || undefined, assetIds: selected,
+      ratio: '9:16', profile: 'primary',
+    })
     await api('/api/jobs', { method: 'POST', body: JSON.stringify(job) }); message('任务已加入队列，完成后会出现在素材库。'); await refresh()
   } catch (error) { message(error.message, true) } finally { $('generate').disabled = false }
 }
