@@ -38,10 +38,10 @@ const templateFile = name => fileURLToPath(new URL(`../../templates/${name}.html
  * 占位图跟着版式走，缺素材时看着仍像一条正经片子，而不是半成品。
  */
 async function placeholderImage(file, layout) {
-  const c0 = (layout === '16:9' ? '0x14161a' : '0x0d0f11').replace('#', '0x')
+  const c0 = (layout.template === 'landscape-product' ? '0x14161a' : '0x0d0f11').replace('#', '0x')
   const c1 = '0x2b2f36'
   await command('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi',
-    '-i', `gradients=size=1080x1920:c0=${c0}:c1=${c1}:nb_colors=2`,
+    '-i', `gradients=size=${layout.width}x${layout.height}:c0=${c0}:c1=${c1}:nb_colors=2`,
     '-frames:v', '1', file])
   return file
 }
@@ -102,7 +102,7 @@ export async function makeProductVideo(input, store, backend, progress, report =
     let images = assets.map(asset => store.path(asset))
     if (!images.length) {
       progress('没有产品画面，先用深色占位图顶上…')
-      images = await Promise.all(lines.map((_, i) => placeholderImage(join(temp, `placeholder-${i}.png`), ratio)))
+      images = await Promise.all(lines.map((_, i) => placeholderImage(join(temp, `placeholder-${i}.png`), layout)))
       await step({ id: 'placeholder', label: '生成占位画面', origin: 'code', engine: 'ffmpeg 渐变', detail: `${images.length} 张占位图，之后可换真图重做` }, async () => ({}))
     }
 
