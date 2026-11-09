@@ -149,3 +149,48 @@ footer {
   color: var(--ink-faint); font-size: 14px;
 }
 footer a { color: var(--ink-soft); }
+
+/* ───── Reel Studio 桌面版 ───── */
+.studio {
+  max-width: 1080px;
+  margin: 0 auto 24px;
+  padding: 40px 24px 44px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg-soft);
+}
+.studio h2 { margin: 0 0 8px; font-size: 26px; letter-spacing: -0.01em; }
+.studio .section-intro { margin: 0 0 26px; max-width: 720px; }
+.studio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.studio-card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.studio-card h3 { margin: 0 0 6px; font-size: 16px; }
+.studio-card p { margin: 0; color: var(--ink-soft); font-size: 14.5px; }
+.studio-download { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+.studio-download .install {
+  display: inline-block;
+  padding: 12px 22px;
+  border-radius: 10px;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+.studio-download .install:hover { background: #b34d43; text-decoration: none; }
+.studio-download .soon {
+  padding: 11px 18px;
+  border-radius: 10px;
+  border: 1px dashed var(--line);
+  color: var(--ink-faint);
+  font-size: 14.5px;
+}
+.studio-meta { flex-basis: 100%; margin: 4px 0 0; color: var(--ink-faint); font-size: 14px; }
