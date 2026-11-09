@@ -55,10 +55,10 @@ scripts/publish-desktop-release.sh app-v0.2.3 --notes /tmp/notes.md
 它会：把清单复制成安装脚本认的名字 → 逐个归档验签 → 生成 `SHA256SUMS` →
 `gh release create` 传全部产物。
 
-### ⚠️ 必须有 `update-<架构>.json`
+### ⚠️ 必须有 `update-darwin-<架构>.json`
 
-`install.sh` 在 macOS 上找的是 `update-<架构>.json`（Apple Silicon 上就是
-`update-arm64.json`），而 mygo 产出的清单叫 `update-<目标>.json`（目标是签名
+`install.sh` 在 macOS 上找的是 `update-darwin-<架构>.json`（Apple Silicon 上就是
+`update-darwin-arm64.json`），而 mygo 产出的清单叫 `update-<目标>.json`（目标是签名
 身份 `darwin-arm64`）。少了前者，README 里那行
 
 ```bash

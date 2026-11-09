@@ -5,7 +5,7 @@
 #
 # 它替你做三件容易漏的事：
 #   1. 把签名清单复制成安装脚本认的那个名字（install.sh 在 macOS 上找的是
-#      update-<架构>.json，而 mygo 产出的清单叫 update-<目标>.json，
+#      update-darwin-<架构>.json，而 mygo 产出的清单叫 update-<目标>.json，
 #      少了这一步，README 里那行 curl 安装命令会直接失败）。
 #   2. 发之前用公钥把每个归档的 Ed25519 签名验一遍。
 #   3. 把所有产物的校验和写进 SHA256SUMS，一起发出去。
@@ -111,14 +111,14 @@ print(dict(zip(names,sigs))['$name'])")"
 		assets+=("$dir/$name")
 	done <"$dir/.assets.list"
 	rm -f "$dir/.assets.list"
-	# macOS 的安装脚本找的是 update-<架构>.json，把清单复制一份过去，
+	# macOS 的安装脚本找的是 update-darwin-<架构>.json，把清单复制一份过去，
 	# 不然 README 里那行 curl 安装命令会 404。
 	case "$target" in
 	darwin-*)
 		arch="$(uname -m)"
 		[ "$arch" = x86_64 ] && arch=amd64
-		cp "$manifest" "$dir/update-$arch.json"
-		assets+=("$dir/update-$arch.json")
+		cp "$manifest" "$dir/update-darwin-$arch.json"
+		assets+=("$dir/update-darwin-$arch.json")
 		;;
 	esac
 done
