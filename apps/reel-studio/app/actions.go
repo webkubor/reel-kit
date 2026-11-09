@@ -50,12 +50,46 @@ func (a *App) submitTalk() {
 	if len(a.talkImages) > 0 {
 		input["assetIds"] = a.talkImages
 	}
+	if a.talkTone != "" {
+		input["tone"] = a.talkTone
+	}
+	if a.talkPause != "" {
+		pause, err := parseNumberIn("镜间停顿", a.talkPause, 0, 2)
+		if err != nil {
+			a.fail(err.Error())
+			return
+		}
+		input["pause"] = pause
+	}
+	if a.talkBGMGain != "" {
+		gain, err := parseNumberIn("BGM 音量", a.talkBGMGain, 0, 100)
+		if err != nil {
+			a.fail(err.Error())
+			return
+		}
+		input["bgmGain"] = gain / 100
+	}
+	bgmChoice := a.talkBGM
+	projectID := a.projectID
 	a.busy.Store(true)
 	a.mutate(func() {
 		a.notice = ""
 	})
 	go func() {
 		client := studioapi.New(a.opts.BaseURL)
+		if bgmChoice != "" {
+			bgmID, err := resolveBGM(client, projectID, bgmChoice)
+			if err != nil {
+				a.busy.Store(false)
+				a.mutate(func() {
+					a.notice = "取配乐失败：" + err.Error()
+					a.noticeErr = true
+				})
+				a.refresh()
+				return
+			}
+			input["bgmId"] = bgmID
+		}
 		job, err := client.SubmitJob(input)
 		a.busy.Store(false)
 		a.mutate(func() {

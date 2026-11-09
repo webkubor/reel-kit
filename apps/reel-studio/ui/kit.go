@@ -33,23 +33,31 @@ const (
 )
 
 // Action 渲染一个按钮。variant 决定外观，label 是文字，disabled 置灰。
+//
+// 四种变体对应四种意图，一个视图里主操作最多一个：
+//
+//	primary   —— 这一屏要做的那件事
+//	secondary —— 旁边的另一个动作
+//	quiet     —— 行内的小动作（查看、对比、取消）
+//	danger    —— 会丢东西的动作
 func (c Comps) Action(ctx *ui.Context, variant, label string, disabled bool) ui.Element {
 	var el ui.Element
 	switch variant {
 	case ButtonPrimary:
 		el = ui.PrimaryButton(ctx, label)
 		el = el.Radius(design.RadiusSM).Padding(0, design.SpaceXL).Height(design.ButtonHigh)
+		el = el.Bold()
 	case ButtonSecondary:
 		el = ui.Button(ctx, label)
 		el = el.Radius(design.RadiusSM).Padding(0, design.SpaceXL).Height(design.ButtonHigh)
-		el = el.Background(c.T.Surface).Border(1, c.T.Line)
+		el = el.Background(c.T.Surface).Border(1, c.T.Line).TextColor(c.T.Ink)
 	case ButtonDanger:
 		el = ui.Button(ctx, label)
 		el = el.Radius(design.RadiusSM).Padding(0, design.SpaceXL).Height(design.ButtonHigh)
 		el = el.Background(c.T.Surface).Border(1, c.T.Accent).TextColor(c.T.Accent)
 	default:
 		el = ui.Button(ctx, label)
-		el = el.TextColor(c.T.Muted).Padding(0, design.SpaceSM)
+		el = el.TextColor(c.T.Muted).Radius(design.RadiusSM).Padding(design.SpaceXS, design.SpaceMD)
 	}
 	return el.FontSize(design.FontMedium).Disabled(disabled)
 }
@@ -59,31 +67,43 @@ func (c Comps) Action(ctx *ui.Context, variant, label string, disabled bool) ui.
 // 网页版每个字段都要手写三段结构，这里统一掉。
 func (c Comps) Field(ctx *ui.Context, label, help string, content func()) ui.Element {
 	return ui.Column(ctx).Gap(design.SpaceSM).Children(func() {
-		ui.Text(ctx, label).FontSize(design.FontBody).TextColor(c.T.Ink)
+		ui.Text(ctx, label).FontSize(design.FontMedium).TextColor(c.T.Ink)
 		content()
 		if help != "" {
-			ui.Text(ctx, help).FontSize(design.FontTiny).TextColor(c.T.Muted)
+			ui.Text(ctx, help).FontSize(design.FontTiny).TextColor(c.T.Muted).FixedLineHeight(15)
 		}
 	})
 }
 
 // Input 是单行输入框。
+//
+// 输入框是浅底 + 细描边：跟面板的白底拉开一层，
+// 一眼能看出「这里能打字」，不用靠光标去试。
 func (c Comps) Input(ctx *ui.Context, value *string, placeholder string) ui.Element {
 	return ui.TextInput(ctx, value).Placeholder(placeholder).
-		Radius(design.RadiusSM).Height(design.ControlHigh).FontSize(design.FontBody)
+		Background(c.T.SurfaceAlt).Border(1, c.T.Line).
+		Radius(design.RadiusSM).Height(design.ControlHigh).Padding(design.SpaceMD, 0).
+		FontSize(design.FontBody).TextColor(c.T.Ink).PlaceholderColor(c.T.Muted).
+		CaretColor(c.T.Accent)
 }
 
 // TextArea 是多行输入框。
 func (c Comps) TextArea(ctx *ui.Context, value *string, placeholder string, minHeight float32) ui.Element {
 	return ui.TextArea(ctx, value).Placeholder(placeholder).
-		Radius(design.RadiusSM).FontSize(design.FontBody).Height(minHeight)
+		Background(c.T.SurfaceAlt).Border(1, c.T.Line).
+		Radius(design.RadiusSM).Padding(design.SpaceMD).FontSize(design.FontBody).
+		TextColor(c.T.Ink).PlaceholderColor(c.T.Muted).CaretColor(c.T.Accent).
+		Height(minHeight).FixedLineHeight(18)
 }
 
 // Select 是下拉选择。
 //
 // options 是显示文字；选择结果写回 selected（与某个 option 相同的文字）。
 func (c Comps) Select(ctx *ui.Context, selected *string, options []string, placeholder string) ui.Element {
-	el := ui.Select(ctx, selected, options).Radius(design.RadiusSM).Height(design.ControlHigh).FontSize(design.FontBody)
+	el := ui.Select(ctx, selected, options).
+		Background(c.T.SurfaceAlt).Border(1, c.T.Line).
+		Radius(design.RadiusSM).Height(design.ControlHigh).Padding(design.SpaceMD, 0).
+		FontSize(design.FontBody).TextColor(c.T.Ink)
 	if placeholder != "" {
 		el = el.Placeholder(placeholder)
 	}
@@ -130,7 +150,8 @@ func (c Comps) Tag(ctx *ui.Context, text, kind string) ui.Element {
 		fill, ink = c.T.GreenSoft, c.T.Green
 	}
 	return ui.Text(ctx, text).FontSize(design.FontTiny).TextColor(ink).
-		Background(fill).Radius(design.RadiusSM).Padding(design.SpaceXS, design.SpaceMD)
+		Background(fill).Radius(design.RadiusSM).Padding(design.SpaceXS, design.SpaceMD).
+		MinWidth(0).TextAlign(ui.Center)
 }
 
 // Hint 是一行提示文字。
@@ -144,17 +165,22 @@ func (c Comps) Notice(ctx *ui.Context, text string, kind string) ui.Element {
 	if kind == "error" {
 		fill, ink = c.T.AccentSoft, c.T.Accent
 	}
-	return ui.Text(ctx, text).FontSize(design.FontBody).TextColor(ink).
-		Background(fill).Radius(design.RadiusSM).Padding(design.SpaceLG).FillWidth()
+	// 左边一道色条：提示和正文一眼分得开，不用靠底色猜。
+	return ui.Row(ctx).FillWidth().Gap(design.SpaceMD).AlignItems(ui.Center).
+		Background(fill).Radius(design.RadiusSM).Padding(design.SpaceMD, design.SpaceLG).Children(func() {
+		ui.Column(ctx).Width(3).Height(16).Radius(2).Background(ink)
+		ui.Text(ctx, text).Grow(1).FontSize(design.FontBody).TextColor(ink).FixedLineHeight(17)
+	})
 }
 
 // Empty 是一块空态：标题 + 说明 + 可选动作。
 func (c Comps) Empty(ctx *ui.Context, title, note string, action func()) ui.Element {
-	return ui.Column(ctx).FillWidth().Gap(design.SpaceLG).AlignItems(ui.Center).
-		Padding(design.Space3X).Background(c.T.SurfaceAlt).Radius(design.RadiusMD).Children(func() {
-		ui.Text(ctx, title).FontSize(design.FontLarge).TextColor(c.T.Ink)
+	return ui.Column(ctx).FillWidth().Gap(design.SpaceMD).AlignItems(ui.Center).
+		Padding(design.Space2X).Background(c.T.SurfaceAlt).Border(1, c.T.Line).
+		Radius(design.RadiusMD).Children(func() {
+		ui.Text(ctx, title).FontSize(design.FontMedium).TextColor(c.T.Ink)
 		if note != "" {
-			ui.Text(ctx, note).FontSize(design.FontSmall).TextColor(c.T.Muted)
+			ui.Text(ctx, note).FontSize(design.FontSmall).TextColor(c.T.Muted).TextAlign(ui.Center)
 		}
 		if action != nil {
 			action()

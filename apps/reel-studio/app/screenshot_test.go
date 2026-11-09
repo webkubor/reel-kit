@@ -12,35 +12,48 @@ import (
 // Test截图 把界面渲染成 PNG，供人眼核对布局。
 //
 // 自动化测试只能证明「文字在不在」，看不出层次、留白与对齐是否成立。
-// 这张图就是 UI 走查的证据。
+// 这张图就是 UI 走查的证据：每条流水线都要有，宽窄两种窗口都要有。
+//
+// 无头渲染（MyGo 的 Tester）不依赖屏幕，锁屏、远程、CI 上都能跑。
 func Test截图(t *testing.T) {
-	server := stub(t, []map[string]any{{
-		"id": "j1", "projectId": "p1", "status": "failed", "createdAt": "2026-01-01T00:00:00Z",
-		"input":    map[string]any{"kind": "video", "prompt": "橘猫在窗台上看雨，晨光斜照，镜头缓慢推近"},
-		"error":    "下载超时（上游任务 task-123 已生成并计费，素材还在上游；重新提交会重复计费）",
-		"upstream": map[string]any{"channel": "minimax", "taskId": "task-123"},
-	}})
+	server := stub(t, talkJobs())
 	a := newApp(t, server.URL)
-	a.prompt = "橘猫在窗台上看雨，晨光斜照，镜头缓慢推近"
+	a.talkTitle = "3 个 AI 小技巧"
+	a.talkCaptions = "第一个技巧：先写脚本再配音\n第二个技巧：一句话一镜，别贪多\n第三个技巧：做完立刻看效果"
+	a.talkSubtitle = "新手也能用"
+	a.recTitle = "Reel Kit：把想法变成视频"
+	a.recCaptions = "一句话说清它解决什么问题\n第二句给出具体用法\n第三句说清谁能用"
+	a.repoURL = "https://github.com/webkubor/reel-kit"
 
-	for _, size := range []struct {
-		name          string
-		width, height int
+	for _, mode := range []struct {
+		name string
+		mode Mode
 	}{
-		{"desktop", 1280, 840},
-		{"narrow", 1024, 720},
+		{"talk", ModeTalk},
+		{"recommend", ModeRecommend},
+		{"export", ModeExport},
+		{"library", ModeLibrary},
 	} {
-		tt := ui.NewTester(a.View, size.width, size.height)
-		tt.Frame()
-		path := filepath.Join(os.TempDir(), "reel-studio-"+size.name+".png")
-		file, err := os.Create(path)
-		if err != nil {
-			t.Fatal(err)
+		a.mode = mode.mode
+		for _, size := range []struct {
+			name          string
+			width, height int
+		}{
+			{"desktop", 1280, 840},
+			{"narrow", 1024, 720},
+		} {
+			tt := ui.NewTester(a.View, size.width, size.height)
+			tt.Frame()
+			path := filepath.Join(os.TempDir(), "reel-studio-"+mode.name+"-"+size.name+".png")
+			file, err := os.Create(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := png.Encode(file, tt.Image()); err != nil {
+				t.Fatal(err)
+			}
+			file.Close()
+			t.Logf("截图：%s（%d×%d）", path, size.width, size.height)
 		}
-		if err := png.Encode(file, tt.Image()); err != nil {
-			t.Fatal(err)
-		}
-		file.Close()
-		t.Logf("截图：%s（%d×%d）", path, size.width, size.height)
 	}
 }

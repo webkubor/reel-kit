@@ -193,29 +193,19 @@ func (a *App) viewMedia(c *ui.Context, asset studioapi.Asset) {
 	if !isImage && !isVideo {
 		return
 	}
-	img, vid, failed, _ := a.mediaFor(asset)
-	frame := func(fn func()) {
-		ui.Column(c).FillWidth().Height(320).Center().Radius(design.RadiusMD).
-			Background(a.kit.T.SurfaceAlt).Children(fn)
-	}
-	switch {
-	case img != nil:
-		frame(func() { ui.Image(c, img).Fill().Fit(ui.Contain) })
-	case vid != nil:
-		frame(func() { ui.Video(c, vid).Fill().Fit(ui.Contain) })
-	case failed != "":
-		frame(func() { a.kit.Hint(c, "预览加载失败："+failed) })
-	default:
-		frame(func() { a.kit.Hint(c, "正在加载预览…") })
-	}
+	a.viewPlayer(c, asset)
 }
 
 // viewAssets 画素材库：名称左对齐，来源标签跟在同一行。
 func (a *App) viewAssets(c *ui.Context) {
-	assets := a.ProjectAssets()
-	a.kit.SectionTitle(c, "素材", fmt.Sprintf("%d 项", len(assets)), nil)
+	assets := a.libraryAssets()
+	a.kit.SectionTitle(c, "素材库", fmt.Sprintf("%d 项", len(assets)), nil)
+	if a.projectID != "" && ui.Button(c, "导入本地素材").FontSize(design.FontSmall).Clicked() {
+		projectID := a.projectID
+		go a.importMedia(projectID)
+	}
 	if len(assets) == 0 {
-		a.kit.Hint(c, "这个项目还没有素材。")
+		a.kit.Hint(c, "这个工作空间还没有素材。")
 		return
 	}
 	current := a.previewAsset()
@@ -244,48 +234,16 @@ func (a *App) viewAssets(c *ui.Context) {
 	})
 }
 
-// viewRecommendationComposer 画项目推荐这一屏：仓库 → 分镜 → 配音 → 配乐 → 出片。
-//
-// 这条是本产品的主线：读一个 GitHub 仓库，直接得到一条能发的推荐视频。
-func (a *App) viewRecommendationComposer(c *ui.Context) {
-	a.kit.Field(c, "GitHub 仓库", "填仓库地址或 owner/repo", func() {
-		a.kit.Input(c, &a.repoURL, "https://github.com/owner/repo")
-	})
-	ui.Row(c).Gap(design.SpaceSM).Children(func() {
-		button := kitButton(a.kit, c, kit.ButtonSecondary, "读取项目", a.busy.Load() || a.repoURL == "")
-		if button.Clicked() {
-			a.readRepoDraft()
-		}
-		if a.busy.Load() {
-			a.kit.Hint(c, "正在读取…")
-		}
-	})
-	a.kit.Field(c, "标题", "", func() {
-		a.kit.Input(c, &a.recTitle, "这条视频的标题")
-	})
-	a.kit.Field(c, "分镜口播", "一行一句，念出来就是这条视频的正文", func() {
-		a.kit.TextArea(c, &a.recCaptions, "第一句说清这个项目解决什么问题", 120)
-	})
-	a.pick(c, "发布平台", "平台决定画幅与字幕排布", []choice{
-		{"channels", "视频号"},
-		{"xiaohongshu", "小红书"},
-		{"bilibili", "横屏（16:9）"},
-	}, a.recPlatform, func(id string) {
-		a.recPlatform = id
-		if id == "bilibili" {
-			a.recRatio = "16:9"
-		} else {
-			a.recRatio = "9:16"
-		}
-	})
-	a.viewChannelPicker(c)
-	a.viewModelPicker(c)
-	a.viewBGMPicker(c)
-	a.viewStoryboardImages(c)
-}
-
 // viewBGMPicker 画配乐选择：默认曲库（带授权）与项目里的本地音频。
 func (a *App) viewBGMPicker(c *ui.Context) {
+	a.viewBGMPickerFor(c, &a.recBGM)
+}
+
+// viewBGMPickerFor 画配乐选择，写回调用方指定的那份选择。
+//
+// 配乐是流水线配置里的一块（声音层次），所以每条流水线各有一份配乐选择，
+// 不能共用一个字段 —— 否则在口播里选了曲，切到推荐会把口播的配乐带过去。
+func (a *App) viewBGMPickerFor(c *ui.Context, current *string) {
 	choices := []choice{{"", "不用配乐"}}
 	if a.bgm != nil {
 		for _, item := range a.bgm.Items {
@@ -307,8 +265,8 @@ func (a *App) viewBGMPicker(c *ui.Context) {
 		})
 		return
 	}
-	a.pick(c, "配乐", "选用后会复制进项目，来源与授权一并记录", choices, a.recBGM, func(id string) {
-		a.recBGM = id
+	a.pick(c, "配乐", "选用后会复制进项目，来源与授权一并记录", choices, *current, func(id string) {
+		*current = id
 	})
 }
 
@@ -336,85 +294,6 @@ func (a *App) viewStoryboardImages(c *ui.Context) {
 					if box.Changed() {
 						a.recSelected[item.ID] = checked
 						a.syncSelectedImages()
-					}
-					a.kit.Tag(c, fmt.Sprintf("%d×%d", item.Width, item.Height), "")
-				})
-				_ = row
-			}
-		})
-	})
-}
-
-// viewTalkComposer 画知识口播这一屏：脚本 → 音色 → 风格 → 画面 → 出片。
-//
-// 一行脚本一镜是这里的硬约定：用户不用自己算镜头时长，
-// 配音生成后每镜按实际语速走，字幕也按行对应画面。
-func (a *App) viewTalkComposer(c *ui.Context) {
-	a.kit.Field(c, "标题", "", func() {
-		a.kit.Input(c, &a.talkTitle, "这条视频的标题")
-	})
-	a.kit.Field(c, "口播脚本", "一行一句，一行一镜；最多 8 镜，每行不超过 80 字", func() {
-		a.kit.TextArea(c, &a.talkCaptions, "第一句说什么？\n第二句说什么？", 120)
-	})
-	a.kit.Field(c, "副标题", "可选，显示在标题下方", func() {
-		a.kit.Input(c, &a.talkSubtitle, "可选")
-	})
-	if a.providers != nil && len(a.providers.Voice.Personas) > 0 {
-		choices := make([]choice, 0, len(a.providers.Voice.Personas))
-		for _, p := range a.providers.Voice.Personas {
-			choices = append(choices, choice{p.Key, p.Name})
-		}
-		a.pick(c, "音色", "本机 VoxFlow 音色，不产生模型费用", choices, a.talkPersona, func(id string) {
-			a.talkPersona = id
-		})
-	} else {
-		a.kit.Field(c, "音色", "本机 VoxFlow 还没连上；先在设置里确认连接状态", func() {
-			a.kit.Hint(c, "暂无可用音色")
-		})
-	}
-	if len(a.talkStyles) > 0 {
-		choices := make([]choice, 0, len(a.talkStyles))
-		for _, s := range a.talkStyles {
-			label := s.Name
-			if label == "" {
-				label = s.Key
-			}
-			choices = append(choices, choice{s.Key, label})
-		}
-		a.pick(c, "视觉风格", "版式与配色跟着风格走", choices, a.talkStyle, func(id string) {
-			a.talkStyle = id
-		})
-	}
-	a.viewTalkImages(c)
-}
-
-// viewTalkImages 画口播画面：勾哪几张，就按列表顺序入片。
-//
-// 不勾也能出片：后端会用风格色生成占位图，先把片子做出来，
-// 之后再换真图重做。总比让新手卡在「先去找图」这一步强。
-func (a *App) viewTalkImages(c *ui.Context) {
-	var images []studioapi.Asset
-	for _, asset := range a.ProjectAssets() {
-		if strings.HasPrefix(asset.Mime, "image/") {
-			images = append(images, asset)
-		}
-	}
-	if len(images) == 0 {
-		a.kit.Field(c, "画面", "项目里还没有图片；不勾也能出片，会先用风格色占位", func() {
-			a.kit.Hint(c, "暂无画面素材")
-		})
-		return
-	}
-	a.kit.Field(c, "画面", fmt.Sprintf("已选 %d 张，按列表顺序入片；不选则用占位图", len(a.talkImages)), func() {
-		ui.Column(c).FillWidth().Gap(design.SpaceXS).Children(func() {
-			for _, image := range images {
-				item := image
-				checked := a.talkSelected[item.ID]
-				row := ui.Row(c).FillWidth().Gap(design.SpaceSM).AlignItems(ui.Center).Children(func() {
-					box := a.kit.Checkbox(c, &checked, item.Name)
-					if box.Changed() {
-						a.talkSelected[item.ID] = checked
-						a.syncTalkImages()
 					}
 					a.kit.Tag(c, fmt.Sprintf("%d×%d", item.Width, item.Height), "")
 				})
