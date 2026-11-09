@@ -512,7 +512,13 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
         voice: {
           ready: voiceLocalReady || minimaxReady,
           label: '语音生成',
-          note: voiceLocalReady ? '本地模型已就绪；云端通道按量计费' : (voice ? '服务在线，Base 模型未就绪' : '未连接：启动 VoxFlow 服务后刷新'),
+          note: voiceLocalReady
+            ? '本地模型已就绪；云端通道按量计费'
+            : voice
+              ? '服务在线，Base 模型未就绪'
+              : minimaxReady
+                ? '本机语音服务没连上；云端配音可以用'
+                : '本机语音服务没连上，云端配音也还没配密钥：到「设置与反馈 → 云端配音密钥」填一个，或启动 VoxFlow 服务后刷新',
           designReady: Boolean(voice?.[0]?.design_model),
           recordingReady: Boolean(voice?.[1]?.capabilities?.reference_text_registration),
           version: voice?.[1]?.version || 'unknown',
@@ -521,7 +527,9 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
             channel('voxflow', 'VoxFlow · 本地', voiceLocalReady, voiceLocalReady ? '本地模型已就绪，本地推理不产生模型费用' : '服务在线，Base 模型未就绪', {
               voices: personas.map(p => ({ id: p.key, name: p.name })),
             }),
-            channel('minimax', 'MiniMax TTS', minimaxReady, '走自己的 MiniMax 套餐，按量计费；只做文字配音，不上传参考音频', {
+            channel('minimax', 'MiniMax TTS', minimaxReady, minimaxReady
+              ? '走自己的 MiniMax 套餐，按量计费；只做文字配音，不上传参考音频'
+              : '还没配 MiniMax 密钥：到「设置与反馈 → 云端配音密钥」填一个（按量计费）', {
               models: MINIMAX_TTS_MODELS.map(m => ({ id: m.id, name: m.name })),
               voices: MINIMAX_VOICES.map(v => ({ id: v.id, name: v.name })),
               allowCustomModel: true,

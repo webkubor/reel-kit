@@ -39,6 +39,10 @@ type Backend struct {
 type BackendStatus struct {
 	State string // starting | ready | failed | stopped
 	Note  string
+	// Started 说明这个工作台是本应用起的（true），还是复用了一个已经在跑的（false）。
+	// 重启工作台后要靠它说话：复用上的进程我们没重启过，密钥未必生效，
+	// 说成「已重启」就是在骗人。
+	Started bool
 }
 
 // NewBackend 返回一个后端管理器。
@@ -69,7 +73,7 @@ func (b *Backend) Alive() bool {
 // Ensure 保证工作台可用：能连上就用，连不上就自己起一个。
 func (b *Backend) Ensure() BackendStatus {
 	if b.Alive() {
-		return BackendStatus{State: "ready", Note: "已连接本机工作台"}
+		return BackendStatus{State: "ready", Note: "已连接本机工作台", Started: false}
 	}
 	if b.Root == "" {
 		return BackendStatus{State: "failed", Note: "找不到本地工作台的运行文件（resources/backend）"}
@@ -85,7 +89,7 @@ func (b *Backend) Ensure() BackendStatus {
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
 		if b.Alive() {
-			return BackendStatus{State: "ready", Note: "已启动本机工作台"}
+			return BackendStatus{State: "ready", Note: "已启动本机工作台", Started: true}
 		}
 		time.Sleep(300 * time.Millisecond)
 	}

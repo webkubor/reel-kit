@@ -98,3 +98,43 @@ func Test配置文件坏了不许被覆盖(t *testing.T) {
 		t.Errorf("坏掉的配置文件被改了：%q", after)
 	}
 }
+
+// Test重启工作台的说法要对得上事实
+//
+// 保存密钥之后会说「已重启」。这句话只有在真的重启了工作台时才成立：
+// 复用了一个已经在跑的工作台（我们没重启它），密钥未必生效；
+// 工作台压根没起来，更不能说成功。
+func Test重启工作台的说法要对得上事实(t *testing.T) {
+	cases := []struct {
+		name    string
+		status  BackendStatus
+		wantErr bool
+		want    string
+	}{
+		{
+			name:   "自己起的，已重启",
+			status: BackendStatus{State: "ready", Note: "已启动本机工作台", Started: true},
+			want:   "密钥已保存，本机工作台已重启",
+		},
+		{
+			name:   "复用别人的工作台",
+			status: BackendStatus{State: "ready", Note: "已连接本机工作台", Started: false},
+			want:   "请自己重启它才会生效",
+		},
+		{
+			name:    "工作台没起来",
+			status:  BackendStatus{State: "failed", Note: "本地工作台 20 秒内没有起来，请看日志"},
+			wantErr: true,
+			want:    "本地工作台 20 秒内没有起来",
+		},
+	}
+	for _, c := range cases {
+		notice, isErr := restartNotice(c.status)
+		if isErr != c.wantErr {
+			t.Errorf("%s：报错标记不对，%v", c.name, isErr)
+		}
+		if !strings.Contains(notice, c.want) {
+			t.Errorf("%s：提示不对，实际 %q", c.name, notice)
+		}
+	}
+}

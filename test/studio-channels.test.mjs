@@ -152,3 +152,30 @@ test('MuseAV 任务 ID 从 stderr 里取，取不到就是取不到', () => {
   assert.equal(museavJobId('视频任务已提交: 0c1a9e15-aed3-4395-b08f-b705e8ab8aa4\n✅ 完成'), '0c1a9e15-aed3-4395-b08f-b705e8ab8aa4')
   assert.equal(museavJobId('✅ 完成 (3.2s)'), '')
 })
+
+test('语音状态：没配密钥时说清楚去哪配，别只让人去启动 VoxFlow', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'reel-voice-status-'))
+  const home = mkdtempSync(join(tmpdir(), 'reel-voice-home-'))
+  t.after(() => { rmSync(root, { recursive: true, force: true }); rmSync(home, { recursive: true, force: true }) })
+  // 隔离本机配置与本机语音服务：这条断言只讲「没配密钥」时该怎么说
+  const previousHome = process.env.HOME
+  const previousKey = process.env.MINIMAX_API_KEY
+  const previousVox = process.env.REEL_VOXFLOW_URL
+  process.env.HOME = home
+  delete process.env.MINIMAX_API_KEY
+  process.env.REEL_VOXFLOW_URL = 'http://127.0.0.1:1'
+  t.after(() => {
+    if (previousHome === undefined) delete process.env.HOME; else process.env.HOME = previousHome
+    if (previousKey === undefined) delete process.env.MINIMAX_API_KEY; else process.env.MINIMAX_API_KEY = previousKey
+    if (previousVox === undefined) delete process.env.REEL_VOXFLOW_URL; else process.env.REEL_VOXFLOW_URL = previousVox
+  })
+
+  const store = createStore(root)
+  const providers = createProviders(store, { fetcher: async () => { throw new Error('offline') } })
+  const state = await providers.status()
+  const minimax = state.voice.channels.find(c => c.id === 'minimax')
+  // 通道本身要说清楚「去哪配密钥」，而不是只说「按量计费」
+  assert.match(minimax.note, /密钥/)
+  // 总体状态也别只指向 VoxFlow：Windows 用户根本没装它
+  assert.match(state.voice.note, /云端配音/)
+})

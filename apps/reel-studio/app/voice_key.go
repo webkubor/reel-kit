@@ -1,6 +1,8 @@
 package app
 
 import (
+	"os"
+
 	"github.com/egoist/mygo/ui"
 	"github.com/webkubor/reel-kit/apps/reel-studio/design"
 	kit "github.com/webkubor/reel-kit/apps/reel-studio/ui"
@@ -36,6 +38,9 @@ func (a *App) viewVoiceKeySettings(c *ui.Context) {
 			}
 		})
 		a.kit.Hint(c, "本机 VoxFlow 不需要密钥：装一次就能用，配音不出本机、不花钱。")
+		if os.Getenv("MINIMAX_API_KEY") != "" {
+			a.kit.Hint(c, "环境变量 MINIMAX_API_KEY 正在生效：它会盖过这里保存的密钥")
+		}
 	})
 }
 
@@ -59,6 +64,10 @@ func (a *App) saveMinimaxKeyAndRestart(key string) {
 //
 // 只重启自己起的那个；工作台是用户另外起的就告诉用户自己重启 ——
 // 别人开的进程不归我们杀。
+//
+// 报什么要说准：只有确实重启了我们自己起的那个进程，才能说「已重启」。
+// 复用了一个已经在跑的工作台（我们没重启过它），密钥未必生效，
+// 说成「已重启」就是在骗人。工作台没起来也要说失败，不能报成功。
 func (a *App) restartWorkbench() {
 	if a.backendProc == nil {
 		a.mutate(func() {
@@ -74,9 +83,26 @@ func (a *App) restartWorkbench() {
 			a.backendState = status
 		})
 		a.refresh()
+		notice, isErr := restartNotice(status)
 		a.mutate(func() {
-			a.notice = "密钥已保存，本机工作台已重启"
-			a.noticeErr = false
+			a.notice = notice
+			a.noticeErr = isErr
 		})
 	}()
+}
+
+// restartNotice 说清「保存密钥之后到底发生了什么」。
+//
+// 只有确实重启了我们自己起的工作台，才能说「已重启」；
+// 复用了一个已经在跑的（没重启过），密钥未必生效，要让用户自己重启；
+// 工作台没起来就直接说失败 —— 报成功就是在骗人。
+func restartNotice(status BackendStatus) (string, bool) {
+	switch {
+	case status.State != "ready":
+		return "密钥已保存，但本机工作台没起来：" + status.Note, true
+	case status.Started:
+		return "密钥已保存，本机工作台已重启", false
+	default:
+		return "密钥已保存。这个工作台不是应用起的（没重启过），请自己重启它才会生效", false
+	}
 }
