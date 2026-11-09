@@ -137,6 +137,26 @@ kyvault run --env MINIMAX_API_KEY=secret://minimax/api-key -- reel studio
 
 工作台另有 **MyGo 原生桌面版**：窗口、按钮、输入框、下拉、卡片全部是 Go 原生控件，不是网页，不用再写前端。
 
+下载安装（macOS Apple Silicon）：
+
+```bash
+curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v0.2.3/install.sh | sh
+```
+
+应用里左栏是**视频流水线**，不是平铺的菜单；点进一条流水线，中间是它的生成配置
+（脚本 / 声音 / 画面 / 版式 / 画幅 / 配乐 / 输出），右栏是这条流水线跑出来的视频
+（条数、进度、每条背后的配置，可以按同一份配置再生成一条，也可以找一条对比）。
+
+| 流水线 | 做什么 |
+|---|---|
+| 知识口播 | 一行一镜的脚本 → 逐句配音 → 按实际语速定每镜时长 → 渲染画面帧 → 合成 |
+| 项目推荐 | 读 GitHub 仓库 → 分镜 → 逐句旁白 → 带解说的项目介绍视频 |
+| 素材合成 | 把素材、配音、BGM 按顺序拼成一条并导出到本地项目 |
+| 人物商品介绍 | 给产品或人物出一条介绍片：竖版出镜画面满屏，横屏左图右文，画幅决定版式 |
+
+素材库这一屏还能**用自己的声音**：填音色名称和录音原文、选一段录音，即可注册一个自己的音色，
+之后任何流水线都能选它（录音不出本机）。
+
 ```bash
 cd apps/reel-studio
 go tool mygo dev      # 开发（带热重载）
@@ -145,6 +165,10 @@ go tool mygo build    # 打包成 .app
 ```
 
 原生界面与网页版共用同一套本地 HTTP 接口（`src/studio/server.mjs`），数据、素材、成片都还在 `~/.reel-kit/studio/`。
+
+打包进应用的后端是发版那一刻的源码快照（`scripts/prepare-resources.sh`）。改了后端源码却没重新刷新快照，
+装出来的应用就会少功能 —— `scripts/check-bundle-freshness.mjs` 会拦住这种发版（已接进 `pnpm check`）。
+
 
 ## ⚡ 30 秒上手
 
