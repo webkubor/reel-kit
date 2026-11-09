@@ -16,7 +16,7 @@ package app
 //
 // 现在的分法：
 //
-//	视频流水线：知识口播 / 项目推荐 / 素材合成 / 人物商品介绍（未开放）
+//	视频流水线：知识口播 / 项目推荐 / 素材合成 / 人物商品介绍
 //	工具：素材库 / 生成素材
 //	设置与反馈
 //
@@ -39,7 +39,7 @@ var videoPipelines = []navItem{
 	{ModeTalk, "知识口播", "写一句一镜的脚本，本机配音与合成", "talk", true},
 	{ModeRecommend, "项目推荐", "读一个 GitHub 仓库，出推荐视频", "repo", true},
 	{ModeExport, "素材合成", "把图片或片段合成一条视频", "film", true},
-	{ModeProduct, "人物商品介绍", "样例还在验证，暂未开放", "person", false},
+	{ModeProduct, "人物商品介绍", "给产品或人物出一条介绍片", "person", true},
 }
 
 // studioTools 是工具，不产出视频。
@@ -49,8 +49,6 @@ var studioTools = []navItem{
 }
 
 // pipelineKind 把导航项映射到后端任务类型。
-//
-// 人物商品介绍还没有后端实现，返回空串。
 func pipelineKind(mode Mode) string {
 	switch mode {
 	case ModeTalk:
@@ -60,7 +58,7 @@ func pipelineKind(mode Mode) string {
 	case ModeExport:
 		return "export"
 	case ModeProduct:
-		return ""
+		return "product"
 	}
 	return ""
 }

@@ -91,6 +91,14 @@ func expectedSteps(kind string, input map[string]any) int {
 	case "recommendation":
 		// 确认配置 + 逐句旁白 + 渲染画面帧 + 合成成片
 		return lines + 3
+	case "product":
+		// 确认配置 + 逐句配音 + 渲染画面帧 + 合成成片
+		total := lines + 3
+		if assets == 0 {
+			// 没有产品画面时先出占位图，多一步
+			total++
+		}
+		return total
 	}
 	return 0
 }

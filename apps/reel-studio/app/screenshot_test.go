@@ -24,6 +24,10 @@ func Test截图(t *testing.T) {
 	a.recTitle = "Reel Kit：把想法变成视频"
 	a.recCaptions = "一句话说清它解决什么问题\n第二句给出具体用法\n第三句说清谁能用"
 	a.repoURL = "https://github.com/webkubor/reel-kit"
+	a.prodTitle = "Reel Studio 本地视频工作台"
+	a.prodSubtitle = "素材不出本机"
+	a.prodCaptions = "Reel Studio 是跑在自己电脑上的视频工作台\n写一句一镜的脚本，它就配好音、渲好画面、合成成片\n每条视频背后的生成配置都留着"
+	a.prodFooter = "现在就去试试"
 
 	for _, mode := range []struct {
 		name string
@@ -32,6 +36,7 @@ func Test截图(t *testing.T) {
 		{"talk", ModeTalk},
 		{"recommend", ModeRecommend},
 		{"export", ModeExport},
+		{"product", ModeProduct},
 		{"library", ModeLibrary},
 	} {
 		a.mode = mode.mode
