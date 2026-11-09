@@ -13,53 +13,59 @@ import (
 // 所以填完之后仍然可以改，改完再生成。
 func (a *App) readRepoDraft() {
 	url := a.repoURL
+	projectID := a.projectID
 	if url == "" {
 		a.fail("先填 GitHub 仓库地址")
 		return
 	}
-	a.mu.Lock()
-	a.busy = true
-	a.notice = "正在读取仓库…"
-	a.noticeErr = false
-	a.mu.Unlock()
-	a.redraw()
+	if projectID == "" {
+		a.fail("请先选择或新建一个项目")
+		return
+	}
+	a.busy.Store(true)
+	a.mutate(func() {
+		a.notice = "正在读取仓库…"
+		a.noticeErr = false
+	})
 	go func() {
 		client := studioapi.New(a.opts.BaseURL)
-		draft, err := client.Draft(a.projectID, url)
-		a.mu.Lock()
-		a.busy = false
-		if err != nil {
-			a.notice = err.Error()
-			a.noticeErr = true
-		} else {
-			if title, ok := draft["title"].(string); ok && title != "" {
-				a.recTitle = title
-			}
-			a.recCaptions = joinCaptions(draft["captions"])
-			// 读取项目时后端已经把仓库里的展示图收进项目素材，这里默认全选。
-			var picked []string
-			if list, ok := draft["images"].([]any); ok {
-				for _, item := range list {
-					asset, ok := item.(map[string]any)
-					if !ok {
-						continue
-					}
-					if id, ok := asset["id"].(string); ok && id != "" {
-						picked = append(picked, id)
-						a.recSelected[id] = true
+		draft, err := client.Draft(projectID, url)
+		a.busy.Store(false)
+		a.mutate(func() {
+			if err != nil {
+				a.notice = err.Error()
+				a.noticeErr = true
+				a.logf("读取仓库草稿失败：%s", err.Error())
+			} else {
+				if title, ok := draft["title"].(string); ok && title != "" {
+					a.recTitle = title
+				}
+				a.recCaptions = joinCaptions(draft["captions"])
+				// 读取项目时后端已经把仓库里的展示图收进项目素材，这里默认全选。
+				var picked []string
+				if list, ok := draft["images"].([]any); ok {
+					for _, item := range list {
+						asset, ok := item.(map[string]any)
+						if !ok {
+							continue
+						}
+						if id, ok := asset["id"].(string); ok && id != "" {
+							picked = append(picked, id)
+							a.recSelected[id] = true
+						}
 					}
 				}
+				a.recImages = picked
+				if len(picked) == 0 {
+					a.notice = "已读取项目介绍；仓库里没有展示图，请在素材库导入图片并勾选。"
+					a.noticeErr = true
+				} else {
+					a.notice = fmt.Sprintf("已读取项目草稿与 %d 张画面，确认文案后再生成。", len(picked))
+					a.noticeErr = false
+				}
+				a.logf("读取仓库草稿完成，得到 %d 张画面", len(picked))
 			}
-			a.recImages = picked
-			if len(picked) == 0 {
-				a.notice = "已读取项目介绍；仓库里没有展示图，请在素材库导入图片并勾选。"
-				a.noticeErr = true
-			} else {
-				a.notice = fmt.Sprintf("已读取项目草稿与 %d 张画面，确认文案后再生成。", len(picked))
-				a.noticeErr = false
-			}
-		}
-		a.mu.Unlock()
+		})
 		a.refresh()
 	}()
 }
@@ -157,33 +163,78 @@ func (a *App) saveReview(jobID string) {
 
 // remakeJob 按当前方法再做一条：复用已有素材，不重新付费生成。
 func (a *App) remakeJob(jobID string) {
-	a.workflowBusy(jobID, "remake", map[string]any{
-		"projectId": a.projectID,
-		"jobId":     jobID,
+	projectID := a.projectID
+	a.busy.Store(true)
+	a.mutate(func() {
+		a.notice = "正在按当前方法创建新制作项目…"
+		a.noticeErr = false
 	})
+	a.logf("按当前方法再做一条（原项目 %s）", projectID)
+	go func() {
+		client := studioapi.New(a.opts.BaseURL)
+		res, err := client.Workflow("remake", map[string]any{
+			"projectId": projectID,
+			"jobId":     jobID,
+		})
+		a.busy.Store(false)
+		a.mutate(func() {
+			if err != nil {
+				a.notice = err.Error()
+				a.noticeErr = true
+				a.logf("复制制作项目失败：%s", err.Error())
+				return
+			}
+			// 后端返回的是 projectId（不是 id）：拿错键就永远切不过去，
+			// 用户点完还停在原项目，以为没生效。
+			newID, _ := res["projectId"].(string)
+			if newID == "" {
+				a.notice = "已克隆制作项目，但没有拿到新项目编号，请刷新后手动选择。"
+				a.noticeErr = true
+				return
+			}
+			a.projectID = newID
+			// 草稿跟着复制过来了，直接填进表单，省一次重新读取
+			if draft, ok := res["draft"].(map[string]any); ok {
+				if title, ok := draft["title"].(string); ok && title != "" {
+					a.recTitle = title
+				}
+				if captions, ok := draft["captions"].(string); ok && captions != "" {
+					a.recCaptions = captions
+				}
+				if url, ok := draft["url"].(string); ok && url != "" {
+					a.repoURL = url
+				}
+			}
+			a.notice = "已复制项目与素材，可调整分镜与参数后重新出片（本次未提交生成请求）。"
+			a.noticeErr = false
+			a.logf("已复制制作项目 → %s", newID)
+		})
+		a.refresh()
+	}()
 }
 
 // workflowBusy 调一个工作流动作，结束后刷新状态。
 func (a *App) workflowBusy(jobID, action string, input map[string]any) {
-	a.mu.Lock()
-	a.busy = true
-	a.notice = "处理中…"
-	a.noticeErr = false
-	a.mu.Unlock()
-	a.redraw()
+	a.busy.Store(true)
+	a.mutate(func() {
+		a.notice = "处理中…"
+		a.noticeErr = false
+	})
 	go func() {
 		client := studioapi.New(a.opts.BaseURL)
 		_, err := client.Workflow(action, input)
-		a.mu.Lock()
-		a.busy = false
-		if err != nil {
-			a.notice = err.Error()
-			a.noticeErr = true
-		} else {
-			a.notice = fmt.Sprintf("「%s」已完成。", action)
-			a.noticeErr = false
-		}
-		a.mu.Unlock()
+		a.busy.Store(false)
+		a.mutate(func() {
+			if err != nil {
+				a.notice = err.Error()
+				a.noticeErr = true
+				a.logf("工作流 %s 失败：%s", action, err.Error())
+			} else {
+				a.notice = fmt.Sprintf("「%s」已完成。", action)
+				a.noticeErr = false
+				a.logf("工作流 %s 完成", action)
+			}
+		})
 		a.refresh()
 	}()
 }

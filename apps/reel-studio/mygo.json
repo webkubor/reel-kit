@@ -13,5 +13,11 @@
   },
   "macos": {
     "dmgTitle": "Reel Studio"
+  },
+  "updates": {
+    "publicKey": "Wl/RioKt0yPxHQPc2qeekeDLTfqxpm60B3xhzxvvFLo=",
+    "github": "webkubor/reel-kit",
+    "tagPrefix": "app-v",
+    "deltas": 3
   }
 }

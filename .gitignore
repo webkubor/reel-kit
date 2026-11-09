@@ -2,3 +2,13 @@ node_modules/
 *.log
 dist/
 .DS_Store
+
+# 桌面版打包时下载的依赖缓存
+.cache/
+
+# 本地 worktree 管理目录，不入库
+.claude/
+
+# 打包产物
+apps/reel-studio/website/*.exe
+apps/reel-studio/website/*.dmg

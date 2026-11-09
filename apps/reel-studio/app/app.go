@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -32,6 +33,7 @@ const (
 	ModeImage
 	ModeSpeech
 	ModeExport
+	ModeSettings
 )
 
 // Options 是启动参数。
@@ -46,10 +48,14 @@ type App struct {
 	opts  Options
 	kit   kit.Comps
 	win   *mygo.Window
-	// mu 保护所有界面状态。View 渲染期间持有它，
-	// 后台线程改状态时短暂持有 —— 状态只有一个写入方，界面不会读到半截数据。
-	mu    sync.Mutex
-	ready bool
+	// mu 只保护 pending 这一个队列。
+	//
+	// 界面状态本身**不加锁**：所有写入都经 mutate 排到渲染线程执行，
+	// 所有读取都发生在渲染线程（View），所以两者天然串行。
+	// 之前给整个状态加锁，结果 View 持锁渲染、按钮回调里再取锁 → 死锁。
+	mu      sync.Mutex
+	pending []func()
+	ready   bool
 
 	state     *studioapi.State
 	providers *studioapi.Providers
@@ -99,17 +105,37 @@ type App struct {
 	// 提示信息
 	notice    string
 	noticeErr bool
-	busy      bool
+	// busy 是「有请求在飞」。
+	//
+	// 用原子量而不是普通 bool：后台线程要能随时读到自己刚设的值。
+	// 普通 bool 配 mutate 会出现这种错 —— mutate 在有窗口时是「排进主线程」，
+	// 不是同步执行，poll 读到的是上一帧的旧值，于是「忙」这个状态根本传不出去。
+	busy atomic.Bool
+
+	// 更新与日志
+	updates updates
+	log     *LogWriter
+
+	// 问题与需求反馈
+	feedback feedbackState
+
+	// stopping 用来叫停后台轮询。
+	stopping chan struct{}
 
 	media mediaCache
 }
 
 // New 返回一个应用。
 func New(opts Options) *App {
+	if opts.BaseURL == "" {
+		opts.BaseURL = "http://127.0.0.1:4390"
+	}
 	root := opts.BackendRoot
 	if root == "" {
 		root = FindRoot()
 	}
+	backend := NewBackend(opts.BaseURL, root)
+	backend.Bundled = FindBundled()
 	return &App{
 		opts:         opts,
 		kit:          kit.New(design.Light()),
@@ -119,35 +145,86 @@ func New(opts Options) *App {
 		recRatio:     "9:16",
 		reviewChecks: map[string]bool{},
 		recSelected:  map[string]bool{},
-		backendProc:  NewBackend(opts.BaseURL, root),
+		backendProc:  backend,
 		backendState: BackendStatus{State: "starting", Note: "正在连接本地工作台…"},
+		log:          NewLogWriter(),
+		feedback: feedbackState{
+			kind:    FeedbackBug,
+			include: true,
+		},
+		stopping: make(chan struct{}),
 	}
 }
 
 // SetWindow 绑定窗口。
 func (a *App) SetWindow(w *mygo.Window) { a.win = w }
 
+// mutate 把一次状态修改排到渲染线程上执行。
+//
+// **所有状态写入都必须走这里**，而且必须发生在渲染线程上：
+// View 在渲染线程读状态，后台 goroutine 写状态，两边撞上就是数据竞态
+// （界面可能渲染出写了一半的值，竞态检测器也会报）。
+//
+// 具体做法是排队：后台线程把要改的东西塞进 pending，请求下一帧；
+// View 在渲染前把 pending 里的动作一个个执行掉。
+//
+// 为什么不直接用 win.Update 改：那样修改发生在主线程的某个时刻，
+// 而 View 可能已经在渲染了 —— 读和写还是会撞。排队 + 每帧开头统一执行，
+// 才能保证「渲染看到的永远是完整的上一帧状态」。
+//
+// 无窗口（单测）时没有帧循环，但 Tester's Frame() 会调 View，
+// 排队的动作照样会被执行。
+func (a *App) mutate(fn func()) {
+	a.mu.Lock()
+	a.pending = append(a.pending, fn)
+	a.mu.Unlock()
+	a.redraw()
+}
+
+// drainPending 执行排队的状态修改。只能在渲染线程调用。
+func (a *App) drainPending() {
+	a.mu.Lock()
+	pending := a.pending
+	a.pending = nil
+	a.mu.Unlock()
+	for _, fn := range pending {
+		fn()
+	}
+}
+
 // Start 准备本地工作台、拉初始数据、开始轮询。
 //
 // 全程在后台线程做：开窗时主线程不能被网络请求卡住。
 func (a *App) Start() {
+	a.logf("Reel Studio 启动（版本 %s）", mygo.App.Version())
 	go func() {
 		if a.backendProc != nil {
 			status := a.backendProc.Ensure()
-			a.mu.Lock()
-			a.backendState = status
-			a.mu.Unlock()
-			a.redraw()
+			a.mutate(func() {
+				a.backendState = status
+			})
+			a.logf("本地工作台：%s（%s）", status.State, status.Note)
 		}
 		a.refresh()
 		a.poll()
 	}()
+	// 后台查一次更新：有新版就在界面上给个提示，而不是等人手动点。
+	go a.checkUpdate()
 }
 
 // Stop 收尾：停掉自己起的工作台。
 func (a *App) Stop() {
+	select {
+	case <-a.stopping:
+		// 已经停过了
+	default:
+		close(a.stopping)
+	}
 	if a.backendProc != nil {
 		a.backendProc.Stop()
+	}
+	if a.log != nil {
+		a.log.Close()
 	}
 }
 
@@ -156,44 +233,42 @@ func (a *App) refresh() {
 	client := studioapi.New(a.opts.BaseURL)
 	state, err := client.State()
 	if err != nil {
-		a.mu.Lock()
-		a.notice = "连不上本地工作台：" + err.Error()
-		a.noticeErr = true
-		a.mu.Unlock()
-		a.redraw()
+		a.mutate(func() {
+			a.notice = "连不上本地工作台：" + err.Error()
+			a.noticeErr = true
+		})
 		return
 	}
-	providers, err := client.Providers()
-	if err == nil {
-		a.mu.Lock()
-		a.providers = providers
-		a.mu.Unlock()
-	}
-	bgm, err := client.BGM()
-	if err == nil {
-		a.mu.Lock()
-		a.bgm = bgm
-		a.mu.Unlock()
-	}
-	a.mu.Lock()
-	a.state = state
-	if a.projectID == "" && len(state.Projects) > 0 {
-		a.projectID = state.Projects[0].ID
-	}
-	// 通道就绪状态可能变（比如用户刚配好密钥），要在可用通道里挑一个
-	a.ensureBackend()
-	a.mu.Unlock()
-	a.redraw()
+	providers, _ := client.Providers()
+	bgm, _ := client.BGM()
+	a.mutate(func() {
+		a.state = state
+		if providers != nil {
+			a.providers = providers
+		}
+		if bgm != nil {
+			a.bgm = bgm
+		}
+		if a.projectID == "" && len(state.Projects) > 0 {
+			a.projectID = state.Projects[0].ID
+		}
+		// 通道就绪状态可能变（比如用户刚配好密钥），要在可用通道里挑一个
+		a.ensureBackend()
+	})
 }
 
 // poll 每两秒拉一次状态。原生界面没有网页的 setInterval，只能自己轮询。
+//
+// 忙的时候不轮询：请求刚提交时界面正在显示「已提交」，此时拉回来的
+// 中间态会把提示冲掉，用户以为没提交。
 func (a *App) poll() {
 	for {
-		time.Sleep(2 * time.Second)
-		a.mu.Lock()
-		busy := a.busy
-		a.mu.Unlock()
-		if busy {
+		select {
+		case <-a.stopping:
+			return
+		case <-time.After(2 * time.Second):
+		}
+		if a.busy.Load() {
 			continue
 		}
 		client := studioapi.New(a.opts.BaseURL)
@@ -201,16 +276,14 @@ func (a *App) poll() {
 		if err != nil {
 			continue
 		}
-		a.mu.Lock()
-		// 数量不变也可能变了内容（任务状态、进度文案），
-		// 所以连任务摘要一起比，别只看计数。
-		changed := a.state == nil || len(state.Jobs) != len(a.state.Jobs) ||
-			len(state.Assets) != len(a.state.Assets) || jobSummary(state.Jobs) != jobSummary(a.state.Jobs)
-		a.state = state
-		a.mu.Unlock()
-		if changed {
-			a.redraw()
-		}
+		a.mutate(func() {
+			changed := a.state == nil || len(state.Jobs) != len(a.state.Jobs) ||
+				len(state.Assets) != len(a.state.Assets) || jobSummary(state.Jobs) != jobSummary(a.state.Jobs)
+			a.state = state
+			if changed && a.win != nil {
+				a.redraw()
+			}
+		})
 	}
 }
 
@@ -348,10 +421,9 @@ func (a *App) ProjectJobs() []studioapi.Job {
 
 // View 画出整个窗口。
 func (a *App) View(c *ui.Context) {
-	// 渲染期间持有锁：后台线程这时改不了状态，
-	// 界面不会看到「项目列表换了、任务列表还没换」的半截画面。
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	// 先把后台线程排队的状态修改执行掉，再渲染。
+	// 这样渲染看到的一定是完整状态，不会撞上写到一半的字段。
+	a.drainPending()
 	a.kit = kit.New(design.Light())
 	c.SetTheme(a.kit.T.Theme())
 	ui.Row(c).Fill().Gap(0).Children(func() {
@@ -405,6 +477,106 @@ func (a *App) viewSidebar(c *ui.Context) {
 			Padding(design.SpaceLG, design.SpaceXL).Children(func() {
 			a.viewBackendStatus(c)
 			a.viewConnections(c)
+			a.viewSidebarFooter(c)
+		})
+	})
+}
+
+// viewSidebarFooter 画左栏底部的设置与反馈入口。
+func (a *App) viewSidebarFooter(c *ui.Context) {
+	info := a.updates.info
+	if info.State == UpdateReady {
+		b := ui.Button(c, "★ 发现新版 "+info.Version)
+		b = b.FillWidth().Radius(design.RadiusSM).Padding(design.SpaceSM, design.SpaceMD).
+			Background(a.kit.T.AccentSoft).TextColor(a.kit.T.Accent)
+		if b.Clicked() {
+			a.mode = ModeSettings
+			a.redraw()
+		}
+		return
+	}
+	b := ui.Button(c, "⚙ 设置与反馈")
+	b = b.FillWidth().Radius(design.RadiusSM).Padding(design.SpaceSM, design.SpaceMD).
+		TextColor(a.kit.T.Muted)
+	if a.mode == ModeSettings {
+		b = b.Background(a.kit.T.AccentSoft).TextColor(a.kit.T.Accent)
+	}
+	if b.Clicked() {
+		a.mode = ModeSettings
+		a.redraw()
+	}
+}
+
+// viewSettingsAndFeedback 画软件设置、更新、日志与反馈面板。
+func (a *App) viewSettingsAndFeedback(c *ui.Context) {
+	ui.Scroll(c).Fill().Padding(design.SpaceXL).Children(func() {
+		ui.Column(c).FillWidth().Gap(design.SpaceXL).Children(func() {
+			// 1. 软件更新
+			a.kit.SectionTitle(c, "软件更新", "检查最新版本与自动安装更新（基于 GitHub Release 签名校验）", nil)
+			a.kit.Card(c, func() {
+				info := a.updates.info
+				ui.Row(c).Gap(design.SpaceLG).AlignItems(ui.Center).Children(func() {
+					ui.Text(c, "当前版本：v0.1.0").FontSize(design.FontBody).Bold().TextColor(a.kit.T.Ink)
+					switch info.State {
+					case UpdateChecking:
+						ui.Text(c, "正在检查更新…").FontSize(design.FontSmall).TextColor(a.kit.T.Muted)
+					case UpdateReady:
+						ui.Text(c, "发现新版本："+info.Version).FontSize(design.FontSmall).TextColor(a.kit.T.Accent)
+					case UpdateLatest:
+						ui.Text(c, "已是最新版本").FontSize(design.FontSmall).TextColor(a.kit.T.Green)
+					case UpdateInstalling:
+						note := "正在下载安装更新…"
+						if info.Error != "" {
+							note = info.Error
+						}
+						ui.Text(c, note).FontSize(design.FontSmall).TextColor(a.kit.T.Accent)
+					case UpdateInstalled:
+						ui.Text(c, "新版本已安装完成，重启后生效").FontSize(design.FontSmall).TextColor(a.kit.T.Green)
+					case UpdateFailed:
+						ui.Text(c, "检查失败").FontSize(design.FontSmall).TextColor(a.kit.T.Accent)
+					}
+				})
+				if info.Notes != "" {
+					ui.Text(c, "更新内容：\n"+info.Notes).FontSize(design.FontSmall).TextColor(a.kit.T.Muted)
+				}
+				if info.State == UpdateFailed && info.Error != "" {
+					a.kit.Notice(c, "更新检查未完成："+info.Error, "")
+				}
+				ui.Row(c).Gap(design.SpaceSM).Children(func() {
+					check := kitButton(a.kit, c, kit.ButtonSecondary, "检查更新", info.State == UpdateChecking || info.State == UpdateInstalling)
+					if check.Clicked() {
+						go a.checkUpdate()
+					}
+					if info.State == UpdateReady {
+						install := kitButton(a.kit, c, kit.ButtonPrimary, "立即安装更新", false)
+						if install.Clicked() {
+							go a.installUpdate()
+						}
+					}
+				})
+			})
+
+			// 2. 运行日志
+			a.kit.SectionTitle(c, "运行日志", "查看本地排障日志与文件位置", nil)
+			a.kit.Card(c, func() {
+				if path := a.LogFilePath(); path != "" {
+					ui.Text(c, "日志文件路径："+path).FontSize(design.FontSmall).TextColor(a.kit.T.Muted)
+				}
+				ui.Row(c).Gap(design.SpaceSM).Children(func() {
+					openBtn := kitButton(a.kit, c, kit.ButtonSecondary, "在文件管理器中打开", false)
+					if openBtn.Clicked() {
+						revealPath(a.LogFilePath())
+					}
+				})
+				if tail := a.logTail(10); tail != "" {
+					a.kit.Field(c, "近期记录（最后 10 行）", "", func() {
+						ui.Text(c, tail).FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
+					})
+				}
+			})
+
+			// 3. 问题与需求反馈
+			a.viewFeedback(c)
 		})
 	})
 }
@@ -475,6 +647,10 @@ func (a *App) viewConnections(c *ui.Context) {
 func (a *App) viewMain(c *ui.Context) {
 	ui.Column(c).Fill().Gap(0).Children(func() {
 		a.viewToolbar(c)
+		if a.mode == ModeSettings {
+			a.viewSettingsAndFeedback(c)
+			return
+		}
 		// Grow(1)：这一行拿走工具条以外的全部高度，
 		// 不然生成器会按内容高度往下长，底部的「生成」按钮被挤出窗口。
 		ui.Row(c).Fill().Grow(1).MinHeight(0).Gap(0).Children(func() {
@@ -488,7 +664,7 @@ func (a *App) viewMain(c *ui.Context) {
 func (a *App) viewToolbar(c *ui.Context) {
 	ui.Row(c).FillWidth().Gap(design.SpaceLG).AlignItems(ui.Center).
 		Background(a.kit.T.Surface).Border(1, a.kit.T.Line).Padding(design.SpaceLG, design.SpaceXL).Children(func() {
-		labels := []string{"项目推荐", "视频", "图片", "配音", "导出"}
+		labels := []string{"项目推荐", "视频", "图片", "配音", "导出", "设置与反馈"}
 		for i, label := range labels {
 			index := i
 			active := int(a.mode) == index
@@ -582,12 +758,12 @@ func (a *App) viewSubmit(c *ui.Context) {
 		a.kit.Notice(c, a.notice, kind)
 	}
 	channel := a.CurrentChannel()
-	disabled := a.busy || channel == nil || !channel.Ready || a.prompt == ""
+	disabled := a.busy.Load() || channel == nil || !channel.Ready || a.prompt == ""
 	label := "生成"
 	switch a.mode {
 	case ModeRecommend:
 		label = "生成推荐视频"
-		disabled = a.busy || a.recTitle == "" || a.recCaptions == "" || a.repoURL == "" || len(a.recImages) == 0
+		disabled = a.busy.Load() || a.recTitle == "" || a.recCaptions == "" || a.repoURL == "" || len(a.recImages) == 0
 	case ModeImage:
 		label = "生成图片"
 	case ModeSpeech:
@@ -669,16 +845,18 @@ func (a *App) viewJobs(c *ui.Context) {
 
 // newProject 新建项目。
 func (a *App) newProject() {
-	client := studioapi.New(a.opts.BaseURL)
-	p, err := client.NewProject("新项目")
-	if err != nil {
-		a.fail(err.Error())
-		return
-	}
-	a.mu.Lock()
-	a.projectID = p.ID
-	a.mu.Unlock()
-	a.refresh()
+	go func() {
+		client := studioapi.New(a.opts.BaseURL)
+		p, err := client.NewProject("新项目")
+		if err != nil {
+			a.fail(err.Error())
+			return
+		}
+		a.mutate(func() {
+			a.projectID = p.ID
+		})
+		a.refresh()
+	}()
 }
 
 // submit 提交生成任务。
@@ -721,25 +899,28 @@ func (a *App) submit() {
 	if len(a.assetIDs) > 0 {
 		input["assetIds"] = a.assetIDs
 	}
-	a.mu.Lock()
-	a.busy = true
-	a.notice = ""
-	a.mu.Unlock()
-	a.redraw()
+	// busy 是原子量，直接设，不用排队 —— 排队要等下一帧，
+	// 那一帧里按钮还是可点的，用户能连点两次提交。
+	a.busy.Store(true)
+	a.mutate(func() {
+		a.notice = ""
+	})
 
 	go func() {
 		client := studioapi.New(a.opts.BaseURL)
 		job, err := client.SubmitJob(input)
-		a.mu.Lock()
-		a.busy = false
-		if err != nil {
-			a.notice = err.Error()
-			a.noticeErr = true
-		} else {
-			a.notice = "已提交：" + job.ID
-			a.noticeErr = false
-		}
-		a.mu.Unlock()
+		a.busy.Store(false)
+		a.mutate(func() {
+			if err != nil {
+				a.notice = err.Error()
+				a.noticeErr = true
+				a.logf("提交生成任务失败（通道 %s，模型 %s）：%s", a.backend, a.model, err.Error())
+			} else {
+				a.notice = "已提交：" + job.ID
+				a.noticeErr = false
+				a.logf("已提交生成任务 %s（通道 %s，模型 %s）", job.ID, a.backend, a.model)
+			}
+		})
 		a.refresh()
 	}()
 }
@@ -801,75 +982,100 @@ func (a *App) submitRecommendation(channel *studioapi.Channel) {
 	if len(images) > 0 {
 		input["assetIds"] = images
 	}
-	a.mu.Lock()
-	a.busy = true
-	a.notice = ""
-	a.mu.Unlock()
-	a.redraw()
+
+	bgmChoice := a.recBGM
+	projectID := a.projectID
+
+	a.busy.Store(true)
+	a.mutate(func() {
+		a.notice = ""
+	})
 
 	go func() {
 		client := studioapi.New(a.opts.BaseURL)
-		if a.recBGM != "" && !strings.HasPrefix(a.recBGM, "bgm:") {
-			// 别名 → 先从默认曲库取到项目里，再把素材 ID 传下去
-			asset, err := client.PullBGM(a.projectID, a.recBGM)
-			if err != nil {
-				a.mu.Lock()
-				a.busy = false
-				a.notice = "取配乐失败：" + err.Error()
-				a.noticeErr = true
-				a.mu.Unlock()
-				a.refresh()
-				return
+		if bgmChoice != "" {
+			switch {
+			case strings.HasPrefix(bgmChoice, "r2:"):
+				alias := strings.TrimPrefix(bgmChoice, "r2:")
+				asset, err := client.PullBGM(projectID, alias)
+				if err != nil {
+					a.busy.Store(false)
+					a.mutate(func() {
+						a.notice = "取配乐失败：" + err.Error()
+						a.noticeErr = true
+					})
+					a.refresh()
+					return
+				}
+				input["bgmId"] = asset.ID
+			case strings.HasPrefix(bgmChoice, "asset:"):
+				input["bgmId"] = strings.TrimPrefix(bgmChoice, "asset:")
+			case strings.HasPrefix(bgmChoice, "bgm:"):
+				input["bgmId"] = strings.TrimPrefix(bgmChoice, "bgm:")
+			default:
+				// 裸 alias：只能当库里的别名解析。
+				// 解析失败就报错 —— 悄悄当成素材 ID 传下去，
+				// 后端会拿一个不存在的 ID 去合成，用户只看到「合成失败」，
+				// 根本不知道是自己选的配乐没拉到。
+				asset, err := client.PullBGM(projectID, bgmChoice)
+				if err != nil {
+					a.busy.Store(false)
+					a.mutate(func() {
+						a.notice = "配乐「" + bgmChoice + "」拉取失败：" + err.Error()
+						a.noticeErr = true
+					})
+					a.refresh()
+					return
+				}
+				input["bgmId"] = asset.ID
 			}
-			input["bgmId"] = asset.ID
-		} else if a.recBGM != "" {
-			input["bgmId"] = strings.TrimPrefix(a.recBGM, "bgm:")
 		}
 		job, err := client.SubmitJob(input)
-		a.mu.Lock()
-		a.busy = false
-		if err != nil {
-			a.notice = err.Error()
-			a.noticeErr = true
-		} else {
-			a.notice = "已提交：" + job.ID
-			a.noticeErr = false
-		}
-		a.mu.Unlock()
+		a.busy.Store(false)
+		a.mutate(func() {
+			if err != nil {
+				a.notice = err.Error()
+				a.noticeErr = true
+			} else {
+				a.notice = "已提交：" + job.ID
+				a.noticeErr = false
+			}
+		})
 		a.refresh()
 	}()
 }
 
 // resume 取回已在上游生成的产物。
 func (a *App) resume(jobID string) {
-	a.mu.Lock()
-	a.busy = true
-	a.mu.Unlock()
-	a.redraw()
+	a.busy.Store(true)
+	a.mutate(func() {
+		a.notice = "正在向后端取回产物…"
+		a.noticeErr = false
+	})
 	go func() {
 		client := studioapi.New(a.opts.BaseURL)
 		_, err := client.ResumeJob(jobID)
-		a.mu.Lock()
-		a.busy = false
-		if err != nil {
-			a.notice = err.Error()
-			a.noticeErr = true
-		} else {
-			a.notice = "已取回素材，没有重复计费。"
-			a.noticeErr = false
-		}
-		a.mu.Unlock()
+		a.busy.Store(false)
+		a.mutate(func() {
+			if err != nil {
+				a.notice = err.Error()
+				a.noticeErr = true
+			} else {
+				a.notice = "已取回素材，未重新提交生成请求。"
+				a.noticeErr = false
+			}
+		})
 		a.refresh()
 	}()
 }
 
 // fail 记一条错误提示。
 func (a *App) fail(message string) {
-	a.mu.Lock()
-	a.notice = message
-	a.noticeErr = true
-	a.mu.Unlock()
-	a.redraw()
+	a.busy.Store(false)
+	a.mutate(func() {
+		a.notice = message
+		a.noticeErr = true
+	})
 }
 
 // kind 返回任务类型。
