@@ -1,6 +1,7 @@
 package app
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -67,5 +68,33 @@ func Test配音通道说明不说反话(t *testing.T) {
 	}
 	if !strings.Contains(joined, "声音不出本机") {
 		t.Errorf("配音通道说明没写「声音不出本机」，实际文字：%q", texts)
+	}
+}
+
+// Test配置文件坏了不许被覆盖
+//
+// 用户的 ~/.reel-kit/config.json 里还有别的键（bgmManifest 等）。
+// 文件读不出来的时候要是当成空配置接着写，那些内容就没了。
+// 保存密钥这时必须失败，并且一个字都不许动。
+func Test配置文件坏了不许被覆盖(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	broken := []byte("{ 这不是 JSON")
+	if err := os.WriteFile(path, broken, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := reelConfigPathFn
+	reelConfigPathFn = func() string { return path }
+	t.Cleanup(func() { reelConfigPathFn = old })
+
+	if err := saveMinimaxKey("sk-test-key"); err == nil {
+		t.Fatal("配置文件读不出来时保存应该失败")
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(broken) {
+		t.Errorf("坏掉的配置文件被改了：%q", after)
 	}
 }

@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"time"
 	"testing"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 )
