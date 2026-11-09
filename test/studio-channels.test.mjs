@@ -121,6 +121,26 @@ test('MiniMax TTS：上游报错时不落库，也不自动换账户重试', asy
   assert.equal(store.state.assets.length, 0)
 })
 
+test('MiniMax TTS：音色也可以从 persona 来 —— 桌面版只有「音色」一个字段', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'reel-tts-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const previous = process.env.MINIMAX_API_KEY
+  process.env.MINIMAX_API_KEY = 'fixture-key'
+  t.after(() => { if (previous === undefined) delete process.env.MINIMAX_API_KEY; else process.env.MINIMAX_API_KEY = previous })
+  const store = createStore(root)
+  store.state.projects.push({ id: 'p1', name: 'p', createdAt: new Date().toISOString() })
+  let sent
+  const providers = createProviders(store, {
+    fetcher: async (url, options) => {
+      sent = { url, body: JSON.parse(options.body) }
+      return { ok: true, status: 200, json: async () => ({ base_resp: { status_code: 0 }, data: { audio: '494433' } }) }
+    },
+  })
+  const asset = await providers.generate({ kind: 'speech', projectId: 'p1', prompt: '你好', backend: 'minimax', persona: 'female-shaonv' }, () => {})
+  assert.equal(sent.body.voice_setting.voice_id, 'female-shaonv')
+  assert.equal(asset.persona, 'female-shaonv')
+})
+
 test('H3 直连：模型可以自填，但请求体仍是 V2 契约', () => {
   const body = h3Body({ prompt: 'walk', duration: 6, ratio: '9:16', model: 'MiniMax-H3-Turbo' }, undefined)
   assert.equal(body.model, 'MiniMax-H3-Turbo')

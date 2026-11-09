@@ -20,6 +20,14 @@ func (a *App) submitTalk() {
 		a.fail("先选一个音色")
 		return
 	}
+	backend := a.talkVoice
+	if backend == "" {
+		backend = "voxflow"
+	}
+	if !a.voiceChannelReady(backend) {
+		a.fail("配音通道没就绪：" + a.voiceChannelNote(backend))
+		return
+	}
 	lines := 0
 	for _, line := range strings.Split(a.talkCaptions, "\n") {
 		if strings.TrimSpace(line) != "" {
@@ -44,7 +52,7 @@ func (a *App) submitTalk() {
 		"subtitle":     a.talkSubtitle,
 		"style":        a.talkStyle,
 		"persona":      a.talkPersona,
-		"voiceBackend": "voxflow",
+		"voiceBackend": backend,
 		"ratio":        "9:16",
 	}
 	if len(a.talkImages) > 0 {
@@ -120,6 +128,14 @@ func (a *App) submitProduct() {
 		a.fail("先选一个音色")
 		return
 	}
+	backend := a.prodVoice
+	if backend == "" {
+		backend = "voxflow"
+	}
+	if !a.voiceChannelReady(backend) {
+		a.fail("配音通道没就绪：" + a.voiceChannelNote(backend))
+		return
+	}
 	lines := splitLines(a.prodCaptions)
 	if len(lines) == 0 || len(lines) > 8 {
 		a.fail("介绍词要 1–8 行，一行一镜")
@@ -143,7 +159,7 @@ func (a *App) submitProduct() {
 		"subtitle":     a.prodSubtitle,
 		"footer":       a.prodFooter,
 		"persona":      a.prodPersona,
-		"voiceBackend": "voxflow",
+		"voiceBackend": backend,
 		"ratio":        ratio,
 	}
 	if len(a.prodImages) > 0 {

@@ -673,8 +673,10 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
         if (channelId === 'minimax') {
           if (input.kind !== 'speech') throw new Error('MiniMax TTS 只支持文字配音；录音克隆与音色设计请用本地 VoxFlow')
           const profile = profiles.find(p => p.id === (input.profile || 'primary'))
-          if (!profile?.key) throw new Error('所选 MiniMax 账户未配置。使用密钥工具注入 MINIMAX_API_KEY 后启动工作台')
-          const voiceId = input.voiceId
+          if (!profile?.key) throw new Error('所选 MiniMax 账户未配置：在应用「设置与反馈 → 云端配音密钥」里填 MiniMax API Key，或用密钥工具注入 MINIMAX_API_KEY 后启动工作台')
+          // 音色可以从 voice_id 来，也可以从 persona 来 ——
+          // 桌面版只有「音色」一个字段，两条通道的值都存在那里。
+          const voiceId = input.voiceId || input.persona
           if (!voiceId) throw new Error('请选择音色（voice_id），或手动填写')
           const model = input.model || MINIMAX_TTS_MODELS[0].id
           progress('MiniMax 正在合成配音…')

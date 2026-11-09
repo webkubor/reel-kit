@@ -32,20 +32,7 @@ func (a *App) viewTalkComposer(c *ui.Context) {
 	})
 
 	a.partTitle(c, partVoice)
-	if a.providers != nil && len(a.providers.Voice.Personas) > 0 {
-		choices := make([]choice, 0, len(a.providers.Voice.Personas))
-		for _, p := range a.providers.Voice.Personas {
-			choices = append(choices, choice{p.Key, p.Name})
-		}
-		a.pick(c, "音色", "本机 VoxFlow 音色，不产生模型费用", choices, a.talkPersona, func(id string) {
-			a.talkPersona = id
-		})
-	} else {
-		a.kit.Field(c, "音色", "本机 VoxFlow 没连上，暂时没有可用音色", func() {
-			a.kit.Hint(c, "暂无可用音色")
-		})
-		a.voxflowHint(c)
-	}
+	a.viewVoicePicker(c, &a.talkVoice, &a.talkPersona)
 	a.kit.Field(c, "语气", "留空用音色默认；填了会传给配音引擎", func() {
 		a.kit.Input(c, &a.talkTone, "例如：亲切、专业")
 	})

@@ -121,6 +121,7 @@ type App struct {
 	talkSubtitle string
 	talkStyle    string
 	talkPersona  string
+	talkVoice    string
 	talkImages   []string
 	talkSelected map[string]bool
 	talkStyles   []studioapi.Style
@@ -135,6 +136,7 @@ type App struct {
 	prodCaptions string
 	prodFooter   string
 	prodPersona  string
+	prodVoice    string
 	prodTone     string
 	prodPause    string
 	prodRatio    string
@@ -192,6 +194,10 @@ type App struct {
 
 	// 问题与需求反馈
 	feedback feedbackState
+
+	// 云端配音（MiniMax TTS）的密钥输入框。
+	// 明文不留在状态里：只留用户刚输入的那一份，保存后清空。
+	minimaxKeyInput string
 
 	// stopping 用来叫停后台轮询。
 	stopping chan struct{}
@@ -739,7 +745,10 @@ func (a *App) viewSettingsAndFeedback(c *ui.Context) {
 				})
 			})
 
-			// 2. 运行日志
+			// 2. 云端配音密钥
+			a.viewVoiceKeySettings(c)
+
+			// 3. 运行日志
 			a.kit.SectionTitle(c, "运行日志", "查看本地排障日志与文件位置", nil)
 			a.kit.Card(c, func() {
 				if path := a.LogFilePath(); path != "" {
@@ -758,7 +767,7 @@ func (a *App) viewSettingsAndFeedback(c *ui.Context) {
 				}
 			})
 
-			// 3. 问题与需求反馈
+			// 4. 问题与需求反馈
 			a.viewFeedback(c)
 		})
 	})
@@ -1029,10 +1038,10 @@ func (a *App) viewSubmit(c *ui.Context) {
 		}
 	}
 	if a.mode == ModeTalk {
-		a.kit.Hint(c, "逐句用本机 VoxFlow 配音，画面与合成都在本机执行，不产生模型费用。")
+		a.kit.Hint(c, a.voicePipelineHint(a.talkVoice))
 	}
 	if a.mode == ModeProduct {
-		a.kit.Hint(c, "逐句用本机 VoxFlow 配音，画面与合成都在本机执行，不产生模型费用。")
+		a.kit.Hint(c, a.voicePipelineHint(a.prodVoice))
 	}
 	if channel != nil && !channel.Ready && a.mode != ModeRecommend && a.mode != ModeTalk &&
 		a.mode != ModeProduct && a.mode != ModeExport && a.mode != ModeLibrary {

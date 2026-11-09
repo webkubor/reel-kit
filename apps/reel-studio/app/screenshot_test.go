@@ -16,6 +16,12 @@ import (
 //
 // 无头渲染（MyGo 的 Tester）不依赖屏幕，锁屏、远程、CI 上都能跑。
 func Test截图(t *testing.T) {
+	// 截图要可复现：密钥状态读的是本机配置，这里换成一个临时文件，
+	// 不然这台机器配没配密钥会决定截图长什么样，密钥尾号还会漏进图里。
+	old := reelConfigPathFn
+	reelConfigPathFn = func() string { return filepath.Join(t.TempDir(), "config.json") }
+	t.Cleanup(func() { reelConfigPathFn = old })
+
 	server := stub(t, talkJobs())
 	a := newApp(t, server.URL)
 	a.talkTitle = "3 个 AI 小技巧"
@@ -38,6 +44,7 @@ func Test截图(t *testing.T) {
 		{"export", ModeExport},
 		{"product", ModeProduct},
 		{"library", ModeLibrary},
+		{"settings", ModeSettings},
 	} {
 		a.mode = mode.mode
 		for _, size := range []struct {

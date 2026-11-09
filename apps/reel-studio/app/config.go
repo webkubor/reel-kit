@@ -207,14 +207,7 @@ func (a *App) configValue(kind, key string, input map[string]any) string {
 		return id
 	case "persona":
 		id, _ := raw.(string)
-		if a.providers != nil {
-			for _, p := range a.providers.Voice.Personas {
-				if p.Key == id {
-					return p.Name
-				}
-			}
-		}
-		return orDash(id)
+		return a.voiceNameFor(id, input)
 	case "style":
 		key, _ := raw.(string)
 		for _, s := range a.talkStyles {
@@ -434,6 +427,7 @@ func (a *App) applyConfig(kind string, input map[string]any, jobID string) {
 		a.talkCaptions = str("captions")
 		a.talkSubtitle = str("subtitle")
 		a.talkPersona = str("persona")
+		a.talkVoice = str("voiceBackend")
 		a.talkStyle = str("style")
 		a.talkTone = str("tone")
 		a.talkPause = num("pause", a.talkPause)
@@ -492,6 +486,7 @@ func (a *App) applyConfig(kind string, input map[string]any, jobID string) {
 		a.prodCaptions = str("captions")
 		a.prodFooter = str("footer")
 		a.prodPersona = str("persona")
+		a.prodVoice = str("voiceBackend")
 		a.prodTone = str("tone")
 		a.prodPause = num("pause", a.prodPause)
 		a.prodRatio = str("ratio")
