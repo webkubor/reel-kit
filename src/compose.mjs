@@ -142,12 +142,11 @@ export async function compose({ frames, durations, bgm, voiceClips, out, fps = 3
   }
 
   args.push(
-    // ffmpeg 5.x 起 -vsync 已弃用、9.0 移除，改用等价的 -fps_mode
-    '-fps_mode', 'cfr', '-r', String(fps),
+    // fps 滤镜在打包的 FFmpeg 4.4 与新版本均可用，统一产生恒定帧率。
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '20',
     // yuv420p + even 尺寸：不加这两条，某些播放器与微信/小红书转码会拒或出绿边
     '-pix_fmt', 'yuv420p',
-    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+    '-vf', `fps=${fps},scale=trunc(iw/2)*2:trunc(ih/2)*2`,
     '-movflags', '+faststart', '-t', String(total + 1 / fps),
     out,
   )

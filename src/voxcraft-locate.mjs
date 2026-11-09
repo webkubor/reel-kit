@@ -20,6 +20,7 @@ const CANDIDATE_HOMES = [
   // 2026-08-30 那次改名（commit a6f6b85「仓库、目录、前端包名全部对齐 VoxFlow」）
   // 只改了项目自己，这份候选表没跟 —— 四条路径全部落空、判定成「没装」，
   // 然后去重装一遍 4.2GB 的模型。新名放前面，旧名保留兜底。
+  join(homedir(), 'dev/video/voxflow'),
   join(homedir(), 'dev/github/app/voxflow'),
   join(homedir(), 'dev/github/webkubor/voxflow'),
   join(homedir(), 'dev/github/voxflow'),
