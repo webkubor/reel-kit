@@ -16,13 +16,28 @@
  */
 
 import { execFile } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import { promisify } from 'node:util'
+import { homedir } from 'node:os'
 import { locateVoxcraft, voxcraftHint } from './voxcraft-locate.mjs'
 import { ensureServer, stopServer, synthesizeViaServer } from './voxcraft-server.mjs'
 
 const run = promisify(execFile)
+
+/**
+ * 读 ~/.reel-kit/config.json。
+ *
+ * 桌面版从 Finder 启动时没有终端环境变量，用户没法自己 export MINIMAX_API_KEY，
+ * 所以密钥要能落在配置文件里（该文件权限 0600）。
+ */
+function readReelConfig() {
+  try {
+    return JSON.parse(readFileSync(join(homedir(), '.reel-kit', 'config.json'), 'utf8'))
+  } catch {
+    return {}
+  }
+}
 
 /**
  * 云端配音：MiniMax TTS。
@@ -32,8 +47,8 @@ const run = promisify(execFile)
  * 现在换成实测能出声的 MiniMax TTS，并把「不支持的能力」明说。
  */
 async function speakViaMinimax({ text, out, voice }) {
-  const key = process.env.MINIMAX_API_KEY
-  if (!key) throw new Error('未配置 MINIMAX_API_KEY（用密钥工具注入后再运行）')
+  const key = process.env.MINIMAX_API_KEY || readReelConfig().minimaxApiKey || ''
+  if (!key) throw new Error('未配置 MINIMAX_API_KEY（用密钥工具注入，或写进 ~/.reel-kit/config.json 的 minimaxApiKey）')
   if (!voice) throw new Error('MiniMax TTS 需要 --voice <音色 ID>，例如 male-qn-qingse')
   const response = await fetch('https://api.minimaxi.com/v1/t2a_v2', {
     method: 'POST',

@@ -19,21 +19,34 @@ type choice struct{ id, label string }
 // 用户看不出是「没选」还是「坏了」。所以「由通道决定」这类选择
 // 必须是一个真实的选项；当前值为空时落到第一项，并写回状态，
 // 这样界面显示的就是将要提交的值。
+//
+// 当前值是「非空但不在选项里」时**不能**悄悄换成第一项 —— 那等于替用户
+// 换供应商或换模型，用户点了才知道。这种情况把原值保留成一个标注过的选项，
+// 让用户自己决定换不换。
 func (a *App) pick(c *ui.Context, label, help string, choices []choice, current string, set func(string)) {
 	if len(choices) == 0 {
 		return
 	}
 	options := make([]string, len(choices))
 	selected := ""
+	found := false
 	for i, ch := range choices {
 		options[i] = ch.label
 		if ch.id == current {
 			selected = ch.label
+			found = true
 		}
 	}
-	if selected == "" {
-		selected = choices[0].label
-		set(choices[0].id)
+	if !found {
+		if current == "" {
+			// 从没选过：落到第一项并写回，界面显示的就是将要提交的值
+			selected = choices[0].label
+			set(choices[0].id)
+		} else {
+			// 选过但当前选项里没有（通道换了、上游下架了）：原值留着并标注
+			options = append(options, current+"（当前不可选）")
+			selected = options[len(options)-1]
+		}
 	}
 	a.kit.Field(c, label, help, func() {
 		if a.kit.Select(c, &selected, options, "").FillWidth().Changed() {
@@ -239,11 +252,11 @@ func (a *App) viewRecommendationComposer(c *ui.Context) {
 		a.kit.Input(c, &a.repoURL, "https://github.com/owner/repo")
 	})
 	ui.Row(c).Gap(design.SpaceSM).Children(func() {
-		button := kitButton(a.kit, c, kit.ButtonSecondary, "读取项目", a.busy || a.repoURL == "")
+		button := kitButton(a.kit, c, kit.ButtonSecondary, "读取项目", a.busy.Load() || a.repoURL == "")
 		if button.Clicked() {
 			a.readRepoDraft()
 		}
-		if a.busy {
+		if a.busy.Load() {
 			a.kit.Hint(c, "正在读取…")
 		}
 	})
@@ -265,6 +278,7 @@ func (a *App) viewRecommendationComposer(c *ui.Context) {
 			a.recRatio = "9:16"
 		}
 	})
+	a.viewChannelPicker(c)
 	a.viewModelPicker(c)
 	a.viewBGMPicker(c)
 	a.viewStoryboardImages(c)
@@ -279,12 +293,12 @@ func (a *App) viewBGMPicker(c *ui.Context) {
 			if item.License != "" {
 				label += "（" + item.License + "）"
 			}
-			choices = append(choices, choice{item.Alias, label})
+			choices = append(choices, choice{"r2:" + item.Alias, label})
 		}
 	}
 	for _, asset := range a.ProjectAssets() {
 		if strings.HasPrefix(asset.Mime, "audio/") {
-			choices = append(choices, choice{asset.ID, "本地：" + asset.Name})
+			choices = append(choices, choice{"asset:" + asset.ID, "本地：" + asset.Name})
 		}
 	}
 	if len(choices) == 1 && a.bgm == nil {
@@ -329,6 +343,96 @@ func (a *App) viewStoryboardImages(c *ui.Context) {
 			}
 		})
 	})
+}
+
+// viewTalkComposer 画知识口播这一屏：脚本 → 音色 → 风格 → 画面 → 出片。
+//
+// 一行脚本一镜是这里的硬约定：用户不用自己算镜头时长，
+// 配音生成后每镜按实际语速走，字幕也按行对应画面。
+func (a *App) viewTalkComposer(c *ui.Context) {
+	a.kit.Field(c, "标题", "", func() {
+		a.kit.Input(c, &a.talkTitle, "这条视频的标题")
+	})
+	a.kit.Field(c, "口播脚本", "一行一句，一行一镜；最多 8 镜，每行不超过 80 字", func() {
+		a.kit.TextArea(c, &a.talkCaptions, "第一句说什么？\n第二句说什么？", 120)
+	})
+	a.kit.Field(c, "副标题", "可选，显示在标题下方", func() {
+		a.kit.Input(c, &a.talkSubtitle, "可选")
+	})
+	if a.providers != nil && len(a.providers.Voice.Personas) > 0 {
+		choices := make([]choice, 0, len(a.providers.Voice.Personas))
+		for _, p := range a.providers.Voice.Personas {
+			choices = append(choices, choice{p.Key, p.Name})
+		}
+		a.pick(c, "音色", "本机 VoxFlow 音色，不产生模型费用", choices, a.talkPersona, func(id string) {
+			a.talkPersona = id
+		})
+	} else {
+		a.kit.Field(c, "音色", "本机 VoxFlow 还没连上；先在设置里确认连接状态", func() {
+			a.kit.Hint(c, "暂无可用音色")
+		})
+	}
+	if len(a.talkStyles) > 0 {
+		choices := make([]choice, 0, len(a.talkStyles))
+		for _, s := range a.talkStyles {
+			label := s.Name
+			if label == "" {
+				label = s.Key
+			}
+			choices = append(choices, choice{s.Key, label})
+		}
+		a.pick(c, "视觉风格", "版式与配色跟着风格走", choices, a.talkStyle, func(id string) {
+			a.talkStyle = id
+		})
+	}
+	a.viewTalkImages(c)
+}
+
+// viewTalkImages 画口播画面：勾哪几张，就按列表顺序入片。
+//
+// 不勾也能出片：后端会用风格色生成占位图，先把片子做出来，
+// 之后再换真图重做。总比让新手卡在「先去找图」这一步强。
+func (a *App) viewTalkImages(c *ui.Context) {
+	var images []studioapi.Asset
+	for _, asset := range a.ProjectAssets() {
+		if strings.HasPrefix(asset.Mime, "image/") {
+			images = append(images, asset)
+		}
+	}
+	if len(images) == 0 {
+		a.kit.Field(c, "画面", "项目里还没有图片；不勾也能出片，会先用风格色占位", func() {
+			a.kit.Hint(c, "暂无画面素材")
+		})
+		return
+	}
+	a.kit.Field(c, "画面", fmt.Sprintf("已选 %d 张，按列表顺序入片；不选则用占位图", len(a.talkImages)), func() {
+		ui.Column(c).FillWidth().Gap(design.SpaceXS).Children(func() {
+			for _, image := range images {
+				item := image
+				checked := a.talkSelected[item.ID]
+				row := ui.Row(c).FillWidth().Gap(design.SpaceSM).AlignItems(ui.Center).Children(func() {
+					box := a.kit.Checkbox(c, &checked, item.Name)
+					if box.Changed() {
+						a.talkSelected[item.ID] = checked
+						a.syncTalkImages()
+					}
+					a.kit.Tag(c, fmt.Sprintf("%d×%d", item.Width, item.Height), "")
+				})
+				_ = row
+			}
+		})
+	})
+}
+
+// syncTalkImages 按勾选状态重排口播画面，保持素材列表的先后顺序。
+func (a *App) syncTalkImages() {
+	var picked []string
+	for _, asset := range a.ProjectAssets() {
+		if strings.HasPrefix(asset.Mime, "image/") && a.talkSelected[asset.ID] {
+			picked = append(picked, asset.ID)
+		}
+	}
+	a.talkImages = picked
 }
 
 // syncSelectedImages 按勾选状态重排分镜画面，保持素材列表的先后顺序。
@@ -379,7 +483,7 @@ func (a *App) viewQuality(c *ui.Context) {
 		return
 	}
 	if job.Quality == nil {
-		button := kitButton(a.kit, c, kit.ButtonSecondary, "自动检查成片", a.busy)
+		button := kitButton(a.kit, c, kit.ButtonSecondary, "自动检查成片", a.busy.Load())
 		if button.Clicked() {
 			a.runQuality(job.ID)
 		}
@@ -437,7 +541,7 @@ func (a *App) viewReview(c *ui.Context) {
 			a.reviewChecks[key] = checked
 		}
 	}
-	button := kitButton(a.kit, c, kit.ButtonSecondary, "确认审片通过", a.busy)
+	button := kitButton(a.kit, c, kit.ButtonSecondary, "确认审片通过", a.busy.Load())
 	if button.Clicked() {
 		a.approveReview(job.ID)
 	}
@@ -460,7 +564,7 @@ func (a *App) viewPublish(c *ui.Context) {
 	a.kit.Field(c, "发布链接", "", func() {
 		a.kit.Input(c, &a.pubURL, "https://")
 	})
-	button := kitButton(a.kit, c, kit.ButtonSecondary, "记录发布", a.busy || a.pubURL == "")
+	button := kitButton(a.kit, c, kit.ButtonSecondary, "记录发布", a.busy.Load() || a.pubURL == "")
 	if button.Clicked() {
 		a.savePublish(job.ID)
 	}
@@ -489,7 +593,7 @@ func (a *App) viewPerformance(c *ui.Context) {
 			a.kit.Input(c, &a.perfSaves, "收藏")
 		})
 	})
-	button := kitButton(a.kit, c, kit.ButtonSecondary, "回填表现", a.busy)
+	button := kitButton(a.kit, c, kit.ButtonSecondary, "回填表现", a.busy.Load())
 	if button.Clicked() {
 		a.savePerformance(job.ID)
 	}
@@ -516,11 +620,11 @@ func (a *App) viewRetrospective(c *ui.Context) {
 		a.kit.TextArea(c, &a.reviewChanges, "例：分镜第一句换成「把 X 变成 Y」", 60)
 	})
 	ui.Row(c).Gap(design.SpaceSM).Children(func() {
-		button := kitButton(a.kit, c, kit.ButtonSecondary, "记录复盘并生成新方法", a.busy)
+		button := kitButton(a.kit, c, kit.ButtonSecondary, "记录复盘并生成新方法", a.busy.Load())
 		if button.Clicked() {
 			a.saveReview(job.ID)
 		}
-		remake := kitButton(a.kit, c, kit.ButtonPrimary, "按新方法再做一条", a.busy)
+		remake := kitButton(a.kit, c, kit.ButtonPrimary, "按新方法再做一条", a.busy.Load())
 		if remake.Clicked() {
 			a.remakeJob(job.ID)
 		}

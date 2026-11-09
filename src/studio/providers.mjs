@@ -253,11 +253,22 @@ function withCause(error, what) {
   return new Error(`${what}失败：${detail}`)
 }
 
+function readReelConfig() {
+  try {
+    return JSON.parse(readFileSync(join(homedir(), '.reel-kit', 'config.json'), 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
 export function createProviders(store, { fetcher = fetch, pause = delay } = {}) {
   const voiceBase = process.env.REEL_VOXFLOW_URL || 'http://127.0.0.1:8866'
+  const cfg = readReelConfig()
+  const primaryKey = process.env.MINIMAX_API_KEY || cfg.minimaxApiKey || ''
+  const secondaryKey = process.env.MINIMAX_API_KEY_2 || cfg.minimaxApiKey2 || ''
   const profiles = [
-    { id: 'primary', label: process.env.REEL_MINIMAX_LABEL || 'MiniMax 主账户', key: process.env.MINIMAX_API_KEY },
-    { id: 'secondary', label: process.env.REEL_MINIMAX_LABEL_2 || 'MiniMax 第二账户', key: process.env.MINIMAX_API_KEY_2 },
+    { id: 'primary', label: process.env.REEL_MINIMAX_LABEL || 'MiniMax 主账户', key: primaryKey },
+    { id: 'secondary', label: process.env.REEL_MINIMAX_LABEL_2 || 'MiniMax 第二账户', key: secondaryKey },
   ]
   const h3 = async (path, key, data) => {
     let response
