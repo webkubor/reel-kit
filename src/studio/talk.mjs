@@ -75,7 +75,7 @@ export async function makeTalkVideo(input, store, backend, progress, report = ()
 
     await step({ id: 'config', label: '确认配置', origin: 'code', engine: '参数校验', detail: `${templateName} · ${lines.length} 镜 · ${WIDTH}×${HEIGHT}` }, () => ({}))
 
-    let images = assets
+    let images = assets.map(asset => store.path(asset))
     if (!images.length) {
       progress('没有画面素材，先用风格色生成占位图…')
       images = await Promise.all(lines.map((_, i) => placeholderImage(join(temp, `placeholder-${i}.png`), style)))
