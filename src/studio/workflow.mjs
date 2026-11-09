@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { id, now } from './store.mjs'
 
 const fail = message => { throw Object.assign(new Error(message), { status: 400 }) }
@@ -19,6 +20,43 @@ export function snapshotSop(state, project, input) {
   const versions = state.sopVersions.filter(v => v.pipeline === 'github-recommend')
   const sop = versions.find(v => v.id === project.sopVersionId) || versions[0]
   return { sopVersionId: sop.id, sopVersion: sop.version, input: copy(input) }
+}
+
+// 「照这个方法再做一条」：新开一个项目，复制同一版本的制作方法与素材，
+// 内容带入上一条作为起点（可改写）。原视频的记录与发布数据不受影响。
+export function remakeProject(store, job) {
+  const state = store.state
+  const source = state.projects.find(p => p.id === job.projectId)
+  if (!source) fail('原项目不存在')
+  const sopId = job.sopSnapshot?.sopVersionId || source.sopVersionId
+  const versions = state.sopVersions.filter(v => v.pipeline === 'github-recommend')
+  const sop = versions.find(v => v.id === sopId) || versions[0]
+  if (!sop) fail('没有可用的制作方法版本')
+  const project = { id: id(), name: `${source.name} · 再做一条`, pipelineKey: 'github-recommend', sopVersionId: sop.id, createdAt: now(), updatedAt: now() }
+  state.projects.push(project)
+  const used = [...new Set([...(job.input.assetIds || []), ...(job.input.voiceIds || []).filter(Boolean), job.input.bgmId, job.input.narrationId].filter(Boolean))]
+  const mapping = {}
+  for (const assetId of used) {
+    const asset = state.assets.find(a => a.id === assetId)
+    if (!asset) continue
+    const copy = store.addAsset(project.id, asset.name, asset.mime, readFileSync(store.path(asset)), { source: asset.source, origin: asset.origin, engine: asset.engine, prompt: asset.prompt, persona: asset.persona })
+    copy.width = asset.width; copy.height = asset.height; copy.duration = asset.duration; copy.hasAudio = asset.hasAudio
+    mapping[assetId] = copy.id
+  }
+  const settings = Object.fromEntries(['platform', 'voiceSource', 'persona', 'tone', 'speed', 'pause', 'bgmGain', 'imageFit'].filter(k => job.input[k] !== undefined).map(k => [k, job.input[k]]))
+  project.recommendationSettings = settings
+  store.save()
+  return {
+    projectId: project.id,
+    projectName: project.name,
+    sopVersionId: sop.id,
+    sopVersion: sop.version,
+    settings,
+    draft: { url: job.input.repoUrl || '', title: job.input.title || '', captions: job.input.captions || '' },
+    assets: mapping,
+    imageIds: (job.input.assetIds || []).map(id => mapping[id] || ''),
+    voiceIds: (job.input.voiceIds || []).map(id => (id && mapping[id]) || ''),
+  }
 }
 
 export function workflowAction(store, action, input) {

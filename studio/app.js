@@ -191,8 +191,38 @@ const rec = recommendationControls({
   upload: target => { uploadTarget = target; $('file-input').click() },
   canvas: platform => { $('preview').style.aspectRatio = ''; $('preview').classList.toggle('landscape', platform === 'landscape'); $('preview').classList.toggle('portrait', platform !== 'landscape') },
 })
+// 「调整这条视频」：把这条视频的输入与配置载回制作表单，改完再生成。
+// 只影响当前项目，不新建项目，也不改动旧记录。
+function reuseJob(job) {
+  setMode(job.input.kind === 'clone' ? 'speech' : job.input.kind)
+  if (job.input.kind === 'clone') { $('voice-mode').value = job.input.persona ? 'speech' : 'clone'; $('voice-name').value = job.input.voiceName || ''; $('reference-text').value = job.input.referenceText || ''; setMode('speech') }
+  $('prompt').value = job.input.prompt || ''; $('prompt').dispatchEvent(new Event('input'))
+  for (const key of ['ratio', 'duration', 'resolution', 'profile', 'persona', 'template', 'captions']) if (job.input[key]) $(key).value = job.input[key]
+  $('reference').value = job.input.referenceId || ''; $('audio').value = job.input.audioId || ''; $('export-title').value = job.input.title || ''
+  selected = job.input.assetIds || []; renderAssets()
+  if (job.input.kind === 'recommendation') {
+    $('repo-url').value = job.input.repoUrl || ''; $('repo-title').value = job.input.title || ''; $('repo-captions').value = job.input.captions || ''
+    renderSceneVoices(); $('scene-voices').querySelectorAll('select').forEach((el, i) => { el.value = job.input.voiceIds?.[i] || '' }); saveRecommendation()
+    rec.apply(job.input); rec.renderAssets()
+  }
+  message('参数已载入，可以修改后再提交。不会自动重新生成。'); $('generate-form').scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
+// 「照这个方法再做一条」：新开一个项目，继承同一版本的制作方法与素材，
+// 内容输入不继承 —— 新一条视频要重新确认内容。
+async function applyRemake(result) {
+  projectId = result.projectId
+  localStorage.setItem('reel-project', projectId)
+  await refresh()
+  selected = result.imageIds.filter(Boolean)
+  $('repo-url').value = result.draft.url || ''; $('repo-title').value = result.draft.title || ''; $('repo-captions').value = result.draft.captions || ''
+  rec.apply(result.settings)
+  renderSceneVoices(); $('scene-voices').querySelectorAll('select').forEach((el, i) => { el.value = result.voiceIds?.[i] || '' })
+  renderAssets(); saveRecommendation(); setMode('recommendation')
+  $('repo-url').scrollIntoView({ behavior: 'smooth', block: 'center' })
+  message(`已新建「${result.projectName}」，沿用 v${result.sopVersion} 的制作方法与素材；确认内容后即可生成。`)
+}
 let lastWorkflowKey = ''
-const workflow = workflowPanel({ api, getState: () => state, getProjectId: () => projectId, refresh, message, applyVersion: version => { rec.apply({ ...rec.read(), ...version.settings }); saveRecommendation() } })
+const workflow = workflowPanel({ api, getState: () => state, getProjectId: () => projectId, refresh, message, applyVersion: version => { rec.apply({ ...rec.read(), ...version.settings }); saveRecommendation() }, onRemake: applyRemake, onAdjust: reuseJob })
 const library = voiceLibrary({ api, message, refresh, connections })
 $('load-voice-work').onclick = async () => {
   try { const tasks = await api('/api/voice/tasks'); optionList($('voice-work'), tasks.map(t => ({ id: t.id, name: `${t.name} · ${t.text.slice(0, 25)}` })), '选择声音作品'); message(`找到 ${tasks.length} 条声音作品。`) } catch (error) { message(error.message, true) }
@@ -226,6 +256,17 @@ $('start-github').onclick = async () => {
 }
 document.querySelectorAll('[data-mode]').forEach(button => button.onclick = () => setMode(button.dataset.mode))
 document.querySelectorAll('[data-filter]').forEach(button => button.onclick = () => { filter = button.dataset.filter; document.querySelectorAll('[data-filter]').forEach(b => b.classList.toggle('active', b === button)); renderAssets() })
+$('backfill-assets').onclick = async () => {
+  try {
+    const result = await api('/api/assets/backfill', { method: 'POST', body: '{}' })
+    await refresh()
+    const parts = []
+    if (result.updated) parts.push(`补全 ${result.updated} 条素材的尺寸与时长`)
+    if (result.projects) parts.push(`给 ${result.projects} 个历史项目补上方法版本`)
+    if (result.jobs) parts.push(`给 ${result.jobs} 条旧视频补上方法版本标记`)
+    message(parts.length ? `已${parts.join('，')}。` : '历史素材与记录都是齐的，没有需要补全的。')
+  } catch (err) { message(err.message, true) }
+}
 $('voice-mode').onchange = () => setMode('speech')
 $('projects').onclick = event => switchProject(event.target.closest('[data-project]')?.dataset.project)
 $('active-project').onchange = () => switchProject($('active-project').value)
@@ -280,18 +321,7 @@ $('jobs').onclick = event => {
   }
   const id = event.target.closest('[data-reuse]')?.dataset.reuse
   const job = state.jobs.find(j => j.id === id); if (!job) return
-  setMode(job.input.kind === 'clone' ? 'speech' : job.input.kind)
-  if (job.input.kind === 'clone') { $('voice-mode').value = job.input.persona ? 'speech' : 'clone'; $('voice-name').value = job.input.voiceName || ''; $('reference-text').value = job.input.referenceText || ''; setMode('speech') }
-  $('prompt').value = job.input.prompt || ''; $('prompt').dispatchEvent(new Event('input'))
-  for (const key of ['ratio', 'duration', 'resolution', 'profile', 'persona', 'template', 'captions']) if (job.input[key]) $(key).value = job.input[key]
-  $('reference').value = job.input.referenceId || ''; $('audio').value = job.input.audioId || ''; $('export-title').value = job.input.title || ''
-  selected = job.input.assetIds || []; renderAssets()
-  if (job.input.kind === 'recommendation') {
-    $('repo-url').value = job.input.repoUrl || ''; $('repo-title').value = job.input.title || ''; $('repo-captions').value = job.input.captions || ''
-    renderSceneVoices(); $('scene-voices').querySelectorAll('select').forEach((el, i) => { el.value = job.input.voiceIds?.[i] || '' }); saveRecommendation()
-    rec.apply(job.input); rec.renderAssets()
-  }
-  message('参数已载入，可以修改后再提交。不会自动重新生成。'); $('generate-form').scrollIntoView({ block: 'start', behavior: 'smooth' })
+  reuseJob(job)
 }
 async function boot() {
   try {

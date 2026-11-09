@@ -9,7 +9,8 @@ import { exportVideo } from './export.mjs'
 import { redact, command, jsonFetch, download, probeBytes } from './process.mjs'
 import { projectDraft, makeRecommendation, githubRepo } from './recommendation.mjs'
 import { recommendationSettings } from './video-settings.mjs'
-import { initializeWorkflow, snapshotSop, workflowAction } from './workflow.mjs'
+import { initializeWorkflow, snapshotSop, workflowAction, remakeProject } from './workflow.mjs'
+import { limitsFor, saveLimits } from './platform-limits.mjs'
 
 const web = fileURLToPath(new URL('../../studio/', import.meta.url))
 const templates = fileURLToPath(new URL('../../templates/', import.meta.url))
@@ -107,6 +108,10 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
       const url = new URL(req.url, `http://${host}`)
       const path = url.pathname
       if (req.method === 'GET' && path === '/api/state') return json(res, 200, { ...store.state, assets: store.state.assets.map(a => store.publicAsset(a)), templates: templateNames })
+      if (req.method === 'GET' && path === '/api/platform-limits') {
+        const platform = url.searchParams.get('platform') || 'default'
+        return json(res, 200, { platform, limits: limitsFor(store.state, platform) })
+      }
       if (req.method === 'GET' && path === '/api/providers') return json(res, 200, await backend.status())
       if (req.method === 'GET' && path === '/api/voice/sample') {
         const key = url.searchParams.get('key')
@@ -193,17 +198,69 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
           let decodable = true
           try { await command('ffmpeg', ['-v', 'error', '-xerror', '-i', store.path(asset), '-f', 'null', '-'], { timeout: 120000 }) } catch { decodable = false }
           const duration = Number(info.format?.duration) || 0
+          const limits = limitsFor(store.state, job.input.platform)
+          const size = statSync(store.path(asset)).size
           const checks = [
             { label: '画幅与尺寸', value: video ? `${video.width}×${video.height}` : '无视频流', passed: video?.width === expected.width && video?.height === expected.height },
-            { label: '视频时长', value: `${duration.toFixed(1)} 秒`, passed: duration > 0 },
+            { label: '视频时长', value: `${duration.toFixed(1)} 秒`, passed: duration > 0 && duration <= limits.maxDuration },
             { label: '音轨', value: audio ? '存在' : '缺失', passed: audio },
             { label: '完整解码', value: decodable ? '通过' : '失败', passed: decodable },
+            { label: '文件大小', value: `${(size / 1024 / 1024).toFixed(1)} MB / 上限 ${(limits.maxBytes / 1024 / 1024).toFixed(0)} MB`, passed: size <= limits.maxBytes },
           ]
           job.quality = { checks, passed: checks.every(c => c.passed), checkedAt: now(), assetId: asset.id }
           delete job.approval; store.save()
           return json(res, 200, job.quality)
         }
+        if (path === '/api/workflow/remake') {
+          const project = store.project(input.projectId)
+          const job = store.state.jobs.find(j => j.id === input.jobId && j.projectId === project.id && j.input.kind === 'recommendation')
+          if (!job || job.status !== 'succeeded') fail('请选择一条已完成的推荐视频')
+          return json(res, 201, remakeProject(store, job))
+        }
+        if (path === '/api/workflow/') fail('接口不存在', 404)
         if (path.startsWith('/api/workflow/')) return json(res, 200, workflowAction(store, path.slice('/api/workflow/'.length), input))
+        if (path === '/api/platform-limits') {
+          const platform = String(input.platform || 'default')
+          const limits = saveLimits(store.state, platform, input.limits || {})
+          store.save()
+          return json(res, 200, { platform, limits })
+        }
+        if (path === '/api/assets/backfill') {
+          // 历史素材入库时可能没有尺寸/时长；用 ffprobe 补齐，不改动任何已有文件。
+          const targets = store.state.assets.filter(a => {
+            const visual = a.mime?.startsWith('image/') || a.mime?.startsWith('video/')
+            return (visual && (!a.width || !a.height)) || a.duration === undefined || a.hasAudio === undefined
+          })
+          let updated = 0
+          for (const asset of targets) {
+            try {
+              const info = JSON.parse(await command('ffprobe', ['-v', 'error', '-print_format', 'json', '-show_streams', '-show_format', store.path(asset)], { timeout: 20000 }))
+              const video = (info.streams || []).find(s => s.codec_type === 'video')
+              const audio = (info.streams || []).some(s => s.codec_type === 'audio')
+              if (video?.width) { asset.width = video.width; asset.height = video.height }
+              if (info.format?.duration) asset.duration = Number(info.format.duration)
+              asset.hasAudio = audio
+              updated++
+            } catch { /* 探测不了的素材保持原样，不阻断其余回填 */ }
+          }
+          store.save()
+          // 历史项目与旧视频补上默认方法版本标记：只补标记，不改任何已有内容与文件。
+          const fallback = store.state.sopVersions.find(v => v.pipeline === 'github-recommend')
+          let projects = 0, jobs = 0
+          if (fallback) {
+            for (const project of store.state.projects) {
+              if (!project.sopVersionId) { project.sopVersionId = fallback.id; projects++ }
+            }
+            for (const job of store.state.jobs) {
+              if (job.input?.kind === 'recommendation' && !job.sopSnapshot) {
+                job.sopSnapshot = { sopVersionId: fallback.id, sopVersion: fallback.version, input: job.input, inferred: true }
+                jobs++
+              }
+            }
+            store.save()
+          }
+          return json(res, 200, { updated, total: targets.length, projects, jobs })
+        }
         if (path === '/api/project-settings') {
           const project = store.project(input.projectId)
           const keys = ['platform', 'voiceSource', 'persona', 'tone', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit']
