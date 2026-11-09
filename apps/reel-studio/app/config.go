@@ -278,9 +278,44 @@ func (a *App) configValue(kind, key string, input map[string]any) string {
 		return fmt.Sprintf("%v 秒", raw)
 	case "ratio":
 		return fmt.Sprintf("%v", raw)
+	case "template":
+		// 版式名写成人话：配置面板是给用户看的，不是给开发者看的。
+		return templateLabel(fmt.Sprintf("%v", raw))
 	default:
 		return fmt.Sprintf("%v", raw)
 	}
+}
+
+// templateLabel 把版式 ID 翻成人话。
+//
+// 这一句在配置面板和对比面板里都会出现：写「出镜竖版」用户一眼知道是什么，
+// 写「product-presenter」用户得猜。
+func templateLabel(id string) string {
+	switch id {
+	case "product-presenter":
+		return "出镜竖版"
+	case "landscape-product":
+		return "左图右文横版"
+	case "knowledge-paper":
+		return "纸本文献"
+	case "knowledge-dark":
+		return "暗场概念"
+	case "knowledge-gufeng":
+		return "古风长卷"
+	case "project-recommendation":
+		return "项目推荐"
+	case "sticker-promo":
+		return "贴纸促销"
+	case "sticker-square":
+		return "方形贴纸"
+	case "music-card":
+		return "音乐卡片"
+	case "quote":
+		return "金句卡片"
+	case "":
+		return "—"
+	}
+	return id
 }
 
 // configText 返回字段的完整文本（用于对比，脚本这类长文本不能只写「3 镜」）。
