@@ -4,11 +4,10 @@
 #   scripts/publish-desktop-release.sh app-v0.2.3 --notes /tmp/notes.md
 #
 # 它替你做三件容易漏的事：
-#   1. 把签名清单复制成安装脚本认的那个名字（install.sh 在 macOS 上找的是
-#      update-darwin-<架构>.json，而 mygo 产出的清单叫 update-<目标>.json，
-#      少了这一步，README 里那行 curl 安装命令会直接失败）。
+#   1. 按清单把该发的归档找齐，缺一个就停。
 #   2. 发之前用公钥把每个归档的 Ed25519 签名验一遍。
-#   3. 把所有产物的校验和写进 SHA256SUMS，一起发出去。
+#   3. 把所有产物的校验和写进 SHA256SUMS（扁平文件名，跟发布页上的
+#      资产名一一对应，用户下完就能 shasum -c 验）。
 #
 # 需要：gh 已登录；签名私钥在发版那一步用 kyvault 注入（见 README）。
 set -euo pipefail
@@ -111,16 +110,6 @@ print(dict(zip(names,sigs))['$name'])")"
 		assets+=("$dir/$name")
 	done <"$dir/.assets.list"
 	rm -f "$dir/.assets.list"
-	# macOS 的安装脚本找的是 update-darwin-<架构>.json，把清单复制一份过去，
-	# 不然 README 里那行 curl 安装命令会 404。
-	case "$target" in
-	darwin-*)
-		arch="$(uname -m)"
-		[ "$arch" = x86_64 ] && arch=amd64
-		cp "$manifest" "$dir/update-darwin-$arch.json"
-		assets+=("$dir/update-darwin-$arch.json")
-		;;
-	esac
 done
 
 # 非 mac 目标的归档（Windows 等）也一并带上

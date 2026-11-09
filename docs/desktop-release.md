@@ -52,20 +52,21 @@ openssl pkeyutl -verify -pubin -inkey pub.pem -rawin -in digest.bin -sigfile sig
 scripts/publish-desktop-release.sh app-v0.2.3 --notes /tmp/notes.md
 ```
 
-它会：把清单复制成安装脚本认的名字 → 逐个归档验签 → 生成 `SHA256SUMS` →
-`gh release create` 传全部产物。
+它会：按清单把归档找齐（缺一个就停）→ 逐个归档验签 → 生成扁平文件名的
+`SHA256SUMS` → `gh release create` 传全部产物。
 
-### ⚠️ 必须有 `update-darwin-<架构>.json`
+### 清单的名字与安装脚本要对得上
 
-`install.sh` 在 macOS 上找的是 `update-darwin-<架构>.json`（Apple Silicon 上就是
-`update-darwin-arm64.json`），而 mygo 产出的清单叫 `update-<目标>.json`（目标是签名
-身份 `darwin-arm64`）。少了前者，README 里那行
+macOS 的 `install.sh` 按架构找清单：`update-darwin-<架构>.json`（Apple Silicon 上
+就是 `update-darwin-arm64.json`）。mygo 在 macOS 上的目标名恰好带上了架构，
+所以 `build/<目标>/` 里产出的清单文件名直接就是对的那一个 —— **发版时别手动
+改名，也别只发其中一个**。发完用这行确认发布页上的清单能取到：
 
 ```bash
-curl -fsSL .../install.sh | sh
+curl -fsSLO https://github.com/webkubor/reel-kit/releases/download/<tag>/update-darwin-arm64.json
 ```
 
-会直接失败（找不到清单）。发布脚本已经代为复制，别再手工发版漏掉它。
+（Windows 目标不需要这一步，Windows 用 `update-<目标>.json`。）
 
 ## 三、发完必做的验证
 
