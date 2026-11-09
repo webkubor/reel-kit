@@ -102,17 +102,26 @@ curl -fsSLO https://github.com/webkubor/reel-kit/releases/download/<tag>/update-
    - 走生产同一条路径 `installUpdate` 把装着旧版的 `.app` 原地换成新版，
      核对换完之后的版本号。
 
-   MyGo 的 `internal/update` 是内部包，只能在它的模块副本里写测试：
+   MyGo 的 `internal/update` 是内部包，只能在它的模块副本里写测试 ——
+   仓库里已经备好了测试文件与脚本：
 
    ```bash
-   cp -R "$(go env GOPATH)/pkg/mod/github.com/egoist/mygo@"* /tmp/mygo-src
-   chmod -R u+w /tmp/mygo-src
-   cd /tmp/mygo-src && GOTOOLCHAIN=go1.27.3 go test -run TestPublishedInstall .
+   bash scripts/verify-desktop-update.sh <tag>          # 打印要准备什么
+   bash scripts/verify-desktop-update.sh <tag> --run    # 自动下载归档并跑完两段验证
    ```
+
+   脚本会把 MyGo 模块复制一份到临时目录，把
+   `scripts/desktop-update-test/` 下的两个测试放进去再跑 ——
+   跑的仍然是发布用的那份生产代码（`ApplyDelta` 与 `installUpdate`）。
 
    2026-11-09 用发布页上的 0.2.2 归档与 0.2.3 增量包跑过：6056 个文件逐个
    SHA-256 一致，原地升级后应用包变成 0.2.3，升级后的应用仍能出一条
    1080×1920 的竖版视频。
+
+   2026-11-10 用 1.0.0 → 1.1.0 再跑一遍：增量包还原出 6056 个文件逐个
+   SHA-256 一致；`installUpdate` 只下了 717 KB 增量包就把装着 1.0.0 的
+   `.app` 换成 1.1.0，换完的应用能起来（日志「Reel Studio 启动（版本 1.1.0）」
+   且本机工作台 ready）。
 
 ## 四、发版后
 
