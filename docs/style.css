@@ -186,6 +186,12 @@ footer a { color: var(--ink-soft); }
   text-decoration: none;
 }
 .studio-download .install:hover { background: #b34d43; text-decoration: none; }
+.studio-download .install.secondary {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.studio-download .install.secondary:hover { background: var(--bg); color: var(--brand); }
 .studio-download .soon {
   padding: 11px 18px;
   border-radius: 10px;
