@@ -1024,6 +1024,9 @@ func (a *App) viewSubmit(c *ui.Context) {
 	}
 	if a.mode == ModeRecommend && channel != nil && !channel.Ready {
 		a.kit.Hint(c, "配音通道未就绪："+channel.Note)
+		if channel.ID == "voxflow" {
+			a.voxflowHint(c)
+		}
 	}
 	if a.mode == ModeTalk {
 		a.kit.Hint(c, "逐句用本机 VoxFlow 配音，画面与合成都在本机执行，不产生模型费用。")

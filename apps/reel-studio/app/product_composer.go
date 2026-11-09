@@ -41,9 +41,10 @@ func (a *App) viewProductComposer(c *ui.Context) {
 			a.prodPersona = id
 		})
 	} else {
-		a.kit.Field(c, "音色", "本机 VoxFlow 还没连上；先在设置里确认连接状态", func() {
+		a.kit.Field(c, "音色", "本机 VoxFlow 没连上，暂时没有可用音色", func() {
 			a.kit.Hint(c, "暂无可用音色")
 		})
+		a.voxflowHint(c)
 	}
 	a.kit.Field(c, "语气", "留空用音色默认；填了会传给配音引擎", func() {
 		a.kit.Input(c, &a.prodTone, "例如：亲切、专业")

@@ -46,7 +46,7 @@
       <h2>Reel Studio · 桌面版</h2>
       <p class="section-intro">
         把上面的引擎装成一个能点的 macOS / Windows 应用：四条流水线，填表就能出片。
-        自包含安装包内含 Node、Chrome、FFmpeg 与 MuseAV CLI，不用另装依赖；
+        自包含安装包内含 Node、Chrome、FFmpeg 与 MuseAV CLI；本机语音服务要单独装一次（下面写了）；
         素材与成片留在你自己电脑上。
       </p>
     </div>
@@ -75,6 +75,23 @@
         v0.2.3 · macOS 168.7 MB / Windows 219 MB ·
         <a href="https://github.com/webkubor/reel-kit/releases/tag/app-v0.2.3">发布页与校验值</a> ·
         <a href="https://github.com/webkubor/reel-kit/releases/latest">历史版本</a>
+      </p>
+    </div>
+    <div class="studio-firstrun">
+      <h3>第一次用，多做一件事：装本机语音服务</h3>
+      <p>
+        配音用的是你自己电脑上的
+        <a href="https://github.com/webkubor/voxflow" target="_blank" rel="noopener">VoxFlow</a>
+        （Apple Silicon，本机推理，不产生模型费用），所以它要单独装一次、
+        每次开机起一次：
+      </p>
+      <pre><code>git clone https://github.com/webkubor/voxflow.git &amp;&amp; cd voxflow
+chmod +x install.sh &amp;&amp; ./install.sh --yes
+source .venv/bin/activate &amp;&amp; voice web</code></pre>
+      <p class="studio-meta">
+        忘了起也没关系：应用里会直接把这两条命令摆出来，点一下就能复制。
+        图片生成另需登录 MuseAV 中台，视频生成走 MiniMax 额度，两项都在
+        「设置与反馈」里能看到当前状态。
       </p>
     </div>
   </section>

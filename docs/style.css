@@ -200,3 +200,14 @@ footer a { color: var(--ink-soft); }
   font-size: 14.5px;
 }
 .studio-meta { flex-basis: 100%; margin: 4px 0 0; color: var(--ink-faint); font-size: 14px; }
+
+.studio-firstrun {
+  margin-top: 26px;
+  padding: 20px 24px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-soft);
+}
+.studio-firstrun h3 { margin: 0 0 8px; font-size: 17px; }
+.studio-firstrun p { margin: 0 0 10px; color: var(--ink-soft); font-size: 15px; }
+.studio-firstrun pre { margin: 0 0 10px; }
