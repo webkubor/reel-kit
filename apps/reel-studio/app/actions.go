@@ -7,6 +7,72 @@ import (
 	"github.com/webkubor/reel-kit/apps/reel-studio/studioapi"
 )
 
+// submitTalk 提交一条知识口播视频。
+//
+// 与推荐视频的区别只有「内容从哪来」：这里是用户自己写的脚本，
+// 一行一镜；配音、渲染、合成都在本机完成，不产生模型费用。
+func (a *App) submitTalk() {
+	if a.talkTitle == "" || a.talkCaptions == "" {
+		a.fail("标题和口播脚本都要填")
+		return
+	}
+	if a.talkPersona == "" {
+		a.fail("先选一个音色")
+		return
+	}
+	lines := 0
+	for _, line := range strings.Split(a.talkCaptions, "\n") {
+		if strings.TrimSpace(line) != "" {
+			lines++
+		}
+	}
+	if lines == 0 || lines > 8 {
+		a.fail("脚本要 1–8 行，一行一镜")
+		return
+	}
+	for _, line := range strings.Split(a.talkCaptions, "\n") {
+		if len([]rune(strings.TrimSpace(line))) > 80 {
+			a.fail("有一行超过 80 字，请拆成多镜")
+			return
+		}
+	}
+	input := map[string]any{
+		"projectId":    a.projectID,
+		"kind":         "talk",
+		"title":        a.talkTitle,
+		"captions":     a.talkCaptions,
+		"subtitle":     a.talkSubtitle,
+		"style":        a.talkStyle,
+		"persona":      a.talkPersona,
+		"voiceBackend": "voxflow",
+		"ratio":        "9:16",
+	}
+	if len(a.talkImages) > 0 {
+		input["assetIds"] = a.talkImages
+	}
+	a.busy.Store(true)
+	a.mutate(func() {
+		a.notice = ""
+	})
+	go func() {
+		client := studioapi.New(a.opts.BaseURL)
+		job, err := client.SubmitJob(input)
+		a.busy.Store(false)
+		a.mutate(func() {
+			if err != nil {
+				a.notice = err.Error()
+				a.noticeErr = true
+				a.logf("提交口播任务失败：%s", err.Error())
+			} else {
+				a.notice = "已提交口播视频任务：" + job.ID
+				a.noticeErr = false
+				a.logf("已提交口播视频任务 %s（%d 镜 · 音色 %s）", job.ID, lines, a.talkPersona)
+			}
+		})
+		a.refresh()
+	}()
+}
+
 // readRepoDraft 读 GitHub 仓库，把标题与分镜填进表单。
 //
 // 草稿只是初稿：它来自 README 与接口截图，可能说得不对，

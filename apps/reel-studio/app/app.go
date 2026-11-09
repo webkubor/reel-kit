@@ -26,9 +26,17 @@ import (
 // Mode 是生成器的模式。
 type Mode int
 
+// Version 是应用版本号。
+//
+// 写死在这里而不在界面上：界面上的版本号必须跟实际发布的版本一致，
+// 写死在两处就会出现「显示 0.1.0、实际发的是 0.2.0」。
+// 打包时可以用 -ldflags "-X ...app.Version=x.y.z" 覆盖。
+var Version = "0.2.0"
+
 // 模式。顺序与网页版的标签一致：项目推荐排在最前，它就是本产品的主线。
 const (
 	ModeRecommend Mode = iota
+	ModeTalk
 	ModeVideo
 	ModeImage
 	ModeSpeech
@@ -45,9 +53,9 @@ type Options struct {
 
 // App 是应用状态。
 type App struct {
-	opts  Options
-	kit   kit.Comps
-	win   *mygo.Window
+	opts Options
+	kit  kit.Comps
+	win  *mygo.Window
 	// mu 只保护 pending 这一个队列。
 	//
 	// 界面状态本身**不加锁**：所有写入都经 mutate 排到渲染线程执行，
@@ -90,6 +98,18 @@ type App struct {
 	recBGM      string
 	recImages   []string
 	recSelected map[string]bool
+
+	// 知识口播
+	talkTitle    string
+	talkCaptions string
+	talkSubtitle string
+	talkStyle    string
+	talkPersona  string
+	talkImages   []string
+	talkSelected map[string]bool
+	talkStyles   []studioapi.Style
+	// talkStylesLoading 防止每帧重复拉风格表
+	talkStylesLoading bool
 
 	// 制作闭环
 	reviewChecks     map[string]bool
@@ -145,6 +165,8 @@ func New(opts Options) *App {
 		recRatio:     "9:16",
 		reviewChecks: map[string]bool{},
 		recSelected:  map[string]bool{},
+		talkSelected: map[string]bool{},
+		talkStyle:    "paper",
 		backendProc:  backend,
 		backendState: BackendStatus{State: "starting", Note: "正在连接本地工作台…"},
 		log:          NewLogWriter(),
@@ -255,6 +277,33 @@ func (a *App) refresh() {
 		// 通道就绪状态可能变（比如用户刚配好密钥），要在可用通道里挑一个
 		a.ensureBackend()
 	})
+}
+
+// ensureTalkStyles 拉一次口播可用的视觉风格。
+//
+// 风格表是固定的（服务端 /api/styles），拉一次就够；
+// 拉失败时留空，界面会只显示标题与脚本，不影响出片。
+func (a *App) ensureTalkStyles() {
+	if len(a.talkStyles) > 0 || a.talkStylesLoading {
+		return
+	}
+	a.talkStylesLoading = true
+	go func() {
+		client := studioapi.New(a.opts.BaseURL)
+		styles, err := client.Styles()
+		a.mutate(func() {
+			a.talkStylesLoading = false
+			if err != nil {
+				a.logf("读取口播视觉风格失败：%s", err.Error())
+				return
+			}
+			a.talkStyles = styles
+			if a.talkStyle == "" && len(styles) > 0 {
+				a.talkStyle = styles[0].Key
+			}
+		})
+		a.redraw()
+	}()
 }
 
 // poll 每两秒拉一次状态。原生界面没有网页的 setInterval，只能自己轮询。
@@ -516,7 +565,7 @@ func (a *App) viewSettingsAndFeedback(c *ui.Context) {
 			a.kit.Card(c, func() {
 				info := a.updates.info
 				ui.Row(c).Gap(design.SpaceLG).AlignItems(ui.Center).Children(func() {
-					ui.Text(c, "当前版本：v0.1.0").FontSize(design.FontBody).Bold().TextColor(a.kit.T.Ink)
+					ui.Text(c, "当前版本：v"+Version).FontSize(design.FontBody).Bold().TextColor(a.kit.T.Ink)
 					switch info.State {
 					case UpdateChecking:
 						ui.Text(c, "正在检查更新…").FontSize(design.FontSmall).TextColor(a.kit.T.Muted)
@@ -664,7 +713,7 @@ func (a *App) viewMain(c *ui.Context) {
 func (a *App) viewToolbar(c *ui.Context) {
 	ui.Row(c).FillWidth().Gap(design.SpaceLG).AlignItems(ui.Center).
 		Background(a.kit.T.Surface).Border(1, a.kit.T.Line).Padding(design.SpaceLG, design.SpaceXL).Children(func() {
-		labels := []string{"项目推荐", "视频", "图片", "配音", "导出", "设置与反馈"}
+		labels := []string{"项目推荐", "口播", "视频", "图片", "配音", "导出", "设置与反馈"}
 		for i, label := range labels {
 			index := i
 			active := int(a.mode) == index
@@ -707,6 +756,9 @@ func (a *App) viewComposer(c *ui.Context) {
 				}
 				if a.mode == ModeRecommend {
 					a.viewRecommendationComposer(c)
+				} else if a.mode == ModeTalk {
+					a.ensureTalkStyles()
+					a.viewTalkComposer(c)
 				} else {
 					a.viewChannelPicker(c)
 					a.viewModelPicker(c)
@@ -764,6 +816,9 @@ func (a *App) viewSubmit(c *ui.Context) {
 	case ModeRecommend:
 		label = "生成推荐视频"
 		disabled = a.busy.Load() || a.recTitle == "" || a.recCaptions == "" || a.repoURL == "" || len(a.recImages) == 0
+	case ModeTalk:
+		label = "生成口播视频"
+		disabled = a.busy.Load() || a.talkTitle == "" || a.talkCaptions == "" || a.talkPersona == ""
 	case ModeImage:
 		label = "生成图片"
 	case ModeSpeech:
@@ -774,7 +829,10 @@ func (a *App) viewSubmit(c *ui.Context) {
 	if a.mode == ModeRecommend && channel != nil && !channel.Ready {
 		a.kit.Hint(c, "配音通道未就绪："+channel.Note)
 	}
-	if channel != nil && !channel.Ready && a.mode != ModeRecommend {
+	if a.mode == ModeTalk {
+		a.kit.Hint(c, "逐句用本机 VoxFlow 配音，画面与合成都在本机执行，不产生模型费用。")
+	}
+	if channel != nil && !channel.Ready && a.mode != ModeRecommend && a.mode != ModeTalk {
 		a.kit.Hint(c, "所选通道未就绪："+channel.Note)
 	}
 	button := kitButton(a.kit, c, kit.ButtonPrimary, label, disabled)
@@ -864,6 +922,10 @@ func (a *App) submit() {
 	channel := a.CurrentChannel()
 	if a.mode == ModeRecommend {
 		a.submitRecommendation(channel)
+		return
+	}
+	if a.mode == ModeTalk {
+		a.submitTalk()
 		return
 	}
 	if channel == nil {
@@ -1083,6 +1145,8 @@ func (a *App) kind() string {
 	switch a.mode {
 	case ModeRecommend:
 		return "recommendation"
+	case ModeTalk:
+		return "talk"
 	case ModeImage:
 		return "image"
 	case ModeSpeech:

@@ -15,13 +15,13 @@ import (
 
 // 更新状态。
 const (
-	UpdateIdle    = "idle"    // 没查过
-	UpdateChecking = "checking" // 正在查
-	UpdateLatest  = "latest"  // 已是最新
-	UpdateReady   = "ready"   // 有新版可装
-	UpdateFailed  = "failed"  // 查不了（离线 / 无签名密钥）
+	UpdateIdle       = "idle"       // 没查过
+	UpdateChecking   = "checking"   // 正在查
+	UpdateLatest     = "latest"     // 已是最新
+	UpdateReady      = "ready"      // 有新版可装
+	UpdateFailed     = "failed"     // 查不了（离线 / 无签名密钥）
 	UpdateInstalling = "installing" // 正在下载安装
-	UpdateInstalled = "installed"  // 装好了，重启生效
+	UpdateInstalled  = "installed"  // 装好了，重启生效
 )
 
 // UpdateInfo 是界面上的更新提示。

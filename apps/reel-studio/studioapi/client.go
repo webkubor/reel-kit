@@ -257,6 +257,22 @@ type BGMLibrary struct {
 	Error      string    `json:"error"`
 }
 
+// Style 是知识短视频的一套视觉风格。
+type Style struct {
+	Key      string `json:"key"`
+	Name     string `json:"name"`
+	Template string `json:"template"`
+}
+
+// Styles 读取口播流水线可用的视觉风格。
+func (c *Client) Styles() ([]Style, error) {
+	var payload struct {
+		Styles []Style `json:"styles"`
+	}
+	err := c.do(http.MethodGet, "/api/styles", nil, &payload)
+	return payload.Styles, err
+}
+
 func (c *Client) do(method, path string, body any, out any) error {
 	var reader io.Reader
 	if body != nil {

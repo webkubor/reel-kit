@@ -2,7 +2,7 @@
   "name": "Reel Studio",
   "slug": "reel-studio",
   "identifier": "online.webkubor.reelstudio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "webkubor",
   "description": "本地视频工作台",
   "out": "build",

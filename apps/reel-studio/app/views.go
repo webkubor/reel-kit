@@ -345,6 +345,96 @@ func (a *App) viewStoryboardImages(c *ui.Context) {
 	})
 }
 
+// viewTalkComposer 画知识口播这一屏：脚本 → 音色 → 风格 → 画面 → 出片。
+//
+// 一行脚本一镜是这里的硬约定：用户不用自己算镜头时长，
+// 配音生成后每镜按实际语速走，字幕也按行对应画面。
+func (a *App) viewTalkComposer(c *ui.Context) {
+	a.kit.Field(c, "标题", "", func() {
+		a.kit.Input(c, &a.talkTitle, "这条视频的标题")
+	})
+	a.kit.Field(c, "口播脚本", "一行一句，一行一镜；最多 8 镜，每行不超过 80 字", func() {
+		a.kit.TextArea(c, &a.talkCaptions, "第一句说什么？\n第二句说什么？", 120)
+	})
+	a.kit.Field(c, "副标题", "可选，显示在标题下方", func() {
+		a.kit.Input(c, &a.talkSubtitle, "可选")
+	})
+	if a.providers != nil && len(a.providers.Voice.Personas) > 0 {
+		choices := make([]choice, 0, len(a.providers.Voice.Personas))
+		for _, p := range a.providers.Voice.Personas {
+			choices = append(choices, choice{p.Key, p.Name})
+		}
+		a.pick(c, "音色", "本机 VoxFlow 音色，不产生模型费用", choices, a.talkPersona, func(id string) {
+			a.talkPersona = id
+		})
+	} else {
+		a.kit.Field(c, "音色", "本机 VoxFlow 还没连上；先在设置里确认连接状态", func() {
+			a.kit.Hint(c, "暂无可用音色")
+		})
+	}
+	if len(a.talkStyles) > 0 {
+		choices := make([]choice, 0, len(a.talkStyles))
+		for _, s := range a.talkStyles {
+			label := s.Name
+			if label == "" {
+				label = s.Key
+			}
+			choices = append(choices, choice{s.Key, label})
+		}
+		a.pick(c, "视觉风格", "版式与配色跟着风格走", choices, a.talkStyle, func(id string) {
+			a.talkStyle = id
+		})
+	}
+	a.viewTalkImages(c)
+}
+
+// viewTalkImages 画口播画面：勾哪几张，就按列表顺序入片。
+//
+// 不勾也能出片：后端会用风格色生成占位图，先把片子做出来，
+// 之后再换真图重做。总比让新手卡在「先去找图」这一步强。
+func (a *App) viewTalkImages(c *ui.Context) {
+	var images []studioapi.Asset
+	for _, asset := range a.ProjectAssets() {
+		if strings.HasPrefix(asset.Mime, "image/") {
+			images = append(images, asset)
+		}
+	}
+	if len(images) == 0 {
+		a.kit.Field(c, "画面", "项目里还没有图片；不勾也能出片，会先用风格色占位", func() {
+			a.kit.Hint(c, "暂无画面素材")
+		})
+		return
+	}
+	a.kit.Field(c, "画面", fmt.Sprintf("已选 %d 张，按列表顺序入片；不选则用占位图", len(a.talkImages)), func() {
+		ui.Column(c).FillWidth().Gap(design.SpaceXS).Children(func() {
+			for _, image := range images {
+				item := image
+				checked := a.talkSelected[item.ID]
+				row := ui.Row(c).FillWidth().Gap(design.SpaceSM).AlignItems(ui.Center).Children(func() {
+					box := a.kit.Checkbox(c, &checked, item.Name)
+					if box.Changed() {
+						a.talkSelected[item.ID] = checked
+						a.syncTalkImages()
+					}
+					a.kit.Tag(c, fmt.Sprintf("%d×%d", item.Width, item.Height), "")
+				})
+				_ = row
+			}
+		})
+	})
+}
+
+// syncTalkImages 按勾选状态重排口播画面，保持素材列表的先后顺序。
+func (a *App) syncTalkImages() {
+	var picked []string
+	for _, asset := range a.ProjectAssets() {
+		if strings.HasPrefix(asset.Mime, "image/") && a.talkSelected[asset.ID] {
+			picked = append(picked, asset.ID)
+		}
+	}
+	a.talkImages = picked
+}
+
 // syncSelectedImages 按勾选状态重排分镜画面，保持素材列表的先后顺序。
 func (a *App) syncSelectedImages() {
 	var picked []string
