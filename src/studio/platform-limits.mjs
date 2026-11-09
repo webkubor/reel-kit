@@ -1,6 +1,8 @@
 // 发布平台的体积/时长上限是可配置阈值，不是平台官方承诺。
 // 默认值取保守值；用户按自己账号实际限制改后，检测才按新阈值判定。
 export const limitDefaults = { maxBytes: 100 * 1024 * 1024, maxDuration: 180 }
+// 只允许给已知平台配阈值；'default' 是所有平台共用的兜底
+export const limitPlatforms = ['default', 'channels', 'xiaohongshu', 'landscape']
 
 export function normalizeLimits(value = {}) {
   const maxBytes = Number(value.maxBytes ?? limitDefaults.maxBytes)
@@ -16,6 +18,7 @@ export function limitsFor(state, platform) {
 }
 
 export function saveLimits(state, platform, value) {
+  if (!limitPlatforms.includes(platform)) fail('不支持的平台')
   const limits = normalizeLimits(value)
   state.platformLimits ||= {}
   state.platformLimits[platform] = limits

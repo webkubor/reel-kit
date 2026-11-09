@@ -74,7 +74,7 @@ export async function makeRecommendation(input, store, backend, progress, report
     for (let i = 0; i < lines.length; i++) {
       const label = `旁白 ${i + 1}/${lines.length}`
       progress(`正在处理第 ${i + 1}/${lines.length} 句旁白…`)
-      const meta = await step({ id: `voice-${i}`, label, origin: narration ? 'import' : 'ai', engine: narration ? '整段素材切分' : 'VoxFlow 本地语音', detail: lines[i].slice(0, 40) }, async () => {
+      const meta = await step({ id: `voice-${i}`, label, origin: narration ? 'import' : 'ai', engine: narration ? '整段素材切分' : settings.voiceBackend === 'minimax' ? 'MiniMax TTS' : 'VoxFlow 本地语音', detail: lines[i].slice(0, 40) }, async () => {
         if (narration) {
           const end = i === lines.length - 1 ? narrationDuration : offset + narrationDuration * lines[i].length / totalChars
           const file = join(temp, `voice-${i}.wav`)
@@ -87,15 +87,22 @@ export async function makeRecommendation(input, store, backend, progress, report
         let reused = false
         let generated = false
         // scenes 模式：用户逐句指定了音频就直接用；tts 模式：音色/文案/表达不匹配的旧配音失效，找匹配的或重新生成。
+        const voiceInput = { ...input, ...settings, backend: settings.voiceBackend, model: settings.voiceModel, voiceId: settings.voiceId, profile: settings.voiceProfile }
         if (settings.voiceSource === 'tts') {
-          if (asset && !reusableVoice(asset, input, lines[i])) asset = null
+          if (asset && !reusableVoice(asset, voiceInput, lines[i])) asset = null
           if (!asset) {
-            const match = store.state.assets.find(a => a.projectId === input.projectId && reusableVoice(a, input, lines[i]))
+            const match = store.state.assets.find(a => a.projectId === input.projectId && reusableVoice(a, voiceInput, lines[i]))
             if (match) { asset = match; reused = true }
           }
         }
         if (!asset) {
-          asset = await backend.generate({ kind: 'speech', projectId: input.projectId, persona: input.persona, prompt: lines[i], tone: input.tone || '' }, () => {})
+          asset = await backend.generate({
+            kind: 'speech', projectId: input.projectId,
+            persona: input.persona, prompt: lines[i], tone: input.tone || '',
+            backend: settings.voiceBackend, model: settings.voiceModel, voiceId: settings.voiceId,
+            // 账户也要传：两个 MiniMax 账户是两份额度、两套声音
+            profile: settings.voiceProfile,
+          }, () => {})
           generated = true
         }
         if (!asset.mime.startsWith('audio/')) throw new Error(`第 ${i + 1} 句选择的素材不是音频`)

@@ -59,7 +59,7 @@ function switchProject(next) {
   saveDraft(); projectId = next; localStorage.setItem('reel-project', projectId); selected = []; previewId = null; loadDraft(); if (mode === 'recommendation') loadRecommendation(); renderProjects(); renderAssets(); lastJobs = ''; renderJobs()
   workflow.render()
   const asset = currentAssets().at(-1); if (asset) showPreview(asset.id)
-  else { $('preview').innerHTML = '<div class="preview-empty"><h3>这个项目的第一帧，等你创造</h3><p>生成或导入素材后，在这里预览。</p></div>'; $('download').hidden = true; $('preview-name').textContent = '还没有选中素材' }
+  else { $('preview').innerHTML = `<div class="preview-empty"><h3>这个项目的第一帧，等你创造</h3><p>生成或导入素材后，在这里预览。</p><span class="preview-caption">${channelCaption()}</span></div>`; $('download').hidden = true; $('preview-name').textContent = '还没有选中素材' }
 }
 function renderAssets() {
   const assets = currentAssets()
@@ -93,7 +93,11 @@ function renderJobs() {
   $('jobs').innerHTML = jobs.length ? jobs.map(j => {
     const steps = j.steps || []
     const timeline = steps.length ? `<details class="job-steps"${j.status === 'failed' ? ' open' : ''}><summary>制作过程 · ${steps.length} 步${j.status === 'running' ? ' · 进行中' : ''}</summary><ol>${steps.map(renderStep).join('')}</ol></details>` : ''
-    return `<article class="job-item"><div class="job-row"><span class="job-kind">${kinds[j.input.kind]}</span><div><p class="job-prompt" title="${escape(j.input.prompt || j.input.title)}">${escape(j.input.prompt || j.input.title || '合成出片')}</p><p class="job-detail">${escape(j.error || j.message)}</p></div><span class="job-state ${j.status}">${labels[j.status]}</span><button class="text-button" data-reuse="${j.id}">复用参数 ↗</button></div>${timeline}</article>`
+    // 上游已经提交过、只是没取回素材的，给一个「取回」入口。
+    // 重新生成等于再付一次钱 —— 通道是按量计费的。
+    const resume = j.upstream?.taskId && ['failed', 'interrupted'].includes(j.status)
+      ? `<button class="text-button" data-resume="${j.id}">取回已生成的素材</button>` : ''
+    return `<article class="job-item"><div class="job-row"><span class="job-kind">${kinds[j.input.kind]}</span><div><p class="job-prompt" title="${escape(j.input.prompt || j.input.title)}">${escape(j.input.prompt || j.input.title || '合成出片')}</p><p class="job-detail">${escape(j.error || j.message)}</p></div><span class="job-state ${j.status}">${labels[j.status]}</span>${resume}<button class="text-button" data-reuse="${j.id}">复用参数 ↗</button></div>${timeline}</article>`
   }).join('') : '<p class="empty-history">还没有生成记录。每次提交的参数与结果都会保留。</p>'
   const latest = jobs.find(j => j.status === 'succeeded' && !previousIds.has(j.id))
   if (latest?.assetId) showPreview(latest.assetId)
@@ -123,13 +127,247 @@ async function refresh() {
   const workflowKey = JSON.stringify([projectId, state.jobs.filter(j => j.projectId === projectId && j.input.kind === 'recommendation' && j.status === 'succeeded').map(j => j.id)])
   if (workflowKey !== lastWorkflowKey) { lastWorkflowKey = workflowKey; workflow.render() }
 }
+const CUSTOM_MODEL = '__custom__'
+const CUSTOM_VOICE = '__custom__'
+/**
+ * 语音通道的选择单独记一份。
+ *
+ * 生成通道的下拉是共用的：切到图片模式时它显示的是生图通道。
+ * 旁白用哪个通道跟生图通道无关，不能被图片模式覆盖 —— 所以语音的选择独立记着，
+ * 回到声音模式再取回来。
+ */
+const voiceState = { backend: '', model: '', voiceId: '', profile: '' }
+try { Object.assign(voiceState, JSON.parse(localStorage.getItem('reel-voice-state') || '{}')) } catch { /* 坏数据就当没记过 */ }
+function saveVoiceState() { localStorage.setItem('reel-voice-state', JSON.stringify(voiceState)) }
+/** 当前模式下生成通道属于哪一组：视频、图片还是语音 */
+function channelGroup() {
+  if (mode === 'speech' || mode === 'recommendation') return 'voice'
+  if (mode === 'video') return 'video'
+  if (mode === 'image') return 'image'
+  return null
+}
+function channelsFor(group) {
+  const list = providers[group]?.channels || []
+  // 克隆是把一段本地录音变成音色，只有本地 VoxFlow 做得了 —— 云端 TTS 只做文字配音
+  if (mode === 'speech' && $('voice-mode').value === 'clone') return list.filter(c => c.id === 'voxflow')
+  return list
+}
+function currentChannel() {
+  const group = channelGroup()
+  if (!group) return null
+  return (providers[group]?.channels || []).find(c => c.id === $('backend').value) || null
+}
+function currentModel() {
+  if ($('model-field').hidden) return ''
+  if ($('model').value === CUSTOM_MODEL) return $('model-custom').value.trim()
+  return $('model').value
+}
+function currentVoiceId() {
+  if ($('voice-field').hidden) return ''
+  if ($('voice-id').value === CUSTOM_VOICE) return $('voice-custom').value.trim()
+  return $('voice-id').value
+}
+/**
+ * 通道与模型一起同步。
+ *
+ * 通道决定「谁来花钱、谁的数据会外传」，模型决定「能力与上限」。
+ * 两者都要跟着模式切换：语音模式只有语音通道，图片模式只有生图通道。
+ */
+function syncBackend() {
+  const group = channelGroup()
+  const field = $('backend-field')
+  if (!group) { field.hidden = true; return }
+  field.hidden = false
+  const list = channelsFor(group)
+  const select = $('backend')
+  const remembered = group === 'voice' ? voiceState.backend : (localStorage.getItem(`reel-channel:${group}`) || '')
+  select.innerHTML = list.map(c => `<option value="${escape(c.id)}">${escape(c.label)}${c.ready ? '' : '（未就绪）'}</option>`).join('')
+  for (const option of select.options) if (!list.find(c => c.id === option.value)?.ready) option.disabled = true
+  const usable = list.filter(c => c.ready)
+  // 记住上次选的通道：每次进来都要重选一遍是折磨。
+  //
+  // 关键：记住的通道若只是「暂时未就绪」，仍然选它 ——
+  // 悄悄换成另一个可用的（可能是另一家的付费）通道，等于替用户改了供应商。
+  // 该不该花钱由用户决定，不是由下拉框的默认值决定。
+  const rememberedChannel = list.find(c => c.id === remembered)
+  const wanted = rememberedChannel ? remembered : (usable[0]?.id || list[0]?.id)
+  if (wanted) select.value = wanted
+  if (group === 'voice') { voiceState.backend = select.value; saveVoiceState() }
+  syncChannel()
+}
+function syncChannel() {
+  const group = channelGroup()
+  if (!group) return
+  const channel = currentChannel()
+  $('backend-help').textContent = channel ? channel.note : ''
+  const models = channel?.models || []
+  const modelField = $('model-field')
+  if (models.length || channel?.allowCustomModel) {
+    modelField.hidden = false
+    const options = models.map(m => ({ id: m.id, name: m.name }))
+    if (channel?.allowCustomModel) options.push({ id: CUSTOM_MODEL, name: '自定义模型…' })
+    optionList($('model'), options, models.length ? '由通道自动路由' : '请选择或填写模型')
+    $('model-custom').hidden = $('model').value !== CUSTOM_MODEL
+    restoreModelPick(group)
+  } else {
+    // 上一组留下的选项要清掉：否则切回声音模式时可能还留着视频模型
+    modelField.hidden = true; $('model').innerHTML = ''; $('model-custom').hidden = true; $('model-custom').value = ''
+  }
+  applyModelLimits()
+  // 音色：本地音色走「音色」下拉（persona），云端 TTS 走独立的 voice_id 选择
+  const voiceField = $('voice-field')
+  const voices = channel?.voices || []
+  if (voices.length && channel?.id !== 'voxflow') {
+    voiceField.hidden = false
+    const options = voices.map(v => ({ id: v.id, name: v.name }))
+    if (channel?.allowCustomVoice) options.push({ id: CUSTOM_VOICE, name: '自定义音色 ID…' })
+    optionList($('voice-id'), options, '')
+    $('voice-custom').hidden = $('voice-id').value !== CUSTOM_VOICE
+  } else { voiceField.hidden = true; $('voice-id').innerHTML = ''; $('voice-custom').hidden = true; $('voice-custom').value = '' }
+  // 本地音色只对 VoxFlow 通道有效；克隆也只能走本地
+  if (mode === 'speech') $('persona-field').hidden = channel?.id !== 'voxflow' || $('voice-mode').value === 'clone'
+  $('profile-field').hidden = channel?.id !== 'minimax'
+  if (group === 'voice') {
+    restoreVoicePick()
+    voiceState.backend = channel?.id || ''
+    voiceState.model = currentModel()
+    voiceState.voiceId = currentVoiceId()
+    voiceState.profile = $('profile').value || ''
+    saveVoiceState()
+  }
+  updateGenerateState()
+  applyChannelCopy()
+}
+/**
+ * 通道没就绪时，生成按钮要跟着这一条通道走，不能按整组算。
+ *
+ * 之前用 group.ready 判断：只要组里还有任一通道可用，按钮就一直可点 ——
+ * 于是用户选中的那条（可能没配密钥、可能欠费）照样能提交，提交后才报错。
+ */
+function updateGenerateState() {
+  const channel = currentChannel()
+  const button = $('generate')
+  if (!button) return
+  const group = channelGroup()
+  if (!group) { button.disabled = false; return }
+  if (mode === 'speech' && $('voice-mode').value === 'clone' && channel?.id !== 'voxflow') {
+    button.disabled = true
+    button.title = '克隆只能走本地 VoxFlow'
+    return
+  }
+  if (channel && !channel.ready) {
+    button.disabled = true
+    button.title = `所选通道「${channel.label}」未就绪：${channel.note || ''}`
+    return
+  }
+  button.disabled = false
+  button.title = ''
+}
+/** 把记住的模型放回选择框：视频与图片的模型也要记住，不能每次从头选 */
+function restoreModelPick(group) {
+  if (group === 'voice') return
+  const saved = localStorage.getItem(`reel-model:${group}`) || ''
+  if (!saved) return
+  if ([...$('model').options].some(o => o.value === saved)) $('model').value = saved
+  else { $('model').value = CUSTOM_MODEL; $('model-custom').value = saved }
+  $('model-custom').hidden = $('model').value !== CUSTOM_MODEL
+}
+
+/**
+ * 标题下的一句话与角标要跟着通道走。
+ *
+ * 以前这里写死「MiniMax H3」，现在通道是用户自己选的 —— 写死就等于撒谎：
+ * 界面说 H3，实际可能走的是 MuseAV。
+ */
+function applyChannelCopy() {
+  const channel = currentChannel()
+  if (!channel || mode === 'recommendation' || mode === 'export') return
+  const subtitles = {
+    museav: 'MuseAV 中台 · 复用本机登录态，按中台当前可用模型出图出片',
+    minimax: 'MiniMax 直连 · 走你自己的账户与额度',
+    voxflow: 'VoxFlow 本地 · 本地推理，不产生模型费用',
+  }
+  $('mode-subtitle').textContent = subtitles[channel.id] || channel.note || ''
+  $('engine-badge').textContent = channel.label.split(/[ ·]/)[0].toUpperCase().slice(0, 12)
+}
+/** 把记住的语音模型与音色放回选择框 */
+function restoreVoicePick() {
+  if (voiceState.model) {
+    if ([...$('model').options].some(o => o.value === voiceState.model)) $('model').value = voiceState.model
+    else if ($('model').options.length) { $('model').value = CUSTOM_MODEL; $('model-custom').value = voiceState.model }
+    $('model-custom').hidden = $('model').value !== CUSTOM_MODEL
+  }
+  if (voiceState.voiceId && !$('voice-field').hidden) {
+    if ([...$('voice-id').options].some(o => o.value === voiceState.voiceId)) $('voice-id').value = voiceState.voiceId
+    else { $('voice-id').value = CUSTOM_VOICE; $('voice-custom').value = voiceState.voiceId }
+    $('voice-custom').hidden = $('voice-id').value !== CUSTOM_VOICE
+  }
+  // 账户也要还原：换了账户就是另一份额度、另一种声音
+  if (voiceState.profile && [...$('profile').options].some(o => o.value === voiceState.profile)) $('profile').value = voiceState.profile
+}
+function applyModelLimits() {
+  const channel = currentChannel()
+  const model = (channel?.models || []).find(m => m.id === $('model').value)
+  const duration = $('duration')
+  // 上一个模型的时长范围要跟着换掉：Kling 限 10 秒，切到 Wan 固定 5 秒时不能还留着 10
+  if (model?.minSeconds) duration.min = model.minSeconds
+  else if (mode === 'video') duration.min = 4
+  if (model?.maxSeconds) duration.max = model.maxSeconds
+  else if (mode === 'video') duration.max = 30
+  const value = Number(duration.value)
+  if (model?.minSeconds && value < model.minSeconds) duration.value = model.minSeconds
+  if (model?.maxSeconds && value > model.maxSeconds) duration.value = model.maxSeconds
+  // 分辨率只有直连 H3 需要自己指定；中台的档次自带分辨率，填了也是白填
+  $('resolution-field').hidden = mode !== 'video' || channel?.id !== 'minimax'
+  // H3 的分辨率是接口参数，不能让用户填一个上游不认的值。
+  // 768P 是本机实跑验证过的；1080P 接口支持，但本机没验过，界面上据实说明。
+  if (channel?.id === 'minimax' && mode === 'video') {
+    const select = $('resolution')
+    const current = select.value
+    select.innerHTML = '<option value="768P">768P（已验证）</option><option value="1080P">1080P（接口支持，未验证）</option>'
+    select.value = ['768P', '1080P'].includes(current) ? current : '768P'
+  }
+}
+function generationNote() {
+  const channel = currentChannel()
+  if (mode === 'recommendation') return '仓库信息经 GitHub API 读取，渲染与合成在本机执行；旁白按上面选定的通道生成。'
+  if (mode === 'export') return '选中的素材按顺序导出；原始素材会保留。'
+  const label = channel?.label || '所选通道'
+  if (mode === 'speech') return channel?.id === 'minimax'
+    ? '将调用 MiniMax TTS 合成文字配音，按量计费；不会上传任何本地录音。'
+    : '使用本机 VoxFlow 模型，本地推理不产生模型费用；首次生成可能需要加载。'
+  if (mode === 'video') return channel?.id === 'museav'
+    ? '将调用 MuseAV 中台出视频，模型与额度以中台实际返回为准；参考图会上传至 MuseAV。'
+    : `将调用 ${label} 视频模型，按所选账户额度计费；能否调用以接口返回为准。`
+  if (mode === 'image') return channel?.id === 'museav'
+    ? '将调用 MuseAV 生图，按账户额度计费；参考图会上传至 MuseAV。'
+    : `将调用 ${label} 生图，按你自己的账户计费。`
+  return '每次提交生成一个版本，使用所选账户的额度。'
+}
 async function connections() {
   providers = await api('/api/providers')
   for (const name of ['video', 'image', 'voice']) $(`${name}-dot`).classList.toggle('off', !providers[name]?.ready)
-  $('connection-list').innerHTML = Object.values(providers).map(p => `<div class="connection-row"><strong><span class="dot ${p.ready ? '' : 'off'}"></span>${escape(p.label)}</strong><p>${escape(p.note)}</p></div>`).join('')
+  const rows = ['video', 'image', 'voice', 'export'].map(key => providers[key]).filter(Boolean)
+  // 自定义通道的配置问题要单列出来：配置错了却没提示，用户只会以为「这个通道不存在」
+  const custom = providers.customChannels
+  const customRows = custom?.problems?.length
+    ? `<div class="connection-row"><strong><span class="dot off"></span>自定义通道配置</strong><p>${custom.problems.map(escape).join('；')}</p><p>配置文件：${escape(custom.file || '')}</p></div>`
+    : ''
+  $('connection-list').innerHTML = rows.map(p => `<div class="connection-row"><strong><span class="dot ${p.ready ? '' : 'off'}"></span>${escape(p.label)}</strong><p>${escape(p.note)}</p></div>`).join('') + customRows
   optionList($('profile'), (providers.video?.profiles || []).map(p => ({ id: p.id, name: `${p.label} · 本周余量 ${p.weeklyRemaining == null ? '未知' : p.weeklyRemaining + '%'}` })), providers.video?.profiles?.length ? null : '尚未配置 MiniMax 密钥')
   optionList($('persona'), (providers.voice?.personas || []).map(p => ({ id: p.key, name: p.name })), '选择一个本地音色')
+  // 底部连接条列的是「实际可用的通道」，不是写死的三个名字
+  const strip = (group, id) => {
+    const ready = (providers[group]?.channels || []).filter(c => c.ready).map(c => c.label.split(/[ ·]/)[0])
+    $(id).textContent = ready.length ? ready.join(' / ') : '未连接'
+  }
+  strip('video', 'video-channel-label'); strip('image', 'image-channel-label'); strip('voice', 'voice-channel-label')
+  syncBackend()
   rec?.personas(providers.voice || {})
+}
+/** 空态预览里那行小字：当前真正可用的通道 */
+function channelCaption() {
+  return ['video', 'image', 'voice'].flatMap(group => (providers[group]?.channels || []).filter(c => c.ready).map(c => c.label.split(/[ ·]/)[0].toUpperCase())).join(' · ') || 'REEL STUDIO'
 }
 function setMode(next) {
   saveDraft(); mode = next; loadDraft()
@@ -144,20 +382,17 @@ function setMode(next) {
   $('voice-work-field').hidden = !voice && !recommending
   $('voice-mode-field').hidden = !voice; $('persona-field').hidden = !voice || clone; $('voice-name-field').hidden = !clone
   $('reference-field').hidden = recommending || exporting || (voice && !clone)
-  $('reference-help').textContent = clone ? '使用你拥有或获授权的音频，清晰单人语音更适合克隆。处理在本地完成。' : '选择项目中的图片。参考图会上传至 MuseAV 供模型读取。'
+  $('reference-help').textContent = clone ? '使用你拥有或获授权的音频，清晰单人语音更适合克隆。处理在本地完成。' : '选择项目中的图片。参考图会上传至所选通道供模型读取。'
   $('ratio-field').hidden = voice || recommending; $('duration-field').hidden = voice || recommending || mode === 'image'
-  $('resolution-field').hidden = mode !== 'video'; $('profile-field').hidden = mode !== 'video'
   $('duration').min = exporting ? 1 : 4; $('duration').max = exporting ? 30 : 15
   $('ratio').querySelector('[value="1:1"]').disabled = exporting
   if (exporting && $('ratio').value === '1:1') $('ratio').value = '9:16'
   $('generate-label').textContent = { recommendation: '生成项目推荐视频', video: '生成视频', image: '生成图片', speech: clone ? '克隆并生成配音' : '生成配音', export: '合成并导出' }[mode]
-  $('generation-note').textContent = recommending
-    ? '本次制作全程本地完成：仓库信息经 GitHub API 读取，配音用本机 VoxFlow，渲染与合成在本机执行，不调用付费模型。'
-    : voice ? '使用本机 VoxFlow 模型，本地推理不产生模型费用；首次生成可能需要加载。'
-    : exporting ? '选中的素材按顺序导出；原始素材会保留。'
-    : mode === 'video' ? '将调用 MiniMax H3 视频模型，按所选账户额度计费；能否调用以接口返回为准。'
-    : mode === 'image' ? '将调用 MuseAV 生图，按账户额度计费；参考图会上传至 MuseAV。'
-    : '每次提交生成一个版本，使用所选账户的额度。'
+  syncBackend()
+  // 本地音色只对 VoxFlow 通道有效；云端 TTS 用独立的音色选择
+  const channel = currentChannel()
+  if (mode === 'speech' && channel?.id === 'voxflow') $('persona-field').hidden = clone
+  $('generation-note').textContent = generationNote()
   if (recommending) loadRecommendation()
   else $('preview').classList.remove('portrait', 'landscape')
   $('use-example').textContent = voice ? '↗ 试试一段旁白' : '↗ 试试时尚棚拍'
@@ -175,6 +410,7 @@ function loadRecommendation() {
   renderSceneVoices(); $('scene-voices').querySelectorAll('select').forEach((el, i) => { el.value = draft.voices?.[i] || '' })
   rec?.renderAssets()
   rec?.apply(draft.settings || state.projects.find(p => p.id === projectId)?.recommendationSettings || {})
+  restoreChannel(draft.settings || state.projects.find(p => p.id === projectId)?.recommendationSettings || {})
 }
 function renderSceneVoices() {
   const previous = [...$('scene-voices').querySelectorAll('select')].map(el => el.value)
@@ -190,7 +426,38 @@ const rec = recommendationControls({
   saveDraft: () => { saveDraft(); saveRecommendation() },
   upload: target => { uploadTarget = target; $('file-input').click() },
   canvas: platform => { $('preview').style.aspectRatio = ''; $('preview').classList.toggle('landscape', platform === 'landscape'); $('preview').classList.toggle('portrait', platform !== 'landscape') },
+  voiceChannel: () => ({ backend: voiceState.backend, model: voiceState.model, voiceId: voiceState.voiceId, profile: voiceState.profile }),
 })
+/**
+ * 把一条记录里的通道 / 模型 / 音色载回表单。
+ *
+ * 没有这一步，「再做一条」出来的片子可能走了另一个供应商、另一个模型，
+ * 而界面上看不出来 —— 这正是要避免的（每条片子都要知道是谁做的、用的什么）。
+ */
+function restoreChannel(input) {
+  const group = channelGroup()
+  if (!group) return
+  const backend = input.backend
+  const channel = (providers[group]?.channels || []).find(c => c.id === backend)
+  if (channel && $('backend').value !== channel.id) { $('backend').value = channel.id; syncChannel() }
+  const model = input.model
+  if (model) {
+    const known = [...$('model').options].some(o => o.value === model)
+    if (known) $('model').value = model
+    else { $('model').value = CUSTOM_MODEL; $('model-custom').value = model }
+    $('model-custom').hidden = $('model').value !== CUSTOM_MODEL
+    applyModelLimits()
+  }
+  const voiceId = input.voiceId
+  if (voiceId) {
+    const known = [...$('voice-id').options].some(o => o.value === voiceId)
+    if (known) $('voice-id').value = voiceId
+    else { $('voice-id').value = CUSTOM_VOICE; $('voice-custom').value = voiceId }
+    $('voice-custom').hidden = $('voice-id').value !== CUSTOM_VOICE
+  }
+  if (input.profile && [...$('profile').options].some(o => o.value === input.profile)) $('profile').value = input.profile
+  if (group === 'voice') { voiceState.backend = $('backend').value; voiceState.model = currentModel(); voiceState.voiceId = currentVoiceId(); voiceState.profile = $('profile').value || ''; saveVoiceState() }
+}
 // 「调整这条视频」：把这条视频的输入与配置载回制作表单，改完再生成。
 // 只影响当前项目，不新建项目，也不改动旧记录。
 function reuseJob(job) {
@@ -198,6 +465,8 @@ function reuseJob(job) {
   if (job.input.kind === 'clone') { $('voice-mode').value = job.input.persona ? 'speech' : 'clone'; $('voice-name').value = job.input.voiceName || ''; $('reference-text').value = job.input.referenceText || ''; setMode('speech') }
   $('prompt').value = job.input.prompt || ''; $('prompt').dispatchEvent(new Event('input'))
   for (const key of ['ratio', 'duration', 'resolution', 'profile', 'persona', 'template', 'captions']) if (job.input[key]) $(key).value = job.input[key]
+  // 通道与模型一起载回来：换了模型再生成，才知道这次跟上次不是同一条路径
+  restoreChannel(job.input)
   $('reference').value = job.input.referenceId || ''; $('audio').value = job.input.audioId || ''; $('export-title').value = job.input.title || ''
   selected = job.input.assetIds || []; renderAssets()
   if (job.input.kind === 'recommendation') {
@@ -218,11 +487,13 @@ async function applyRemake(result) {
   rec.apply(result.settings)
   renderSceneVoices(); $('scene-voices').querySelectorAll('select').forEach((el, i) => { el.value = result.voiceIds?.[i] || '' })
   renderAssets(); saveRecommendation(); setMode('recommendation')
+  // setMode 会按上次的偏好重置通道 —— 继承回来的版本必须再压回去，否则「沿用同一套方法」是假的
+  rec.apply(result.settings); restoreChannel(result.settings)
   $('repo-url').scrollIntoView({ behavior: 'smooth', block: 'center' })
   message(`已新建「${result.projectName}」，沿用 v${result.sopVersion} 的制作方法与素材；确认内容后即可生成。`)
 }
 let lastWorkflowKey = ''
-const workflow = workflowPanel({ api, getState: () => state, getProjectId: () => projectId, refresh, message, applyVersion: version => { rec.apply({ ...rec.read(), ...version.settings }); saveRecommendation() }, onRemake: applyRemake, onAdjust: reuseJob })
+const workflow = workflowPanel({ api, getState: () => state, getProjectId: () => projectId, refresh, message, applyVersion: version => { rec.apply({ ...rec.read(), ...version.settings }); restoreChannel(version.settings); saveRecommendation() }, onRemake: applyRemake, onAdjust: reuseJob })
 const library = voiceLibrary({ api, message, refresh, connections })
 $('load-voice-work').onclick = async () => {
   try { const tasks = await api('/api/voice/tasks'); optionList($('voice-work'), tasks.map(t => ({ id: t.id, name: `${t.name} · ${t.text.slice(0, 25)}` })), '选择声音作品'); message(`找到 ${tasks.length} 条声音作品。`) } catch (error) { message(error.message, true) }
@@ -262,12 +533,48 @@ $('backfill-assets').onclick = async () => {
     await refresh()
     const parts = []
     if (result.updated) parts.push(`补全 ${result.updated} 条素材的尺寸与时长`)
-    if (result.projects) parts.push(`给 ${result.projects} 个历史项目补上方法版本`)
-    if (result.jobs) parts.push(`给 ${result.jobs} 条旧视频补上方法版本标记`)
-    message(parts.length ? `已${parts.join('，')}。` : '历史素材与记录都是齐的，没有需要补全的。')
+    if (result.total) parts.push(`共 ${result.total} 条待补`)
+    if (result.failed?.length) parts.push(`${result.failed.length} 条探测失败`)
+    let text = parts.length ? `${parts.join('，')}。` : '历史素材都是齐的，没有需要补全的。'
+    // 探测失败的素材必须能被看见 —— 否则「都补好了」是假象
+    if (result.failed?.length) text += ` 失败明细：${result.failed.map(f => `${f.name}（${f.reason}）`).join('；')}`
+    message(text, result.failed?.length > 0)
   } catch (err) { message(err.message, true) }
 }
 $('voice-mode').onchange = () => setMode('speech')
+$('backend').addEventListener('change', () => {
+  const group = channelGroup()
+  if (group) localStorage.setItem(`reel-channel:${group}`, $('backend').value)
+  // 换通道 = 换一套模型与音色，旧的选择不再成立
+  if (group === 'voice') { voiceState.backend = $('backend').value; voiceState.model = ''; voiceState.voiceId = ''; saveVoiceState() }
+  // 换通道后，上一条通道记住的模型不再适用（型号、时长范围、分辨率都不同）
+  else if (group) { localStorage.removeItem(`reel-model:${group}`); $('model').value = '' }
+  syncChannel()
+  $('generation-note').textContent = generationNote()
+  rec?.sync()
+})
+$('model').addEventListener('change', () => {
+  $('model-custom').hidden = $('model').value !== CUSTOM_MODEL
+  applyModelLimits()
+  const group = channelGroup()
+  if (group === 'voice') { voiceState.model = currentModel(); saveVoiceState() }
+  else if (group) localStorage.setItem(`reel-model:${group}`, currentModel())
+})
+$('voice-id').addEventListener('change', () => {
+  $('voice-custom').hidden = $('voice-id').value !== CUSTOM_VOICE
+  if (channelGroup() === 'voice') { voiceState.voiceId = currentVoiceId(); saveVoiceState() }
+})
+$('model-custom').addEventListener('input', () => {
+  const group = channelGroup()
+  if (group === 'voice') { voiceState.model = currentModel(); saveVoiceState() }
+  else if (group) localStorage.setItem(`reel-model:${group}`, currentModel())
+})
+$('voice-custom').addEventListener('input', () => {
+  if (channelGroup() === 'voice') { voiceState.voiceId = currentVoiceId(); saveVoiceState() }
+})
+$('profile').addEventListener('change', () => {
+  if (channelGroup() === 'voice') { voiceState.profile = $('profile').value || ''; saveVoiceState() }
+})
 $('projects').onclick = event => switchProject(event.target.closest('[data-project]')?.dataset.project)
 $('active-project').onchange = () => switchProject($('active-project').value)
 $('new-project-top').onclick = () => { $('project-dialog').showModal(); $('new-name').focus() }
@@ -280,6 +587,54 @@ $('project-form').onsubmit = async event => {
 $('connections').onclick = async () => { $('connections-dialog').showModal(); try { await connections() } catch (error) { message(error.message, true) } }
 $('refresh-connections').onclick = async () => { try { await connections(); message('连接状态已更新') } catch (error) { message(error.message, true) } }
 for (const name of ['upload-top', 'upload-reference']) $(name).onclick = () => { uploadTarget = null; $('file-input').click() }
+// 配乐库：默认走 R2 上的清单，本地上传仍可用（上传的音频也在同一个下拉里）
+let bgmLibrary = []
+async function loadBgmLibrary() {
+  try {
+    const result = await api('/api/bgm')
+    bgmLibrary = result.items || []
+    const select = $('bgm-library')
+    select.innerHTML = bgmLibrary.length
+      // 选项文字要短：下拉框宽度有限，堆太多信息会被截断成「轻快/可爱/日…」，反而看不出是什么
+      ? bgmLibrary.map(b => `<option value="${escape(b.alias)}">${escape(b.alias)}${b.kind === 'track' ? '（原创）' : ''}</option>`).join('')
+      : '<option value="">配乐库为空</option>'
+    select.disabled = !bgmLibrary.length
+    const first = bgmLibrary[0]
+    $('bgm-library-note').textContent = result.error
+      ? `配乐库暂时拉不到：${result.error}`
+      : result.configured
+        ? (bgmLibrary.length
+          ? `${bgmLibrary.length} 首可选。${first.license ? '授权：' + first.license : ''}取用后会加入本项目素材，授权与来源一并记录。`
+          : '配乐库已连接，但清单里还没有配乐。')
+        : '还没配置配乐库。可以在 ~/.reel-kit/config.json 里写 { "bgmManifest": "https://…/manifest.json" }，或直接用上面的上传按钮。'
+    // 授权随所选曲目走：换一首就要换一段授权说明，不能一直显示第一首的
+    const updateLicense = () => {
+      const picked = bgmLibrary.find(b => b.alias === $('bgm-library').value)
+      $('bgm-library-note').textContent = picked
+        ? `「${picked.alias}」${picked.license ? ' · 授权：' + picked.license : ''}${picked.source ? ' · 来源：' + picked.source : ''}。取用后会加入本项目素材。`
+        : $('bgm-library-note').textContent
+    }
+    select.onchange = updateLicense
+    updateLicense()
+  } catch (error) {
+    $('bgm-library-note').textContent = '配乐库暂时连不上：' + error.message
+    $('bgm-library').innerHTML = '<option value="">配乐库不可用</option>'
+    $('bgm-library').disabled = true
+  }
+}
+$('bgm-library-pull').onclick = async () => {
+  const alias = $('bgm-library').value
+  if (!alias) return message('请先选择要取用的配乐', true)
+  const button = $('bgm-library-pull'); button.disabled = true
+  try {
+    const item = bgmLibrary.find(b => b.alias === alias) || {}
+    const asset = await api('/api/bgm/pull', { method: 'POST', body: JSON.stringify({ projectId, alias }) })
+    await refresh()
+    $('rec-bgm').value = asset.id
+    rec.sync(); saveRecommendation()
+    message(`已取用「${alias}」并加入本项目素材。${item.license ? '授权：' + item.license : ''}`)
+  } catch (error) { message(error.message, true) } finally { button.disabled = false }
+}
 $('assets').onclick = event => {
   if (event.target.closest('#empty-upload')) $('file-input').click()
   const button = event.target.closest('[data-preview]'); if (button) showPreview(button.dataset.preview)
@@ -303,15 +658,24 @@ $('file-input').onchange = async () => {
 $('generate-form').onsubmit = async event => {
   event.preventDefault(); $('generate').disabled = true
   try {
-    const job = { projectId, kind: mode === 'speech' ? $('voice-mode').value : mode, prompt: $('prompt').value, ratio: $('ratio').value, duration: Number($('duration').value), resolution: $('resolution').value, profile: $('profile').value || 'primary', referenceId: $('reference').value || undefined, persona: $('persona').value || undefined, voiceName: $('voice-name').value, assetIds: selected, audioId: $('audio').value || undefined, template: $('template').value, title: $('export-title').value, captions: $('captions').value }
+    const job = { projectId, kind: mode === 'speech' ? $('voice-mode').value : mode, prompt: $('prompt').value, ratio: $('ratio').value, duration: Number($('duration').value), resolution: $('resolution').value, profile: $('profile').value || 'primary', backend: currentChannel()?.id, model: currentModel(), voiceId: currentVoiceId(), referenceId: $('reference').value || undefined, persona: currentChannel()?.id === 'voxflow' ? ($('persona').value || undefined) : undefined, voiceName: $('voice-name').value, assetIds: selected, audioId: $('audio').value || undefined, template: $('template').value, title: $('export-title').value, captions: $('captions').value }
     if (job.kind === 'clone') { job.persona = undefined; job.referenceText = $('reference-text').value }
-    if (mode === 'recommendation') Object.assign(job, { repoUrl: $('repo-url').value, title: $('repo-title').value, captions: $('repo-captions').value, assetIds: selected, voiceIds: [...$('scene-voices').querySelectorAll('select')].map(el => el.value) }, rec.read())
+    if (mode === 'recommendation') Object.assign(job, { repoUrl: $('repo-url').value, title: $('repo-title').value, captions: $('repo-captions').value, assetIds: selected, voiceIds: [...$('scene-voices').querySelectorAll('select')].map(el => el.value) }, rec.read(), { backend: currentChannel()?.id, model: currentModel(), voiceId: currentVoiceId(), profile: voiceState.profile || job.profile })
     await api('/api/jobs', { method: 'POST', body: JSON.stringify(job) }); message('任务已加入队列，完成后会出现在素材库。'); await refresh()
   } catch (error) { message(error.message, true) } finally { $('generate').disabled = false }
 }
 $('jobs').onclick = event => {
   const preview = event.target.closest('[data-preview]')
   if (preview) { showPreview(preview.dataset.preview); document.querySelector('.preview-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return }
+  const resume = event.target.closest('[data-resume]')?.dataset.resume
+  if (resume) {
+    const button = event.target.closest('[data-resume]')
+    button.disabled = true; button.textContent = '正在取回…'
+    api('/api/jobs/resume', { method: 'POST', body: JSON.stringify({ jobId: resume }) })
+      .then(() => { message('已取回上游生成的素材，费用没有重复产生。'); return refresh() })
+      .catch(error => { message(error.message, true); button.disabled = false; button.textContent = '取回已生成的素材' })
+    return
+  }
   const fix = event.target.closest('[data-fix]')?.dataset.fix
   if (fix) {
     if (mode !== 'recommendation') setMode('recommendation')
@@ -327,7 +691,7 @@ async function boot() {
   try {
     await refresh()
     if (!state.projects.length) { const project = await api('/api/projects', { method: 'POST', body: JSON.stringify({ name: '我的第一支短片' }) }); projectId = project.id; localStorage.setItem('reel-project', projectId); await refresh() }
-    loadDraft(); await connections()
+    loadDraft(); await connections(); loadBgmLibrary()
   } catch (error) { message(error.message, true) }
   let busy = false
   setInterval(async () => { if (busy || document.hidden) return; busy = true; try { await refresh() } catch (error) { message('工作台连接中断，请检查本地服务。' + error.message, true) } finally { busy = false } }, 3000)

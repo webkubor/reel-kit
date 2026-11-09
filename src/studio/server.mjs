@@ -9,6 +9,7 @@ import { exportVideo } from './export.mjs'
 import { redact, command, jsonFetch, download, probeBytes } from './process.mjs'
 import { projectDraft, makeRecommendation, githubRepo } from './recommendation.mjs'
 import { recommendationSettings } from './video-settings.mjs'
+import { listBgm, resolveBgmEntry, bgmConfigured } from '../bgm-library.mjs'
 import { initializeWorkflow, snapshotSop, workflowAction, remakeProject } from './workflow.mjs'
 import { limitsFor, saveLimits } from './platform-limits.mjs'
 
@@ -30,7 +31,7 @@ function json(res, code, value) { res.writeHead(code, { 'content-type': 'applica
 function validate(input, store) {
   store.project(input.projectId)
   if (!['image', 'video', 'speech', 'clone', 'voice-design', 'export', 'recommendation'].includes(input.kind)) fail('任务类型不支持')
-  const allowed = ['kind', 'projectId', 'prompt', 'ratio', 'duration', 'resolution', 'assetIds', 'audioId', 'referenceId', 'persona', 'referenceText', 'voiceName', 'template', 'captions', 'title', 'profile', 'repoUrl', 'voiceIds', 'platform', 'voiceSource', 'tone', 'emotion', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit']
+  const allowed = ['kind', 'projectId', 'prompt', 'ratio', 'duration', 'resolution', 'assetIds', 'audioId', 'referenceId', 'persona', 'referenceText', 'voiceName', 'template', 'captions', 'title', 'profile', 'repoUrl', 'voiceIds', 'platform', 'voiceSource', 'tone', 'emotion', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit', 'backend', 'model', 'voiceId']
   const value = Object.fromEntries(allowed.filter(k => input[k] !== undefined).map(k => [k, input[k]]))
   if (typeof value.prompt !== 'string' || !value.prompt.trim() || value.prompt.length > 10000) {
     if (!['export', 'recommendation'].includes(value.kind)) fail('请输入 1–10000 字的提示词或配音文字')
@@ -39,8 +40,20 @@ function validate(input, store) {
   if (!['9:16', '16:9', '1:1'].includes(value.ratio)) fail('不支持的画幅')
   value.duration = Number(value.duration || 6)
   if (!Number.isFinite(value.duration) || value.duration < 1 || value.duration > 30) fail('时长须为 1–30 秒')
-  if (value.kind === 'video' && (!Number.isInteger(value.duration) || value.duration < 4 || value.duration > 15)) fail('H3 时长请选择 4–15 秒的整数')
+  // 各通道的时长上限不一样（H3 4–15 秒、Kling 5–10 秒、Wan 固定 5 秒）：
+  // 界面上按所选模型给范围，服务端只做基本约束，具体上限由上游说了算
+  if (value.kind === 'video' && !Number.isInteger(value.duration)) fail('时长须为整数秒')
   if (value.resolution && !['768P', '1080P', '2K'].includes(value.resolution)) fail('不支持的分辨率')
+  // 通道与模型：允许自填（中台上新一个模型时不用等 reel-kit 发版）。
+  // 模型名里常有空格与括号（"Seedance 2.0"、"Chinese (Mandarin)_Warm_Girl"），不能一刀切；
+  // 真正要挡的是控制字符与路径分隔符 —— 这两个字段不会拿去拼路径或进 shell。
+  if (value.backend !== undefined) {
+    if (typeof value.backend !== 'string' || !/^[A-Za-z0-9_.-]{1,60}$/.test(value.backend)) fail('生成通道格式无效')
+  }
+  for (const key of ['model', 'voiceId']) {
+    if (value[key] === undefined) continue
+    if (typeof value[key] !== 'string' || value[key].length > 120 || /[\u0000-\u001f/\\]/.test(value[key])) fail(`${key} 格式无效`)
+  }
   value.assetIds = value.assetIds || []
   if (!Array.isArray(value.assetIds) || value.assetIds.length > 30) fail('最多选择 30 个素材')
   value.assetIds.forEach(assetId => store.asset(assetId, value.projectId))
@@ -59,10 +72,10 @@ function validate(input, store) {
     for (const id of value.assetIds) if (!store.asset(id, value.projectId).mime.startsWith('image/')) fail('项目画面必须是图片')
     for (const key of ['bgmId', 'narrationId']) if (value[key] && !store.asset(value[key], value.projectId).mime.startsWith('audio/')) fail('旁白和 BGM 须选择音频素材')
     if (settings.voiceSource === 'audio' && !value.narrationId) fail('请选择整段旁白素材')
-    if (settings.voiceSource === 'tts' && !value.persona) fail('请选择音色或创建新音色')
+    if (settings.voiceSource === 'tts' && !value.persona && !value.voiceId) fail('请选择音色或创建新音色')
     if (!Array.isArray(value.voiceIds) || value.voiceIds.length !== lines.length) fail('旁白素材与分镜数量不匹配')
     value.voiceIds.filter(Boolean).forEach(id => { if (!store.asset(id, value.projectId).mime.startsWith('audio/')) fail('分镜旁白须选择音频') })
-    if (settings.voiceSource === 'scenes' && !value.persona && value.voiceIds.some(id => !id)) fail('空缺分镜需要选择生成音色')
+    if (settings.voiceSource === 'scenes' && !value.persona && !value.voiceId && value.voiceIds.some(id => !id)) fail('空缺分镜需要选择生成音色')
   }
   value.template = value.template || 'sticker-promo'
   if (!templateNames.includes(value.template)) fail('模板不存在')
@@ -82,7 +95,17 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
       for (;;) {
         const job = store.state.jobs.find(j => j.status === 'queued')
         if (!job) break
-        const progress = text => { job.message = text; job.updatedAt = now(); store.save() }
+        // progress 除了文案，还可以带一条上游任务回执（meta.upstream）。
+        // 提交即计费的通道必须在提交那一刻就把上游任务 ID 存下来 ——
+        // 否则下载失败或进程重启后，用户只能重新提交一次，等于重复花钱。
+        const progress = (text, meta) => {
+          job.message = text
+          if (meta?.upstream) {
+            job.upstream = { ...(job.upstream || {}), ...meta.upstream }
+            job.updatedAt = now(); store.save()
+          }
+          job.updatedAt = now(); store.save()
+        }
         const report = step => {
           const steps = (job.steps || []).filter(s => s.id !== step.id)
           steps.push(step)
@@ -127,6 +150,14 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
           if (match) { match.hints = local.hints || []; match.note = local.note || '' } else voices.push({ persona: local.persona, name: local.persona, hasSample: false, hints: local.hints || [], note: local.note || '' })
         }
         return json(res, 200, { voices, voiceReady: Boolean(provider.voice?.ready), recordingReady: Boolean(provider.voice?.recordingReady), designReady: Boolean(provider.voice?.designReady) })
+      }
+      if (req.method === 'GET' && path === '/api/bgm') {
+        // 配乐库默认来自 R2 上的清单（~/.reel-kit/config.json 的 bgmManifest）。
+        // 「没配库」和「配了但暂时拉不到」必须分开说 —— 否则用户会去检查根本没配的东西。
+        const configured = await bgmConfigured()
+        let items = [], error = ''
+        try { items = await listBgm() || [] } catch (e) { error = redact(e.message).slice(0, 200) }
+        return json(res, 200, { items, configured, error })
       }
       if (req.method === 'GET' && path === '/api/voice/tasks') {
         const data = await jsonFetch((process.env.REEL_VOXFLOW_URL || 'http://127.0.0.1:8866') + '/api/tasks')
@@ -179,6 +210,26 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
           store.save()
           return json(res, 200, { persona, hints })
         }
+        if (path === '/api/bgm/pull') {
+          // 从配乐库取一首，落到本项目素材里：授权与来源一起记进素材，出片时可查
+          const projectId = String(input.projectId || ''); store.project(projectId)
+          const alias = String(input.alias || '').trim()
+          if (!alias) fail('请选择配乐')
+          // exact：接口只接受清单里的精确别名 —— 模糊匹配会让任意碎片命中某首曲子
+          const resolved = await resolveBgmEntry(alias, { exact: true })
+          if (!resolved) fail('配乐库里没有这一首，请刷新列表后重试')
+          const bytes = readFileSync(resolved.file)
+          if (!bytes.length) fail('配乐文件为空')
+          const mime = resolved.file.endsWith('.wav') ? 'audio/wav' : resolved.file.endsWith('.m4a') ? 'audio/mp4' : resolved.file.endsWith('.flac') ? 'audio/flac' : 'audio/mpeg'
+          const asset = store.addAsset(projectId, `${resolved.alias} · 配乐`, mime, bytes, {
+            source: '配乐库', origin: 'import', engine: '配乐库',
+            license: resolved.license, licenseUrl: resolved.licenseUrl || '',
+            bgmSource: resolved.source || '', sourceUrl: resolved.sourceUrl || '',
+          })
+          const probe = await probeBytes(asset.file, bytes)
+          Object.assign(asset, probe); store.save()
+          return json(res, 201, store.publicAsset(asset))
+        }
         if (path === '/api/workflow/select-sop') {
           const project = store.project(input.projectId)
           const version = store.state.sopVersions.find(v => v.id === input.sopVersionId && v.pipeline === 'github-recommend')
@@ -202,7 +253,7 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
           const size = statSync(store.path(asset)).size
           const checks = [
             { label: '画幅与尺寸', value: video ? `${video.width}×${video.height}` : '无视频流', passed: video?.width === expected.width && video?.height === expected.height },
-            { label: '视频时长', value: `${duration.toFixed(1)} 秒`, passed: duration > 0 && duration <= limits.maxDuration },
+            { label: '视频时长', value: `${duration.toFixed(1)} 秒 / 上限 ${limits.maxDuration} 秒`, passed: duration > 0 && duration <= limits.maxDuration },
             { label: '音轨', value: audio ? '存在' : '缺失', passed: audio },
             { label: '完整解码', value: decodable ? '通过' : '失败', passed: decodable },
             { label: '文件大小', value: `${(size / 1024 / 1024).toFixed(1)} MB / 上限 ${(limits.maxBytes / 1024 / 1024).toFixed(0)} MB`, passed: size <= limits.maxBytes },
@@ -222,51 +273,66 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
         if (path === '/api/platform-limits') {
           const platform = String(input.platform || 'default')
           const limits = saveLimits(store.state, platform, input.limits || {})
+          // 阈值变了，之前按旧阈值给出的「通过」就不再成立 —— 清掉，让用户重新检测。
+          // 改 default 会影响所有平台，所以全都清。
+          const affected = platform === 'default' ? store.state.jobs : store.state.jobs.filter(j => j.input?.platform === platform)
+          let cleared = 0
+          for (const job of affected) {
+            if (job.input?.kind !== 'recommendation') continue
+            if (job.quality) { delete job.quality; cleared++ }
+            delete job.approval
+          }
           store.save()
-          return json(res, 200, { platform, limits })
+          return json(res, 200, { platform, limits, cleared })
         }
         if (path === '/api/assets/backfill') {
           // 历史素材入库时可能没有尺寸/时长；用 ffprobe 补齐，不改动任何已有文件。
-          const targets = store.state.assets.filter(a => {
-            const visual = a.mime?.startsWith('image/') || a.mime?.startsWith('video/')
-            return (visual && (!a.width || !a.height)) || a.duration === undefined || a.hasAudio === undefined
-          })
+          // 按媒体种类判定缺什么：图片没有时长是正常的，不该每次都被当成「待回填」。
+          const needs = asset => {
+            const missing = []
+            if (asset.mime?.startsWith('image/')) {
+              if (!asset.width || !asset.height) missing.push('尺寸')
+            } else if (asset.mime?.startsWith('video/')) {
+              if (!asset.width || !asset.height) missing.push('尺寸')
+              if (asset.duration === undefined) missing.push('时长')
+              if (asset.hasAudio === undefined) missing.push('音轨')
+            } else if (asset.mime?.startsWith('audio/')) {
+              if (asset.duration === undefined) missing.push('时长')
+            }
+            return missing
+          }
+          const targets = store.state.assets.map(a => ({ asset: a, missing: needs(a) })).filter(t => t.missing.length)
           let updated = 0
-          for (const asset of targets) {
+          const failed = []
+          for (const { asset, missing } of targets) {
             try {
               const info = JSON.parse(await command('ffprobe', ['-v', 'error', '-print_format', 'json', '-show_streams', '-show_format', store.path(asset)], { timeout: 20000 }))
               const video = (info.streams || []).find(s => s.codec_type === 'video')
               const audio = (info.streams || []).some(s => s.codec_type === 'audio')
-              if (video?.width) { asset.width = video.width; asset.height = video.height }
-              if (info.format?.duration) asset.duration = Number(info.format.duration)
-              asset.hasAudio = audio
-              updated++
-            } catch { /* 探测不了的素材保持原样，不阻断其余回填 */ }
+              const before = { width: asset.width, height: asset.height, duration: asset.duration, hasAudio: asset.hasAudio }
+              if (missing.includes('尺寸') && video?.width) { asset.width = video.width; asset.height = video.height }
+              if (missing.includes('时长') && info.format?.duration) asset.duration = Number(info.format.duration)
+              if (missing.includes('音轨')) asset.hasAudio = audio
+              if (asset.width !== before.width || asset.height !== before.height || asset.duration !== before.duration || asset.hasAudio !== before.hasAudio) updated++
+              else failed.push({ id: asset.id, name: asset.name, reason: '探测成功但没有可补的字段' })
+            } catch (error) {
+              // 探测失败的素材要能看见，否则「回填完成」是假象。
+              // 只留第一行原因：ffprobe 的报错会带本地绝对路径，贴到界面上既没用也泄露目录结构。
+              const reason = redact(String(error.message || '').split('\n')[0]).slice(0, 200)
+              failed.push({ id: asset.id, name: asset.name, reason })
+            }
           }
           store.save()
-          // 历史项目与旧视频补上默认方法版本标记：只补标记，不改任何已有内容与文件。
-          const fallback = store.state.sopVersions.find(v => v.pipeline === 'github-recommend')
-          let projects = 0, jobs = 0
-          if (fallback) {
-            for (const project of store.state.projects) {
-              if (!project.sopVersionId) { project.sopVersionId = fallback.id; projects++ }
-            }
-            for (const job of store.state.jobs) {
-              if (job.input?.kind === 'recommendation' && !job.sopSnapshot) {
-                job.sopSnapshot = { sopVersionId: fallback.id, sopVersion: fallback.version, input: job.input, inferred: true }
-                jobs++
-              }
-            }
-            store.save()
-          }
-          return json(res, 200, { updated, total: targets.length, projects, jobs })
+          return json(res, 200, { updated, total: targets.length, failed })
         }
         if (path === '/api/project-settings') {
           const project = store.project(input.projectId)
-          const keys = ['platform', 'voiceSource', 'persona', 'tone', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit']
+          const keys = ['platform', 'voiceSource', 'persona', 'tone', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit', 'backend', 'model', 'voiceId', 'profile']
           const preferences = Object.fromEntries(keys.filter(k => input.settings?.[k] !== undefined).map(k => [k, input.settings[k]]))
           recommendationSettings(preferences)
           for (const key of ['persona', 'tone']) if (preferences[key] !== undefined && (typeof preferences[key] !== 'string' || preferences[key].length > 500)) fail('声音设置格式无效')
+          // 通道、模型、音色、账户也要存：换台机器或换个人接手，配音仍得是同一个声音
+          for (const key of ['backend', 'model', 'voiceId', 'profile']) if (preferences[key] !== undefined && (typeof preferences[key] !== 'string' || preferences[key].length > 120 || /[\u0000-\u001f/\\]/.test(preferences[key]))) fail('生成通道设置格式无效')
           for (const key of ['bgmId', 'narrationId']) if (preferences[key]) { if (!store.asset(preferences[key], project.id).mime.startsWith('audio/')) fail('请选择当前项目的音频素材') }
           project.recommendationSettings = preferences; store.save()
           return json(res, 200, { settings: preferences })
@@ -286,6 +352,24 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
         if (path === '/api/recommendation/draft') {
           store.project(input.projectId)
           return json(res, 200, await projectDraft(input.repoUrl, input.projectId, store))
+        }
+        if (path === '/api/jobs/resume') {
+          // 取回上次已经提交、但下载失败的上游产物。
+          // 不重新生成：付费通道提交即计费，重新提交等于再付一次。
+          const job = store.state.jobs.find(j => j.id === input.jobId)
+          if (!job) fail('任务不存在', 404)
+          if (!job.upstream?.taskId) fail('这条任务没有可继续的上游任务；请重新提交')
+          if (['queued', 'running'].includes(job.status)) fail('任务正在执行中，请稍候')
+          if (!backend.resume) fail('当前后端不支持取回，请升级 reel-kit', 503)
+          store.project(job.projectId)
+          try {
+            const asset = await backend.resume({ upstream: job.upstream, input: job.input }, text => { job.message = text; job.updatedAt = now(); store.save() })
+            job.assetId = asset.id; job.status = 'succeeded'; delete job.error; job.updatedAt = now(); store.save()
+            return json(res, 200, job)
+          } catch (error) {
+            job.status = 'failed'; job.error = redact(error.message); job.updatedAt = now(); store.save()
+            throw error
+          }
         }
         if (path === '/api/projects') {
           const name = String(input.name || '').trim()

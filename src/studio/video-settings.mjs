@@ -13,8 +13,36 @@ export function recommendationSettings(input) {
   const voiceSource = input.voiceSource || 'scenes'
   if (!['tts', 'scenes', 'audio'].includes(voiceSource)) throw new Error('请选择旁白来源')
   if (!['cover', 'contain'].includes(input.imageFit || 'contain')) throw new Error('请选择画面填充方式')
-  return { platform, ...platforms[platform], speed, pause, bgmGain, voiceSource, imageFit: input.imageFit || 'contain' }
+  return {
+    platform, ...platforms[platform], speed, pause, bgmGain, voiceSource,
+    imageFit: input.imageFit || 'contain',
+    // 通道 / 模型 / 音色 / 账户是四件独立的事，都要跟着这条片子走。
+    // 少存一个，接手的人就不知道这条片子当时是「谁」的声音。
+    voiceBackend: input.backend || 'voxflow',
+    voiceModel: input.model || '',
+    voiceId: input.voiceId || '',
+    voiceProfile: input.profile || '',
+  }
 }
+
+/**
+ * 这条配音能不能复用。
+ *
+ * 必须连「谁合成的、用哪个模型、哪个音色」一起比 ——
+ * 换了通道或换了音色的旧配音，语速、咬字、情绪都不一样，直接套用会听出接缝。
+ */
 export function reusableVoice(asset, input, line) {
-  return asset?.mime?.startsWith('audio/') && asset.persona === input.persona && asset.prompt === line && (asset.tone || '') === (input.tone || '')
+  if (!asset?.mime?.startsWith('audio/')) return false
+  if (asset.prompt !== line) return false
+  if ((asset.tone || '') !== (input.tone || '')) return false
+  const backend = input.backend || 'voxflow'
+  const assetBackend = asset.voiceBackend || (asset.source === 'MiniMax TTS' ? 'minimax' : 'voxflow')
+  if (backend !== assetBackend) return false
+  const model = input.model || (backend === 'minimax' ? 'speech-02-hd' : 'voxflow-local')
+  if ((asset.requestedModel || 'voxflow-local') !== model) return false
+  const voice = input.voiceId || input.persona || ''
+  if ((asset.persona || '') !== voice) return false
+  // 同一个模型在两个账户下也不是同一段声音 —— 账户也要比
+  const profile = input.profile || ''
+  return (asset.profile || '') === profile
 }

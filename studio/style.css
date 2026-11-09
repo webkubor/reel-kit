@@ -61,3 +61,6 @@ dialog{border:1px solid var(--line);border-radius:12px;padding:28px;width:min(50
 .library-actions{margin-top:16px}
 .library-actions .primary{width:auto;margin-top:0}
 @media(max-width:800px){.origin-legend{display:none}.step-main{min-width:0;flex-basis:100%}.voice-hints{flex-wrap:wrap}}
+.inline-row{display:flex;gap:10px;align-items:center}
+.inline-row select{flex:1;min-width:0}
+.inline-row .text-button{flex:none;white-space:nowrap}

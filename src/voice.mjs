@@ -8,15 +8,15 @@
  *   voxcraft（默认）—— 本地 Qwen3-TTS（Base-1.7B，4.2GB 权重）。**一次性成本，
  *                      之后每句合成都不花钱**；且支持声音克隆与音色设计，
  *                      IP 专属嗓音只能靠它。自研开源项目，用自己的东西。
- *   museav          —— 走小米 MiMo API，无需本地模型、秒级出声，
- *                      但按 token 计费。适合临时试验或本地模型未就绪时兜底。
+ *   minimax         —— MiniMax 云端 TTS，无需本地模型、秒级出声，按量计费。
+ *                      只做文字配音（音色用 voice_id），不支持克隆与音色设计。
  *
  * 默认选 voxcraft 是**成本决定的**：批量流水线一支片子几十句，
  * API 调用会持续累积，而本地推理是一次性投入。
  */
 
 import { execFile } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import { promisify } from 'node:util'
 import { locateVoxcraft, voxcraftHint } from './voxcraft-locate.mjs'
@@ -24,19 +24,42 @@ import { ensureServer, stopServer, synthesizeViaServer } from './voxcraft-server
 
 const run = promisify(execFile)
 
-/** museav speak 依赖 MIMO_API_KEY；密钥库里是 secret://mimo/api-key */
-const MIMO_SECRET = 'secret://mimo/api-key'
-
-async function speakViaMuseav({ text, out, voice, design, instruction }) {
-  const inner = ['speak', text, '--out', out]
-  if (voice) inner.push('--voice', voice)
-  if (design) inner.push('--design', design)
-  if (instruction) inner.push('--instruction', instruction)
-
-  // 用 cs kyvault run 注入 key —— 明文不落盘、不进 argv、不进 shell history
-  const args = ['kyvault', 'run', '--env', `MIMO_API_KEY=${MIMO_SECRET}`, '--', 'museav', ...inner]
-  await run('cs', args, { maxBuffer: 8 * 1024 * 1024 })
-  if (!existsSync(out)) throw new Error(`museav speak 未产出文件: ${out}`)
+/**
+ * 云端配音：MiniMax TTS。
+ *
+ * 原来这里挂的是 `museav speak` —— 中台**没有这个命令**（3.16.0 的 CLI 里不存在），
+ * 调下去必然 unknown command。所谓「MiMo API 兜底」从来没能跑通。
+ * 现在换成实测能出声的 MiniMax TTS，并把「不支持的能力」明说。
+ */
+async function speakViaMinimax({ text, out, voice }) {
+  const key = process.env.MINIMAX_API_KEY
+  if (!key) throw new Error('未配置 MINIMAX_API_KEY（用密钥工具注入后再运行）')
+  if (!voice) throw new Error('MiniMax TTS 需要 --voice <音色 ID>，例如 male-qn-qingse')
+  const response = await fetch('https://api.minimaxi.com/v1/t2a_v2', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: process.env.REEL_MINIMAX_TTS_MODEL || 'speech-02-hd',
+      text,
+      stream: false,
+      voice_setting: { voice_id: voice, speed: 1, vol: 1, pitch: 0 },
+      audio_setting: { sample_rate: 32000, bitrate: 128000, format: 'mp3', channel: 1 },
+    }),
+    signal: AbortSignal.timeout(120000),
+  })
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(`MiniMax HTTP ${response.status}${result.base_resp?.status_msg ? `：${result.base_resp.status_msg}` : ''}`)
+  // 成功回执里也带 base_resp，status_code 为 0 才算成功 —— 有 base_resp 不等于失败
+  if (result.base_resp?.status_code) throw new Error(`MiniMax 拒绝请求（${result.base_resp.status_code}）：${result.base_resp.status_msg || '请核对权限或额度'}`)
+  const hex = result.data?.audio
+  if (!hex) throw new Error('MiniMax 未返回音频数据')
+  const tmp = out.replace(/\.wav$/, '.mp3')
+  writeFileSync(tmp, Buffer.from(hex, 'hex'))
+  // 流水线后面统一按 wav 处理（拼接、混音），所以这里转一次
+  try {
+    await run('ffmpeg', ['-y', '-loglevel', 'error', '-i', tmp, '-ar', '24000', '-ac', '1', out])
+  } finally { rmSync(tmp, { force: true }) }
+  if (!existsSync(out)) throw new Error(`MiniMax 音频转换失败: ${out}`)
   return out
 }
 
@@ -105,6 +128,19 @@ export async function synthesizeCaptions({
   mkdirSync(outDir, { recursive: true })
   const results = []
 
+  if (engine === 'museav') {
+    throw new Error(
+      'museav 配音已下线：中台的 CLI 里没有 speak 命令，这条路径从来没能跑通。\n' +
+      '  改用 --voice-engine minimax（云端 TTS，需 MINIMAX_API_KEY），或在 Reel Studio 里选 MiniMax TTS 通道。',
+    )
+  }
+  if (!['voxcraft', 'minimax'].includes(engine)) {
+    throw new Error(`未知的配音后端 "${engine}"；可用：voxcraft（本地）、minimax（云端 TTS）`)
+  }
+  if (engine === 'minimax' && (design || instruction)) {
+    throw new Error('MiniMax TTS 只做文字配音，不支持音色设计（--design）与指令（--instruction）；这两项请用本地 voxcraft')
+  }
+
   /*
    * voxcraft 的 `voice` 命令在它自己的 venv 里，默认不在 PATH。
    * 只判断 `which voice` 会误判成「没装」，进而重复装一遍 —— 模型 4.2GB，
@@ -155,7 +191,7 @@ export async function synthesizeCaptions({
     const text = captions[i]
     const out = join(outDir, `voice_${String(i).padStart(4, '0')}.wav`)
     try {
-      await speakViaMuseav({ text, out, voice, design, instruction })
+      await speakViaMinimax({ text, out, voice })
     } catch (e) {
       throw new Error(`第 ${i + 1} 句配音失败（"${text.slice(0, 20)}"）: ${e.message}`)
     }

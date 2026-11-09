@@ -93,6 +93,59 @@ Agent 工作流里也可通过 [cs-mcp](https://github.com/webkubor/cs-mcp) 调�
 kyvault run --env MINIMAX_API_KEY=secret://minimax/api-key -- reel studio
 ```
 
+### 生成通道：自己选，不替你换
+
+视频、图片、配音各有独立的「通道」，在界面上直接切换：
+
+| 通道 | 能力 | 计费 |
+|---|---|---|
+| **MuseAV 中台** | 图片与视频（含 Seedance、Kling、Wan 等中台可用模型） | 按中台额度 |
+| **MiniMax 直连** | H3 视频、speech-02-hd 配音 | 按你自己的 MiniMax 账户 |
+| **本地 VoxFlow** | 音色设计、配音、克隆自己的声音 | 本地推理，不产生模型费用 |
+| **自定义通道** | 任意兼容的生图 / 视频接口 | 按你自己的账户 |
+
+规则：**不静默换供应商、不静默换账户**。你选的那条通道没就绪，工作台会禁用生成并写明原因，不会悄悄改用另一条（可能另一家的付费）通道。模型、音色、账户是三件独立的事，界面分开设置。
+
+已付过费的任务如果只是下载失败，工作台会保留上游任务 ID，历史记录里出现「取回已生成的素材」——**取回不会重新提交，因此不会重复计费**。
+
+### 自定义通道配置
+
+在 `~/.reel-kit/providers.json` 里声明自己的通道。**只写环境变量名，不写密钥明文**：
+
+```json
+{
+  "channels": [
+    {
+      "id": "seedream",
+      "label": "Seedream 生图",
+      "kind": "image",
+      "protocol": "openai",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+      "model": "doubao-seedream-4-0-250828",
+      "env": "ARK_API_KEY"
+    }
+  ]
+}
+```
+
+- `kind`：`image` 或 `video`。`protocol`：`openai`（一次 POST 生图）或 `ark-task`（提交任务再轮询，视频用）。
+- `env` 是环境变量名；启动工作台时注入即可：`REEL_STUDIO_HOME=... ARK_API_KEY=... reel studio`。
+- 配置有问题时，「连接状态」里会逐条列出是哪一项不对，而不是让通道悄悄消失。
+- 自定义 TTS 尚未实现，请用 MiniMax TTS 或本地 VoxFlow。
+
+## 🎬 桌面应用（MyGo 原生界面）
+
+工作台另有 **MyGo 原生桌面版**：窗口、按钮、输入框、下拉、卡片全部是 Go 原生控件，不是网页，不用再写前端。
+
+```bash
+cd apps/reel-studio
+go tool mygo dev      # 开发（带热重载）
+go test ./...         # 不开窗口测交互
+go tool mygo build    # 打包成 .app
+```
+
+原生界面与网页版共用同一套本地 HTTP 接口（`src/studio/server.mjs`），数据、素材、成片都还在 `~/.reel-kit/studio/`。
+
 ## ⚡ 30 秒上手
 
 ```bash
@@ -158,7 +211,7 @@ reel-kit 把那段流程固化成可复用的命令。
 
 默认接 [voxcraft](https://github.com/webkubor/voxcraft)（本地 Qwen3-TTS），
 一次性下 4.2GB 模型，之后每句合成都不花钱，还支持声音克隆做 IP 专属嗓音。
-也可切 `--voice-engine museav` 走 API（无需本地模型，按量计费）。
+也可选择 `--voice-engine minimax` 直连 MiniMax TTS，需注入账户密钥，费用与套餐覆盖以实际账户为准。
 
 ---
 
@@ -205,17 +258,17 @@ npm link
 
 ```bash
 reel make ... --voice <音色>                 # voxcraft 本地（默认）
-reel make ... --voice <音色> --voice-engine museav   # API 后端
+reel make ... --voice <音色ID> --voice-engine minimax   # MiniMax TTS 直连
 ```
 
-| | voxcraft（默认） | museav |
+| | voxcraft（默认） | MiniMax TTS |
 |---|---|---|
-| 位置 | 本地 Qwen3-TTS Base-1.7B | 小米 MiMo API |
-| 成本 | 一次性 4.2GB 模型，之后免费 | 按 token 计费 |
-| 音色 | 声音克隆 / 文字描述造音色 | 预置音色，开箱即用 |
-| 前置 | 需先注册音色 | 无 |
+| 位置 | 本地 Qwen3-TTS Base-1.7B | MiniMax 云端 API |
+| 成本 | 一次性下载模型，本地推理 | 以账户实际计费为准 |
+| 音色 | 已注册的本地音色 | 供应商音色 ID |
+| 前置 | 需先注册音色 | 注入 `MINIMAX_API_KEY` |
 
-> voxcraft 的音色库初始为空。没注册音色前 `--voice` 会失败，此时可用 `--voice-engine museav` 兜底。
+> `museav speak` 在当前 MuseAV CLI 中不可用，不能作为配音后端。voxcraft 的音色库初始为空，使用前需注册音色。
 > reel-kit 会自动定位本机的 voxcraft 安装（它的 `voice` 命令在 venv 里，默认不在 PATH），
 > 缺什么会明确报出来并给可复制的修复命令 —— **不会自动去装 4.2GB 的东西**。
 

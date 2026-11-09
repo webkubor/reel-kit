@@ -94,10 +94,10 @@ make 选项:
   --transition-duration <秒>  转场时长,默认 0.4
 
 配音（让念白驱动镜头时长，而非固定 --per-shot）:
-  --voice <音色>       开启配音。voxcraft 后端此项为已注册音色 key（voice list 可查）
-  --voice-engine <名>  voxcraft（默认，本地 Qwen3-TTS，免费）| museav（MiMo API，按量计费）
-  --design <描述>      museav 后端：一句话描述音色，当场造一个
-  --instruction <文本> 语气/风格指令
+  --voice <音色>       开启配音。voxcraft 为已注册音色 key；minimax 为音色 ID（如 male-qn-qingse）
+  --voice-engine <名>  voxcraft（默认，本地 Qwen3-TTS，免费）| minimax（云端 TTS，按量计费）
+  --design <描述>      voxcraft 后端：一句话描述音色
+  --instruction <文本> 语气/风格指令（voxcraft 后端）
   --voice-margin <秒>  每镜在念白之后多留的时间，默认 0.45
   --min-shot <秒>      镜头下限，避免极短句一闪而过，默认 1.2
 
@@ -371,7 +371,8 @@ async function main() {
     if (!list.length) { console.log('清单里还没有配乐。'); return }
     console.log('可用配乐（--bgm <别名>）:')
     for (const b of list) {
-      console.log(`  ${b.alias.padEnd(14)} ${String(b.duration || '?').padStart(4)}s  ${(b.mood || []).join('/')}`)
+      const tag = b.kind === 'track' ? '原创' : '配乐'
+      console.log(`  ${b.alias.padEnd(14)} ${String(b.duration || '?').padStart(4)}s  ${tag}  ${(b.mood || []).join('/')}`)
       if (b.license) console.log(`  ${' '.repeat(14)} ${b.license}`)
       if (b.usedBy?.length) console.log(`  ${' '.repeat(14)} 用过：${b.usedBy.join('、')}`)
     }

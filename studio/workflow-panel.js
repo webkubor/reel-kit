@@ -43,16 +43,20 @@ export function workflowPanel({ api, getState, getProjectId, refresh, message, a
       e.preventDefault()
       const form = new FormData(e.currentTarget)
       try {
-        await api('/api/platform-limits', { method: 'POST', body: JSON.stringify({ platform, limits: { maxBytes: Number(form.get('maxMb')) * 1024 * 1024, maxDuration: Number(form.get('maxSeconds')) } }) })
-        await refresh(); render(); message('阈值已保存，检测会按新阈值判定。')
+        const result = await api('/api/platform-limits', { method: 'POST', body: JSON.stringify({ platform, limits: { maxBytes: Number(form.get('maxMb')) * 1024 * 1024, maxDuration: Number(form.get('maxSeconds')) } }) })
+        await refresh(); render()
+        message(result.cleared ? '阈值已保存；之前的检测结果已作废，请重新检测成片。' : '阈值已保存，检测会按新阈值判定。')
       } catch (err) { message(err.message, true) }
     })
     root.querySelector('#workflow-adjust')?.addEventListener('click', () => { onAdjust?.(job); })
-    root.querySelector('#workflow-remake')?.addEventListener('click', async () => {
+    root.querySelector('#workflow-remake')?.addEventListener('click', async event => {
+      const button = event.currentTarget
+      if (button.disabled) return
+      button.disabled = true
       try {
         const result = await api('/api/workflow/remake', { method: 'POST', body: JSON.stringify({ projectId, jobId: selectedJob }) })
         await onRemake?.(result)
-      } catch (err) { message(err.message, true) }
+      } catch (err) { message(err.message, true) } finally { button.disabled = false }
     })
     root.querySelector('#workflow-approve')?.addEventListener('click', () => request('review-check', { checks: Object.fromEntries([...root.querySelectorAll('[data-check]')].map(e => [e.dataset.check, e.checked])) }))
     for (const [formId, action] of [['workflow-publish','publish'],['workflow-performance','performance'],['workflow-review','review']]) root.querySelector('#' + formId)?.addEventListener('submit', e => { e.preventDefault(); request(action, Object.fromEntries(new FormData(e.currentTarget))) })

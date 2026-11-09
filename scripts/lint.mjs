@@ -12,6 +12,9 @@ import { join } from 'node:path'
 const FILES = [
   'bin/reel.mjs',
   ...readdirSync('src').filter(f => f.endsWith('.mjs')).map(f => join('src', f)),
+  // studio/ 是子目录，readdirSync 只看一层 —— 漏掉它等于没检查工作台的代码
+  ...readdirSync(join('src', 'studio')).filter(f => f.endsWith('.mjs')).map(f => join('src', 'studio', f)),
+  ...readdirSync('studio').filter(f => f.endsWith('.js')).map(f => join('studio', f)),
 ]
 
 const RULES = [

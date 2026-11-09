@@ -48,7 +48,9 @@
 | 后端 | 何时用 |
 |---|---|
 | `voxcraft`（默认） | 批量。本地 Qwen3-TTS，一次性 4.2GB 模型，之后免费 |
-| `museav` | 临时试验，或本地模型未就绪时兜底。按 token 计费 |
+| `minimax` | MiniMax 云端 TTS，需 `MINIMAX_API_KEY`，按量计费，音色用 voice_id |
+
+`museav speak` **不存在**（CLI 3.16.0 实测）；不要再拿它当配音兜底。
 
 **voxcraft 的 `voice` 命令在它自己的 venv 里，默认不在 PATH。**
 `src/voxcraft-locate.mjs` 负责定位并按完整度打分（能跑 > 有模型 > 有音色），
@@ -59,30 +61,20 @@
 它的 CLI 每次调用都重载模型，逐句起进程做 8 句就是加载 8 次，
 实测第 5 句崩在 `libc++abi: recursive_mutex lock failed`。
 
-## AI 视频生成后端选择顺序(2026-09-24 起)
+## AI 生成通道（用户选择，不自动切账户）
 
-reel-kit 接入 AI 视频生成时,**按以下顺序自动选**(用户拍板,不要反过来):
+2026-11-09 用户拍板：Reel Kit 是本地视频工作台，需要图片/视频 AI 能力时，用户自己选：
 
-| 顺序 | 后端 | 何时用 |
+| 通道 | 适用 | 说明 |
 |---|---|---|
-| ① 优先 | **`MiniMax Hailuo 2.3`** | Ultra 覆盖,**5 段/天** quota。走 `connector__matrix__submit_video_generation` + `query_video_generation`,走 mcode-tools shared-broker 鉴权(无需在 kyvault 单独存 API key)。768P(6/10s)/1080P(6s),**输出无声 → 仍要叠 voxcraft 配音** |
-| ② 降级 | `museav`(用户自建业务中台) | ① quota 用完 / 调用失败时自动降级。按 token 计费,接口路径以 museav 实际为准 |
+| **MuseAV 中台** | 图片、视频 | 工作台调用本机 `museav` CLI，中台实际可用模型以 `museav models` 为准；支持自填模型名 |
+| **MiniMax 直连** | 视频 H3、TTS | 走用户自己的 API 账户与额度；密钥用环境变量注入，**不要自动切账户** |
+| **自定义通道** | 图片、视频 | 用户在 `~/.reel-kit/providers.json` 配 baseUrl / 模型 / 密钥环境变量；协议需匹配（见 README） |
 
-**不要默认接 H3 / H3-Max** — Token Plan 不覆盖,按账户余额付费;只有用户主动要"原生音轨+愿意花钱"时才考虑,不在自动选择链里。
-
-### Quota 管理(必做)
-
-每日 quota 用本地计数文件,`~/.reel-kit/quotas.json`:
-
-```json
-{
-  "minimax-hailuo-2.3": { "date": "2026-09-24", "count": 3 }
-}
-```
-
-- 提交任务前 `+1`,超 5 段直接拒绝 + 报"quota 用完,自动降级 museav"
-- 跨日自动 reset
-- **失败/被取消的任务不消耗 quota**(Mavis H3 任务会 succeeded / failed / cancelled,Hailuo 同样语义)
+- **不默认静默切换通道或账户**：一次提交就用用户选的通道，失败提示原因，不自动重试到另一个供应商。
+- **请求模型和实际模型分开记**：请求的是用户选的，实际模型以同一任务回执为准；没有回执就写 `unknown`。
+- **额度以接口返回为准**：密钥存在不代表套餐覆盖 H3/TTS，不能把旧的 Hailuo 每日 quota 推成通用规则。
+- **本地录音不传云端**：MiniMax TTS 只接收文字和音色 ID；克隆/设计仍走本地 VoxFlow。
 
 ## 验证改动
 

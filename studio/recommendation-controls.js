@@ -6,11 +6,13 @@ const styles = {
   xiaohongshu: { tone: '亲切轻快，像向朋友分享发现，咬字清楚，有交流感，不刻意卖萌', speed: 1.15, pause: 0.2, note: '建议起点：亲切分享、节奏轻快。平台不限定声音性别或年龄。' },
   landscape: { tone: '自然清晰，节奏平稳，像在演示产品功能', speed: 1, pause: 0.35, note: '建议起点：清楚讲解，给观众观察画面的时间。' },
 }
-export function recommendationControls({ api, getState, getProjectId, optionList, message, refresh, connections, saveDraft, upload, canvas }) {
+export function recommendationControls({ api, getState, getProjectId, optionList, message, refresh, connections, saveDraft, upload, canvas, voiceChannel }) {
   let pendingDesign, pendingTrial
   function read() {
     const result = Object.fromEntries(Object.entries(fields).map(([key, id]) => [key, $(id).value]))
     result.speed = Number(result.speed); result.pause = Number(result.pause); result.bgmGain = Number($('rec-bgm-gain').value) / 100
+    // 通道、模型、音色也存进项目设置 —— 换一台机器、换一个人接手时，配音还是同一个声音
+    Object.assign(result, voiceChannel?.() || {})
     return result
   }
   function audio(id, src) {
@@ -33,12 +35,28 @@ export function recommendationControls({ api, getState, getProjectId, optionList
     audio('rec-bgm-preview', assets.find(a => a.id === s.bgmId)?.url || '')
     for (const id of ['rec-voice-sample', 'rec-narration-preview']) { $(id).playbackRate = s.speed; $(id).preservesPitch = true }
     $('rec-bgm-preview').volume = s.bgmGain
-    $('voice-selection-help').textContent = s.voiceSource === 'scenes' ? '下方逐句选择的旧配音会保留。需要全片换音色时，改选「用所选音色生成旁白」。' : s.persona ? '切换音色或表达方式后会生成新旁白；画面与原配音保留。' : '请选择已有音色并试听，或点击「新建音色」。不会自动使用默认音色。'
+    // 走云端 TTS 时，本地音色选择没有意义（音色是另一个供应商的 voice_id）
+    const cloud = s.backend && s.backend !== 'voxflow'
+    $('rec-persona').closest('.field').hidden = cloud
+    $('preview-persona').disabled = cloud
+    // 云端试听：以前直接禁掉，用户就没法判断「这个音色听着对不对」——
+    // 只能先花钱生成整条片子再听。改成照常发一句试听任务。
+    $('trial-voice').disabled = false
+    $('trial-voice').textContent = cloud ? '用这句文案试听（云端计费）' : '用这句文案试听'
+    // MiniMax 的 TTS 接口没有「情绪」参数：tone 只在本地 VoxFlow 上真正生效。
+    // 界面不能让人以为填了就会生效。
+    $('rec-tone').disabled = cloud
+    $('rec-tone').closest('.field').hidden = false
+    $('voice-selection-help').textContent = cloud
+      ? '当前用云端配音通道，音色在上方「生成通道」里选；本地音色不参与这条片子。' + (s.backend === 'minimax' ? 'MiniMax TTS 没有情绪参数，「表达方式」对它不生效。' : '')
+      : s.voiceSource === 'scenes' ? '下方逐句选择的旧配音会保留。需要全片换音色时，改选「用所选音色生成旁白」。'
+      : s.persona ? '切换音色或表达方式后会生成新旁白；画面与原配音保留。' : '请选择已有音色并试听，或点击「新建音色」。不会自动使用默认音色。'
   }
   function renderAssets() {
     const assets = getState().assets.filter(a => a.projectId === getProjectId() && a.mime.startsWith('audio/'))
-    const values = assets.map(a => ({ id: a.id, name: a.name }))
-    optionList($('rec-narration'), values, '选择当前项目的音频')
+    // 授权与来源直接写进选项里：片子是要对外发的，「这首能不能商用」必须在选它的时候就看得见
+    const values = assets.map(a => ({ id: a.id, name: a.license ? `${a.name}（${a.license}）` : a.name }))
+    optionList($('rec-narration'), assets.map(a => ({ id: a.id, name: a.name })), '选择当前项目的音频')
     optionList($('rec-bgm'), values, '不使用背景音乐')
     sync()
   }
@@ -85,12 +103,20 @@ export function recommendationControls({ api, getState, getProjectId, optionList
     } catch (error) { message(error.message, true) } finally { $('design-submit').disabled = false }
   }
   $('trial-voice').onclick = async () => {
-    const s = read(); if (!s.persona) return message('请先选择或创建音色', true)
+    const s = read()
+    const cloud = s.backend && s.backend !== 'voxflow'
+    if (cloud && !s.voiceId) return message('请先在上方「生成通道」里选择音色', true)
+    if (!cloud && !s.persona) return message('请先选择或创建音色', true)
     $('trial-voice').disabled = true
     try {
       const prompt = $('repo-captions').value.split('\n').find(line => line.trim()) || '今天分享一个实用的开源项目，一起来看看它能做什么。'
-      const job = await api('/api/jobs', { method: 'POST', body: JSON.stringify({ projectId: getProjectId(), kind: 'speech', persona: s.persona, tone: s.tone, prompt }) })
-      pendingTrial = { id: job.id, projectId: getProjectId() }; message('正在用当前音色和表达方式生成一句试听。'); await refresh()
+      // 云端试听必须带上通道、模型、音色与账户 —— 否则这条试听走的是本地音色，
+      // 听到的声音根本不是最终要用的那个声音，等于白试听。
+      const payload = cloud
+        ? { projectId: getProjectId(), kind: 'speech', prompt, backend: s.backend, model: s.model, voiceId: s.voiceId, profile: s.profile || 'primary' }
+        : { projectId: getProjectId(), kind: 'speech', persona: s.persona, tone: s.tone, prompt }
+      const job = await api('/api/jobs', { method: 'POST', body: JSON.stringify(payload) })
+      pendingTrial = { id: job.id, projectId: getProjectId() }; message(cloud ? '正在用所选云端音色生成一句试听（按量计费）。' : '正在用当前音色和表达方式生成一句试听。'); await refresh()
     } catch (error) { message(error.message, true); $('trial-voice').disabled = false }
   }
   async function jobs() {
