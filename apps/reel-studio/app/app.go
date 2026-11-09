@@ -143,6 +143,11 @@ type App struct {
 	prodBGM      string
 	prodBGMGain  string
 
+	// 我的声音（声音克隆）
+	voiceImportOpen bool
+	voiceName       string
+	voiceRefText    string
+
 	// 右栏选中的视频与对比对象。
 	selectedJobID string
 	compareJobID  string

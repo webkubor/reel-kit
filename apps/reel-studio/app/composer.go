@@ -312,6 +312,55 @@ func (a *App) viewLibraryComposer(c *ui.Context) {
 		})
 	})
 	a.kit.Hint(c, "素材本身不是视频。素材要用起来，去「素材合成」把它拼成一条。")
+	a.viewVoiceLibrary(c)
+}
+
+// viewVoiceLibrary 画声音库：现成的音色，加上「用自己的声音」。
+//
+// 音色是全局的：这里注册一次，任何流水线里都能选到它。
+func (a *App) viewVoiceLibrary(c *ui.Context) {
+	a.partTitle(c, "声音库")
+	var personas []string
+	if a.providers != nil {
+		for _, p := range a.providers.Voice.Personas {
+			personas = append(personas, p.Name)
+		}
+	}
+	a.kit.Field(c, "可用音色", "本机语音服务提供的音色，配音不产生模型费用", func() {
+		if len(personas) == 0 {
+			a.kit.Hint(c, "本机语音服务还没连上；先在设置里看连接状态")
+			return
+		}
+		ui.Row(c).FillWidth().Gap(design.SpaceSM).Children(func() {
+			for _, name := range personas {
+				a.kit.Tag(c, name, "")
+			}
+		})
+	})
+	a.kit.Field(c, "我的声音", "用一段录音注册一个自己的音色，之后任何流水线都能选它", func() {
+		if !a.voiceImportOpen {
+			ui.Row(c).Gap(design.SpaceSM).Children(func() {
+				if button := kitButton(a.kit, c, kit.ButtonSecondary, "导入录音并注册", false); button.Clicked() {
+					a.voiceImportOpen = true
+					a.redraw()
+				}
+			})
+			return
+		}
+		ui.Column(c).FillWidth().Gap(design.SpaceSM).Children(func() {
+			a.kit.Input(c, &a.voiceName, "音色名称，例如「我的播客声」")
+			a.kit.TextArea(c, &a.voiceRefText, "录音原文：你在录音里念的是哪段话", 80)
+			ui.Row(c).Gap(design.SpaceSM).Children(func() {
+				if button := kitButton(a.kit, c, kit.ButtonPrimary, "选择录音并注册", false); button.Clicked() {
+					go a.registerVoice()
+				}
+				if button := kitButton(a.kit, c, kit.ButtonSecondary, "取消", false); button.Clicked() {
+					a.voiceImportOpen = false
+					a.redraw()
+				}
+			})
+		})
+	})
 }
 
 // viewGenerateComposer 画「生成素材」：用 AI 生成图片、视频或配音。
