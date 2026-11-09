@@ -1,0 +1,71 @@
+package app
+
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/egoist/mygo/ui"
+)
+
+// Test密钥输入框不回显
+//
+// 密钥是能直接花钱的东西。输入框要是明文，录个屏、截个图、
+// 旁边有人瞄一眼，密钥就出去了。
+// 界面上要把它当密码框处理，保存后也只显示末四位。
+func Test密钥输入框不回显(t *testing.T) {
+	// 状态读的是本机配置，换成临时文件：不然这台机器配没配密钥
+	// 会决定界面长什么样，密钥尾号还会漏进截图与断言里。
+	old := reelConfigPathFn
+	reelConfigPathFn = func() string { return filepath.Join(t.TempDir(), "config.json") }
+	t.Cleanup(func() { reelConfigPathFn = old })
+
+	server := stubVoiceChannels(t, []map[string]any{
+		{"id": "voxflow", "label": "VoxFlow · 本地", "ready": true,
+			"voices": []map[string]any{{"id": "demo_narrator", "name": "默认旁白"}}},
+	})
+	a := newApp(t, server.URL)
+	a.mode = ModeSettings
+	tt := ui.NewTester(a.View, 1280, 840)
+	tt.Frame()
+
+	var keyField *ui.AccessInfo
+	for _, info := range tt.AccessAll() {
+		if info.Role == ui.RoleTextField && strings.Contains(info.Placeholder, "sk-") {
+			f := info
+			keyField = &f
+		}
+	}
+	if keyField == nil {
+		t.Fatalf("设置页没找到 MiniMax 密钥输入框，实际控件：%+v", tt.AccessAll())
+	}
+	if !keyField.Password {
+		t.Error("密钥输入框是明文的，应该按密码框处理")
+	}
+}
+
+// Test配音通道说明不说「不出声」
+//
+// 1.1.0 的说明写的是「本机推理不花钱也不出声」。
+// 「不出声」在配音这件事上意思完全反了 ——
+// 用户看到的是「这条通道不会出声」，于是不敢选本机。
+// 原意是「声音不出本机」，这句话要说准。
+func Test配音通道说明不说反话(t *testing.T) {
+	server := stubVoiceChannels(t, []map[string]any{
+		{"id": "voxflow", "label": "VoxFlow · 本地", "ready": true,
+			"voices": []map[string]any{{"id": "demo_narrator", "name": "默认旁白"}}},
+	})
+	a := newApp(t, server.URL)
+	a.mode = ModeTalk
+	tt := ui.NewTester(a.View, 1280, 840)
+	tt.Frame()
+
+	texts := tt.Texts()
+	joined := strings.Join(texts, "\n")
+	if strings.Contains(joined, "不出声") {
+		t.Errorf("界面里还有「不出声」这种把意思说反的写法：%q", texts)
+	}
+	if !strings.Contains(joined, "声音不出本机") {
+		t.Errorf("配音通道说明没写「声音不出本机」，实际文字：%q", texts)
+	}
+}

@@ -140,11 +140,11 @@ kyvault run --env MINIMAX_API_KEY=secret://minimax/api-key -- reel studio
 下载安装（macOS Apple Silicon）：
 
 ```bash
-curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v1.1.0/install.sh | sh
+curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v1.1.1/install.sh | sh
 ```
 
 Windows（x64，未做代码签名，首次运行被 SmartScreen 拦一下选「仍要运行」）：下载
-`reel-studio-1.1.0-windows-amd64.tar.gz` 解压，把 `Reel Studio.exe` 和它旁边的
+`reel-studio-1.1.1-windows-amd64.tar.gz` 解压，把 `Reel Studio.exe` 和它旁边的
 `backend/` `bin/` `chrome/` `museav/` 资源目录保持在同一层目录再双击。
 
 **第一次用要先装本机语音服务**（配音、克隆自己的声音都要它；本机推理，不产生模型费用）：

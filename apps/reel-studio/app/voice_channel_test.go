@@ -71,7 +71,7 @@ func Test配音通道两条都在界面上(t *testing.T) {
 	if len(channels) != 2 || channels[0].ID != "voxflow" || channels[1].ID != "minimax" {
 		t.Fatalf("待选通道不对：%+v", channels)
 	}
-	// 两条都就绪时默认走本机：它不花钱也不出声。
+	// 两条都就绪时默认走本机：声音不出本机，也不花钱。
 	if a.talkVoice != "voxflow" {
 		t.Errorf("默认该选本机通道，实际 %q", a.talkVoice)
 	}

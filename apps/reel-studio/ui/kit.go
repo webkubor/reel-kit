@@ -87,6 +87,14 @@ func (c Comps) Input(ctx *ui.Context, value *string, placeholder string) ui.Elem
 		CaretColor(c.T.Accent)
 }
 
+// InputSecret 是会藏住内容的单行输入框。
+//
+// 用在密钥这类东西上：输入时屏幕上不显示明文，
+// 免得录屏、截图、旁边有人瞄一眼就把密钥带出去了。
+func (c Comps) InputSecret(ctx *ui.Context, value *string, placeholder string) ui.Element {
+	return c.Input(ctx, value, placeholder).Password()
+}
+
 // TextArea 是多行输入框。
 func (c Comps) TextArea(ctx *ui.Context, value *string, placeholder string, minHeight float32) ui.Element {
 	return ui.TextArea(ctx, value).Placeholder(placeholder).

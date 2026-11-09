@@ -7,7 +7,7 @@ import (
 
 // 配音通道：把一句话变成配音，有两条路。
 //
-//	本机 VoxFlow —— 本地推理，音色不花钱也不出声，但只在 Apple 芯片的 Mac 上跑得起来；
+//	本机 VoxFlow —— 本地推理，声音不出本机也不花钱，但只在 Apple 芯片的 Mac 上跑得起来；
 //	云端 MiniMax TTS —— 任何机器都能用，按量计费，文字会发到云端。
 //
 // 桌面版原来把通道写死成本机（submitTalk 里直接传 voiceBackend=voxflow），
@@ -91,7 +91,7 @@ func (a *App) viewVoicePicker(c *ui.Context, backend *string, voiceID *string) {
 		}
 		choices = append(choices, choice{ch.ID, label})
 	}
-	a.pick(c, "配音通道", "本机推理不花钱也不出声；云端按量计费，任何机器都能用", choices, *backend, func(id string) {
+	a.pick(c, "配音通道", "本机推理：声音不出本机、不花钱；云端按量计费，任何机器都能用", choices, *backend, func(id string) {
 		if id != *backend {
 			*voiceID = "" // 换通道等于换音色列表，旧音色不再有意义
 		}

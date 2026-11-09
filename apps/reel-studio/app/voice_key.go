@@ -11,8 +11,8 @@ import (
 // 什么时候用得上：Windows 机器装不了本机 VoxFlow（它只在 Apple 芯片上跑），
 // 想在 Windows 上出片就得让配音走云端 MiniMax TTS —— 那需要用户自己的密钥。
 //
-// 密钥只落在本机 ~/.reel-kit/config.json（权限 0600），不上传、不进日志、
-// 也不回显到界面上（只显示末四位）。
+// 密钥只落在本机 ~/.reel-kit/config.json（权限 0600），不上传、不进日志；
+// 输入框不回显明文，保存后界面上只显示末四位。
 func (a *App) viewVoiceKeySettings(c *ui.Context) {
 	a.kit.SectionTitle(c, "云端配音密钥", "没有本机语音服务时，用 MiniMax TTS 走云端配音（按量计费）", nil)
 	a.kit.Card(c, func() {
@@ -23,7 +23,7 @@ func (a *App) viewVoiceKeySettings(c *ui.Context) {
 			ui.Text(c, "未配置 MiniMax 密钥").FontSize(design.FontSmall).TextColor(a.kit.T.Muted)
 		}
 		a.kit.Field(c, "MiniMax API Key", "从 MiniMax 开放平台取；只在你自己机器上保存", func() {
-			a.kit.Input(c, &a.minimaxKeyInput, "sk-…")
+			a.kit.InputSecret(c, &a.minimaxKeyInput, "sk-…")
 		})
 		ui.Row(c).Gap(design.SpaceSM).Children(func() {
 			save := kitButton(a.kit, c, kit.ButtonPrimary, "保存密钥", a.minimaxKeyInput == "")
