@@ -31,14 +31,15 @@ const (
 // 排版档位。数值来自网页版的实际使用，不是拍脑袋。
 //
 // 网页版正文 12px、副标题 13px、标题 15–17px、大标题 30px。
-// 桌面版直接沿用这套刻度：密度一致，两边不会看起来像两个产品。
+// 桌面版在网页版刻度上整体加一档：桌面是 1:1 的原生控件，
+// 没有浏览器缩放兜底，12px 正文在一屏 1280 宽的窗口里读起来太小。
 const (
-	FontTiny   = 10.0 // 辅助信息、标签
-	FontSmall  = 11.0 // 次要说明
-	FontBody   = 12.0 // 正文
-	FontMedium = 13.0 // 按钮、控件文字
-	FontTitle  = 15.0 // 区块标题
-	FontLarge  = 17.0 // 卡片标题
+	FontTiny   = 11.0 // 辅助信息、标签
+	FontSmall  = 12.0 // 次要说明
+	FontBody   = 13.0 // 正文
+	FontMedium = 14.0 // 按钮、控件文字
+	FontTitle  = 16.0 // 区块标题
+	FontLarge  = 18.0 // 卡片标题
 	FontBrand  = 24.0 // 品牌字
 	FontHero   = 30.0 // 页面主标题
 )
@@ -59,7 +60,7 @@ const (
 	RadiusSM    = 5.0
 	RadiusMD    = 7.0
 	RadiusLG    = 10.0
-	ControlHigh = 39.0 // 输入框、���拉
+	ControlHigh = 39.0 // 输入框、下拉
 	ButtonHigh  = 38.0
 )
 
@@ -137,7 +138,7 @@ func (t Tokens) Theme() *ui.Theme {
 	th.AccentText = t.AccentText
 	th.Success = t.Green
 	th.Radius = 7
-	th.FontSize = 12
+	th.FontSize = 13
 	return th
 }
 

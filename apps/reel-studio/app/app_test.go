@@ -80,7 +80,7 @@ func newApp(t *testing.T, base string) *App {
 	return a
 }
 
-func Test界面显示项目与素材(t *testing.T) {
+func Test界面显示工作空间与素材(t *testing.T) {
 	server := stub(t, nil)
 	a := newApp(t, server.URL)
 	tt := ui.NewTester(a.View, 1280, 840)
@@ -89,10 +89,28 @@ func Test界面显示项目与素材(t *testing.T) {
 		t.Errorf("界面里没有品牌名，实际文字：%q", tt.Texts())
 	}
 	if !tt.HasText("我的第一支短片") {
-		t.Errorf("界面里没有项目名，实际文字：%q", tt.Texts())
+		t.Errorf("界面里没有工作空间名，实际文字：%q", tt.Texts())
 	}
+	// 素材在素材库里，不在口播这一屏
+	a.mode = ModeLibrary
+	tt.Frame()
 	if !tt.HasText("H3 视频.mp4") {
 		t.Errorf("界面里没有素材名，实际文字：%q", tt.Texts())
+	}
+}
+
+// Test左栏把视频类型与工具分开
+//
+// 「视频类型」和「工具」平铺在一起时，用户点进去之前不知道自己在选什么。
+func Test左栏把视频类型与工具分开(t *testing.T) {
+	server := stub(t, nil)
+	a := newApp(t, server.URL)
+	tt := ui.NewTester(a.View, 1280, 840)
+	tt.Frame()
+	for _, want := range []string{"视频流水线", "知识口播", "项目推荐", "素材合成", "工具", "素材库"} {
+		if !tt.HasText(want) {
+			t.Errorf("左栏少了 %q，实际文字：%q", want, tt.Texts())
+		}
 	}
 }
 
@@ -100,7 +118,8 @@ func Test通道未就绪时写明原因(t *testing.T) {
 	server := stub(t, nil)
 	a := newApp(t, server.URL)
 	// 选中未就绪的 MuseAV 通道
-	a.mode = ModeVideo
+	a.mode = ModeGenerate
+	a.libKind = "video"
 	a.backend = "museav"
 	tt := ui.NewTester(a.View, 1280, 840)
 	tt.Frame()
@@ -116,7 +135,8 @@ func Test通道未就绪时写明原因(t *testing.T) {
 func Test选过的值不在选项里时不被静默换掉(t *testing.T) {
 	server := stub(t, nil)
 	a := newApp(t, server.URL)
-	a.mode = ModeVideo
+	a.mode = ModeGenerate
+	a.libKind = "video"
 	a.backend = "museav"
 	// 用户之前选过「Seedance 2.0」，现在上游只提供「Seedance 2.0 Mini」
 	a.model = "Seedance 2.0"
@@ -154,6 +174,8 @@ func Test失败的付费任务给出取回入口(t *testing.T) {
 	}}
 	server := stub(t, jobs)
 	a := newApp(t, server.URL)
+	a.mode = ModeGenerate
+	a.libKind = "video"
 	tt := ui.NewTester(a.View, 1280, 840)
 	tt.Frame()
 	if !tt.HasText("取回已生成的素材") {
@@ -169,6 +191,8 @@ func Test没有上游任务的不给取回入口(t *testing.T) {
 	}}
 	server := stub(t, jobs)
 	a := newApp(t, server.URL)
+	a.mode = ModeGenerate
+	a.libKind = "image"
 	tt := ui.NewTester(a.View, 1280, 840)
 	tt.Frame()
 	for _, text := range tt.Texts() {
@@ -184,20 +208,26 @@ func Test模式切换会换通道组(t *testing.T) {
 	if got := a.group(); got != "voice" {
 		t.Fatalf("项目推荐模式应该走语音通道组：%s", got)
 	}
-	a.mode = ModeSpeech
+	a.mode = ModeGenerate
+	a.libKind = "speech"
 	if got := a.group(); got != "voice" {
-		t.Fatalf("配音模式的通道组不对：%s", got)
+		t.Fatalf("配音素材的通道组不对：%s", got)
 	}
-	a.mode = ModeImage
+	a.libKind = "image"
 	if got := a.group(); got != "image" {
-		t.Fatalf("图片模式的通道组不对：%s", got)
+		t.Fatalf("图片素材的通道组不对：%s", got)
+	}
+	a.libKind = "video"
+	if got := a.group(); got != "video" {
+		t.Fatalf("视频素材的通道组不对：%s", got)
 	}
 }
 
 func Test通道选择不会被静默换掉(t *testing.T) {
 	server := stub(t, nil)
 	a := newApp(t, server.URL)
-	a.mode = ModeVideo
+	a.mode = ModeGenerate
+	a.libKind = "video"
 	// 用户选了未就绪的 MuseAV
 	a.backend = "museav"
 	a.ensureBackend()
@@ -218,12 +248,13 @@ func Test按钮交互不发生死锁(t *testing.T) {
 	tt := ui.NewTester(a.View, 1280, 840)
 	tt.Frame()
 
-	// 1. 点击「新建项目」，断言能够正常调度后台网络请求而不卡死主线程
-	if err := tt.Click("新建项目"); err != nil {
-		t.Fatalf("点击「新建项目」失败：%v", err)
+	// 1. 点击「新建工作空间」，断言能够正常调度后台网络请求而不卡死主线程
+	if err := tt.Click("新建工作空间"); err != nil {
+		t.Fatalf("点击「新建工作空间」失败：%v", err)
 	}
 
-	// 2. 填入仓库地址后，点击「读取项目」
+	// 2. 填入仓库地址后，点击「读取项目」（项目推荐这一屏）
+	a.mode = ModeRecommend
 	a.repoURL = "https://github.com/egoist/mygo"
 	tt.Frame()
 	if err := tt.Click("读取项目"); err != nil {

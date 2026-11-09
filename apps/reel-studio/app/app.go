@@ -11,6 +11,7 @@ package app
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -31,16 +32,20 @@ type Mode int
 // 写死在这里而不在界面上：界面上的版本号必须跟实际发布的版本一致，
 // 写死在两处就会出现「显示 0.1.0、实际发的是 0.2.0」。
 // 打包时可以用 -ldflags "-X ...app.Version=x.y.z" 覆盖。
-var Version = "0.2.1"
+var Version = "0.2.2"
 
-// 模式。顺序与网页版的标签一致：项目推荐排在最前，它就是本产品的主线。
+// 模式就是左栏的导航项，分三类：视频流水线、工具、设置。
+//
+// 「视频类型」不再和「素材类别」「工具菜单」平铺成一行标签 ——
+// 一个视频类型 = 一条流水线，点进去看到的表单就是这条流水线的生成配置。
+// 详见 nav.go。
 const (
-	ModeRecommend Mode = iota
-	ModeTalk
-	ModeVideo
-	ModeImage
-	ModeSpeech
+	ModeTalk Mode = iota
+	ModeRecommend
 	ModeExport
+	ModeProduct
+	ModeLibrary
+	ModeGenerate
 	ModeSettings
 )
 
@@ -90,14 +95,25 @@ type App struct {
 	previewID  string
 
 	// 项目推荐
-	repoURL     string
-	recTitle    string
-	recCaptions string
-	recPlatform string
-	recRatio    string
-	recBGM      string
-	recImages   []string
-	recSelected map[string]bool
+	repoURL        string
+	recTitle       string
+	recCaptions    string
+	recPlatform    string
+	recRatio       string
+	recBGM         string
+	recImages      []string
+	recSelected    map[string]bool
+	recTone        string
+	recSpeed       string
+	recPause       string
+	recVoiceSource string
+	recImageFit    string
+	recBGMGain     string
+	// recVoiceIDs 是「逐镜指定」时每一句各自的配音素材，与分镜行一一对应；
+	// 空字符串表示这一句用 AI 配音。
+	recVoiceIDs []string
+	// recNarrationID 是「整段音频切分」用的那条音频。
+	recNarrationID string
 
 	// 知识口播
 	talkTitle    string
@@ -108,6 +124,25 @@ type App struct {
 	talkImages   []string
 	talkSelected map[string]bool
 	talkStyles   []studioapi.Style
+	talkTone     string
+	talkPause    string
+	talkBGM      string
+	talkBGMGain  string
+
+	// 右栏选中的视频与对比对象。
+	selectedJobID string
+	compareJobID  string
+	comparePick   string
+	// adjustingJobID 是当前正在拿来调整的那条视频（配置已载入表单）。
+	adjustingJobID string
+	// libKind 是「生成素材」里要生成什么：video / image / speech。
+	libKind string
+
+	// 素材合成这条流水线的配置
+	expTitle    string
+	expCaptions string
+	expAudioID  string
+	expTemplate string
 	// talkStylesLoading 防止每帧重复拉风格表
 	talkStylesLoading bool
 
@@ -157,19 +192,28 @@ func New(opts Options) *App {
 	backend := NewBackend(opts.BaseURL, root)
 	backend.Bundled = FindBundled()
 	return &App{
-		opts:         opts,
-		kit:          kit.New(design.Light()),
-		ratio:        "9:16",
-		duration:     "5",
-		recPlatform:  "channels",
-		recRatio:     "9:16",
-		reviewChecks: map[string]bool{},
-		recSelected:  map[string]bool{},
-		talkSelected: map[string]bool{},
-		talkStyle:    "paper",
-		backendProc:  backend,
-		backendState: BackendStatus{State: "starting", Note: "正在连接本地工作台…"},
-		log:          NewLogWriter(),
+		opts:           opts,
+		kit:            kit.New(design.Light()),
+		ratio:          "9:16",
+		duration:       "5",
+		recPlatform:    "channels",
+		recRatio:       "9:16",
+		recSpeed:       "1",
+		recPause:       "0.35",
+		recVoiceSource: "scenes",
+		recImageFit:    "contain",
+		recBGMGain:     "12",
+		talkPause:      "0.45",
+		talkBGMGain:    "12",
+		libKind:        "video",
+		expTemplate:    "sticker-promo",
+		reviewChecks:   map[string]bool{},
+		recSelected:    map[string]bool{},
+		talkSelected:   map[string]bool{},
+		talkStyle:      "paper",
+		backendProc:    backend,
+		backendState:   BackendStatus{State: "starting", Note: "正在连接…"},
+		log:            NewLogWriter(),
 		feedback: feedbackState{
 			kind:    FeedbackBug,
 			include: true,
@@ -228,7 +272,10 @@ func (a *App) Start() {
 			a.logf("本地工作台：%s（%s）", status.State, status.Note)
 		}
 		a.refresh()
-		a.poll()
+		// poll 会一直跑下去，所以它自己开一个线程；
+		// 播放进度是另一条线，也要单独开一个 —— 写在 poll 后面就永远轮不到。
+		go a.poll()
+		go a.playback()
 	}()
 	// 后台查一次更新：有新版就在界面上给个提示，而不是等人手动点。
 	go a.checkUpdate()
@@ -336,6 +383,38 @@ func (a *App) poll() {
 	}
 }
 
+// playback 每半秒重绘一次，让播放进度条走起来。
+//
+// 只在真的有视频在播时才重绘 —— 界面每一帧都要重建，
+// 没有视频的时候白白重绘只是白烧 CPU。
+func (a *App) playback() {
+	for {
+		select {
+		case <-a.stopping:
+			return
+		case <-time.After(500 * time.Millisecond):
+		}
+		if a.win == nil {
+			continue
+		}
+		if a.hasPlayingVideo() {
+			a.redraw()
+		}
+	}
+}
+
+// hasPlayingVideo 判断当前有没有视频在播。
+func (a *App) hasPlayingVideo() bool {
+	a.media.mu.Lock()
+	defer a.media.mu.Unlock()
+	for _, player := range a.media.videos {
+		if player.Playing() {
+			return true
+		}
+	}
+	return false
+}
+
 // jobSummary 把任务的关键状态压成一行，用于判断有没有变化。
 func jobSummary(jobs []studioapi.Job) string {
 	var b strings.Builder
@@ -386,16 +465,18 @@ func (a *App) ensureBackend() {
 // group 返回当前模式对应的能力组。
 func (a *App) group() string {
 	switch a.mode {
-	case ModeVideo:
-		return "video"
-	case ModeImage:
-		return "image"
-	case ModeRecommend, ModeSpeech:
-		// 项目推荐要配音，也要混 BGM：用的是语音这一组通道。
+	case ModeTalk, ModeRecommend:
+		// 两条流水线都要配音：用的是语音这一组通道。
 		return "voice"
-	default:
-		return "video"
+	case ModeGenerate:
+		switch a.libKind {
+		case "image":
+			return "image"
+		case "speech":
+			return "voice"
+		}
 	}
+	return "video"
 }
 
 // Channels 返回当前模式的通道列表。
@@ -483,52 +564,87 @@ func (a *App) View(c *ui.Context) {
 
 // viewSidebar 画左栏：品牌、项目列表、连接状态。
 func (a *App) viewSidebar(c *ui.Context) {
-	ui.Column(c).Width(232).FillHeight().
+	ui.Column(c).Width(248).FillHeight().
 		Background(a.kit.T.Surface).Border(1, a.kit.T.Line).Children(func() {
-		ui.Column(c).FillWidth().Gap(design.SpaceLG).Padding(design.SpaceXL).Children(func() {
-			ui.Text(c, "Reel Studio").FontSize(design.FontBrand).Bold().TextColor(a.kit.T.Ink)
-			ui.Text(c, "本地视频工作台").FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
-
-			ui.Row(c).Gap(design.SpaceSM).Children(func() {
-				if kitButton(a.kit, c, kit.ButtonPrimary, "新建项目", false).Clicked() {
-					a.newProject()
-				}
+		ui.Column(c).FillWidth().Gap(design.SpaceLG).Padding(design.SpaceXL, design.SpaceXL).Children(func() {
+			ui.Row(c).FillWidth().Gap(design.SpaceMD).AlignItems(ui.Center).Children(func() {
+				ui.Column(c).Width(4).Height(26).Radius(2).Background(a.kit.T.Accent)
+				ui.Column(c).Gap(0).Children(func() {
+					ui.Text(c, "Reel Studio").FontSize(design.FontLarge).Bold().TextColor(a.kit.T.Ink)
+					ui.Text(c, "本地视频工作台").FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
+				})
 			})
-
-			ui.Divider(c)
-
-			ui.Text(c, "项目").FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
-			if a.state == nil || len(a.state.Projects) == 0 {
-				ui.Text(c, "还没有项目").FontSize(design.FontSmall).TextColor(a.kit.T.Muted)
+			if kitButton(a.kit, c, kit.ButtonPrimary, "新建视频", a.busy.Load()).Clicked() {
+				a.startNewVideo()
 			}
 		})
-		// 项目列表会变多，可滚；连接状态固定在底部。
-		ui.Scroll(c).FillWidth().Grow(1).MinHeight(0).Padding(design.SpaceLG, design.SpaceXL).Children(func() {
-			ui.Column(c).FillWidth().Gap(design.SpaceXS).Children(func() {
-				for _, p := range a.projects() {
-					project := p
-					selected := project.ID == a.projectID
-					item := ui.Button(c, project.Name)
-					item = item.TextColor(a.kit.T.Ink).FillWidth().Justify(ui.Start).Radius(design.RadiusSM)
-					item = item.Padding(design.SpaceSM, design.SpaceMD)
-					if selected {
-						item = item.Background(a.kit.T.AccentSoft).TextColor(a.kit.T.Accent)
-					}
-					if item.Clicked() {
-						a.projectID = project.ID
-						a.redraw()
-					}
+		// 导航分三段：视频流水线、工具、设置。
+		// 分段的原因是「能产出成片」和「只是素材」必须一眼可分。
+		ui.Column(c).FillWidth().Grow(1).MinHeight(0).Padding(design.SpaceXL, design.SpaceXL).Children(func() {
+			ui.Column(c).FillWidth().Gap(design.SpaceSM).Children(func() {
+				a.kit.NavLabel(c, "视频流水线")
+				for _, item := range videoPipelines {
+					a.viewNavItem(c, item)
+				}
+				ui.Column(c).Height(design.SpaceMD).Children(func() {})
+				a.kit.NavLabel(c, "工具")
+				for _, item := range studioTools {
+					a.viewNavItem(c, item)
 				}
 			})
 		})
 		ui.Column(c).FillWidth().Gap(design.SpaceSM).
 			Background(a.kit.T.Surface).Border(1, a.kit.T.Line).
 			Padding(design.SpaceLG, design.SpaceXL).Children(func() {
-			a.viewBackendStatus(c)
 			a.viewConnections(c)
 			a.viewSidebarFooter(c)
 		})
 	})
+}
+
+// viewNavItem 画左栏一个导航项。
+//
+// 每条流水线后面带视频条数 —— 用户点进去之前就能知道这条流水线有没有产出过。
+func (a *App) viewNavItem(c *ui.Context, item navItem) {
+	selected := a.mode == item.Mode
+	count := ""
+	if kind := pipelineKind(item.Mode); kind != "" {
+		count = fmt.Sprintf("%d", a.pipelineCount(kind))
+	} else if item.Mode == ModeLibrary {
+		count = fmt.Sprintf("%d", len(a.libraryAssets()))
+	}
+	label := item.Name
+	if !item.Enabled {
+		label = item.Name
+	}
+	el := a.kit.NavItem(c, kit.Icon(item.Icon), label, count, selected, !item.Enabled)
+	if el.Clicked() {
+		if !item.Enabled {
+			a.notice = "「" + item.Name + "」还没开放：" + item.Desc
+			a.noticeErr = true
+			a.redraw()
+			return
+		}
+		a.mode = item.Mode
+		a.selectedJobID = ""
+		a.compareJobID = ""
+		a.comparePick = ""
+		a.redraw()
+	}
+}
+
+// startNewVideo 开始一条新视频：进知识口播流水线，清空上一条的配置。
+func (a *App) startNewVideo() {
+	a.mode = ModeTalk
+	a.talkTitle, a.talkCaptions, a.talkSubtitle = "", "", ""
+	a.talkImages = nil
+	a.talkSelected = make(map[string]bool)
+	a.adjustingJobID = ""
+	a.selectedJobID = ""
+	if a.state != nil && len(a.state.Projects) == 0 {
+		a.createProject("我的视频")
+	}
+	a.redraw()
 }
 
 // viewSidebarFooter 画左栏底部的设置与反馈入口。
@@ -544,13 +660,8 @@ func (a *App) viewSidebarFooter(c *ui.Context) {
 		}
 		return
 	}
-	b := ui.Button(c, "⚙ 设置与反馈")
-	b = b.FillWidth().Radius(design.RadiusSM).Padding(design.SpaceSM, design.SpaceMD).
-		TextColor(a.kit.T.Muted)
-	if a.mode == ModeSettings {
-		b = b.Background(a.kit.T.AccentSoft).TextColor(a.kit.T.Accent)
-	}
-	if b.Clicked() {
+	el := a.kit.NavItem(c, kit.Icon("settings"), "设置与反馈", "", a.mode == ModeSettings, false)
+	if el.Clicked() {
 		a.mode = ModeSettings
 		a.redraw()
 	}
@@ -633,35 +744,36 @@ func (a *App) viewSettingsAndFeedback(c *ui.Context) {
 // viewBackendStatus 画本地工作台的连接状态。
 //
 // 桌面版要能双击就用：工作台没起来时，界面会自己起一个并把过程写在这里。
+// viewBackendStatus 画工作台自身的一行状态：连上了没有。
 func (a *App) viewBackendStatus(c *ui.Context) {
 	status := a.backendState
-	label := "本地工作台"
+	ink := a.kit.T.Muted
 	switch status.State {
-	case "starting":
+	case "ready":
+		ink = a.kit.T.Green
 	case "failed":
+		ink = a.kit.T.Accent
+	}
+	note := status.Note
+	if note == "" {
+		note = "正在连接本地工作台…"
 	}
 	ui.Row(c).Gap(design.SpaceSM).AlignItems(ui.Center).Children(func() {
-		dot := ui.Text(c, "●").FontSize(design.FontTiny)
-		if status.State == "ready" {
-			dot = dot.TextColor(a.kit.T.Green)
-		} else if status.State == "failed" {
-			dot = dot.TextColor(a.kit.T.Accent)
-		} else {
-			dot = dot.TextColor(a.kit.T.Muted)
-		}
-		ui.Text(c, label).FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
+		ui.Text(c, "●").FontSize(design.FontTiny).TextColor(ink)
+		ui.Text(c, "本地工作台").FontSize(design.FontSmall).TextColor(a.kit.T.Ink)
 	})
-	if status.Note != "" {
-		ui.Text(c, status.Note).FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
-	}
+	ui.Text(c, note).FontSize(design.FontTiny).TextColor(ink)
 }
 
 // viewConnections 画左栏底部的连接状态。
+//
+// 只有一块，不拆成「工作台状态」+「连接状态」两段：
+// 两段说的都是同一件事（能不能干活），分开写只会让人以为有两件事。
 func (a *App) viewConnections(c *ui.Context) {
 	ui.Column(c).FillWidth().Gap(design.SpaceSM).Children(func() {
+		a.viewBackendStatus(c)
 		ui.Text(c, "连接状态").FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
 		if a.providers == nil {
-			ui.Text(c, "正在连接本地工作台…").FontSize(design.FontSmall).TextColor(a.kit.T.Muted)
 			return
 		}
 		for _, row := range []struct {
@@ -711,38 +823,71 @@ func (a *App) viewMain(c *ui.Context) {
 
 // viewToolbar 画顶部：模式切换 + 项目名。
 func (a *App) viewToolbar(c *ui.Context) {
-	ui.Row(c).FillWidth().Gap(design.SpaceLG).AlignItems(ui.Center).
+	ui.Row(c).FillWidth().Gap(design.SpaceXL).AlignItems(ui.Center).
 		Background(a.kit.T.Surface).Border(1, a.kit.T.Line).Padding(design.SpaceLG, design.SpaceXL).Children(func() {
-		labels := []string{"项目推荐", "口播", "视频", "图片", "配音", "导出", "设置与反馈"}
-		for i, label := range labels {
-			index := i
-			active := int(a.mode) == index
-			b := ui.Button(c, label)
-			b = b.Radius(design.RadiusSM).Padding(design.SpaceXS, design.SpaceLG)
-			if active {
-				b = b.Background(a.kit.T.AccentSoft).TextColor(a.kit.T.Accent)
-			} else {
-				b = b.TextColor(a.kit.T.Muted)
-			}
-			if b.Clicked() {
-				a.mode = Mode(index)
-				a.ensureBackend()
-				a.redraw()
-			}
+		a.kit.PageHeader(c, modeTitle(a.mode), modeDesc(a.mode), nil)
+		a.viewWorkspacePicker(c)
+	})
+}
+
+// viewWorkspacePicker 画工作空间选择。
+//
+// 「工作空间」= 素材与视频存放的地方。它是**上下文**，不是导航项：
+// 放在顶栏里常驻，用户随时知道自己在一个工作空间里干活，
+// 也不会把工作空间跟视频类型混在一列里。
+//
+// 这一块给固定宽度：标题栏是 Grow 的，如果这里也跟着伸缩，
+// 顶栏会被压到几十像素宽，工作空间名就竖成一列字。
+func (a *App) viewWorkspacePicker(c *ui.Context) {
+	projects := a.projects()
+	// 下拉按显示名选，回填时按显示名找 ID。重名的工作空间要能分清，
+	// 否则两个都叫「我的视频」时，选哪个都说不清。
+	names := make([]string, 0, len(projects))
+	seen := map[string]int{}
+	for _, p := range projects {
+		seen[p.Name]++
+		label := p.Name
+		if seen[p.Name] > 1 {
+			label = p.Name + " · " + strconv.Itoa(seen[p.Name])
 		}
-		ui.Spacer(c)
-		if p := a.CurrentProject(); p != nil {
-			ui.Text(c, p.Name).FontSize(design.FontMedium).TextColor(a.kit.T.Ink)
+		names = append(names, label)
+	}
+	selected := ""
+	for i, p := range projects {
+		if p.ID == a.projectID {
+			selected = names[i]
+		}
+	}
+	ui.Row(c).Gap(design.SpaceMD).AlignItems(ui.Center).Children(func() {
+		// 标签压在上、控制在下：横排放不下时不会挤成两三行。
+		ui.Column(c).Width(220).Gap(design.SpaceXS).Children(func() {
+			ui.Text(c, "工作空间").FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
+			if len(names) == 0 {
+				ui.Text(c, "还没有工作空间").FontSize(design.FontBody).TextColor(a.kit.T.Ink)
+			} else {
+				if a.kit.Select(c, &selected, names, "").FillWidth().Changed() {
+					for i, p := range projects {
+						if names[i] == selected {
+							a.projectID = p.ID
+							a.assetIDs = nil
+							a.previewID = ""
+							a.selectedJobID = ""
+							a.compareJobID = ""
+							a.redraw()
+							return
+						}
+					}
+				}
+			}
+		})
+		if kitButton(a.kit, c, kit.ButtonSecondary, "新建工作空间", a.busy.Load()).Clicked() {
+			a.newProject()
 		}
 	})
 }
 
-// viewComposer 画中间的生成器。
-//
-// 表单项会随项目变多（分镜画面可能几十张），所以内容区要能滚，
-// 否则「生成」按钮会被挤出窗口，用户根本点不到。
 func (a *App) viewComposer(c *ui.Context) {
-	ui.Column(c).Width(380).FillHeight().
+	ui.Column(c).Width(420).FillHeight().
 		Background(a.kit.T.Paper).Border(1, a.kit.T.Line).Children(func() {
 		ui.Scroll(c).FillWidth().Grow(1).MinHeight(0).Padding(design.SpaceXL).Children(func() {
 			ui.Column(c).FillWidth().Gap(design.SpaceLG).Children(func() {
@@ -751,55 +896,70 @@ func (a *App) viewComposer(c *ui.Context) {
 					return
 				}
 				if len(a.state.Projects) == 0 {
-					ui.Text(c, "先新建一个项目").FontSize(design.FontBody).TextColor(a.kit.T.Muted)
+					ui.Text(c, "开始制作你的第一条视频").FontSize(design.FontBody).TextColor(a.kit.T.Ink)
+					a.kit.Hint(c, "开始后会建立一个“我的视频”工作空间；之后可在这里制作多条视频。")
+					if kitButton(a.kit, c, kit.ButtonPrimary, "开始制作", a.busy.Load()).Clicked() {
+						a.createProject("我的视频")
+					}
 					return
 				}
-				if a.mode == ModeRecommend {
-					a.viewRecommendationComposer(c)
-				} else if a.mode == ModeTalk {
+				a.viewAdjustingBanner(c)
+				switch a.mode {
+				case ModeTalk:
 					a.ensureTalkStyles()
 					a.viewTalkComposer(c)
-				} else {
-					a.viewChannelPicker(c)
-					a.viewModelPicker(c)
-					a.viewPrompt(c)
+				case ModeRecommend:
+					a.viewRecommendationComposer(c)
+				case ModeExport:
+					a.viewExportComposer(c)
+				case ModeLibrary:
+					a.viewLibraryComposer(c)
+				case ModeGenerate:
+					a.viewGenerateComposer(c)
+				case ModeProduct:
+					a.kit.Empty(c, "人物商品介绍还没开放", "样例还在验证，先用知识口播或项目推荐出片", nil)
 				}
 			})
 		})
 		// 提交条固定在底部：表单再长，「生成」也一直在眼前。
-		ui.Column(c).FillWidth().Gap(design.SpaceSM).
-			Background(a.kit.T.Surface).Border(1, a.kit.T.Line).
-			Padding(design.SpaceLG, design.SpaceXL).Children(func() {
-			a.viewSubmit(c)
-		})
+		// 还没有工作空间时不画 —— 那时该给的是「开始制作」，不是一条点不动的按钮。
+		if a.state != nil && len(a.state.Projects) > 0 {
+			ui.Column(c).FillWidth().Gap(design.SpaceSM).
+				Background(a.kit.T.Surface).Border(1, a.kit.T.Line).
+				Padding(design.SpaceLG, design.SpaceXL).Children(func() {
+				a.viewSubmit(c)
+			})
+		}
 	})
 }
 
-// viewPrompt 画提示词与参数。
-func (a *App) viewPrompt(c *ui.Context) {
-	if a.mode == ModeExport {
-		a.kit.Field(c, "合成说明", "按素材顺序合成，镜头时长由旁白决定", func() {
-			a.kit.TextArea(c, &a.prompt, "选好素材后点下面的合成按钮", 70)
-		})
+// viewAdjustingBanner 画「正在调整这条视频的配置」的提示条。
+//
+// 调整一条已有视频时必须说清楚：**这是新的一条**，原来那条还在。
+// 不说清楚，用户会以为改了配置就等于改了原来那条视频。
+func (a *App) viewAdjustingBanner(c *ui.Context) {
+	if a.adjustingJobID == "" {
 		return
 	}
-	a.kit.Field(c, "提示词", "写清楚画面内容、镜头与主体", func() {
-		a.kit.TextArea(c, &a.prompt, "例如：橘猫在窗台上看雨，晨光斜照，镜头缓慢推近", 80)
-	})
-	if a.mode == ModeVideo {
-		ratios := []string{"9:16", "16:9", "1:1"}
-		selected := a.ratio
-		a.kit.Field(c, "画幅", "", func() {
-			el := a.kit.Select(c, &selected, ratios, "")
-			if el.Changed() {
-				a.ratio = selected
-				a.redraw()
-			}
-		})
+	name := ""
+	for _, job := range a.ProjectJobs() {
+		if job.ID == a.adjustingJobID {
+			name = a.jobTitle(job)
+			break
+		}
 	}
+	ui.Column(c).FillWidth().Gap(design.SpaceSM).
+		Background(a.kit.T.AccentSoft).Radius(design.RadiusSM).Padding(design.SpaceLG).Children(func() {
+		ui.Text(c, "正在调整《"+orDash(name)+"》的配置").FontSize(design.FontBody).TextColor(a.kit.T.Accent)
+		ui.Text(c, "改完点下面的「生成」，会新出一条视频；原来那条保留在右边的视频列表里。").
+			FontSize(design.FontTiny).TextColor(a.kit.T.Accent)
+		if kitButton(a.kit, c, kit.ButtonSecondary, "放弃调整", false).Clicked() {
+			a.adjustingJobID = ""
+			a.redraw()
+		}
+	})
 }
 
-// viewSubmit 画提交按钮与提示。
 func (a *App) viewSubmit(c *ui.Context) {
 	ui.Spacer(c)
 	if a.notice != "" {
@@ -819,12 +979,22 @@ func (a *App) viewSubmit(c *ui.Context) {
 	case ModeTalk:
 		label = "生成口播视频"
 		disabled = a.busy.Load() || a.talkTitle == "" || a.talkCaptions == "" || a.talkPersona == ""
-	case ModeImage:
-		label = "生成图片"
-	case ModeSpeech:
-		label = "生成配音"
 	case ModeExport:
-		label = "合成并导出"
+		label = "合成视频"
+		disabled = a.busy.Load() || len(a.assetIDs) == 0
+	case ModeGenerate:
+		switch a.libKind {
+		case "image":
+			label = "生成图片素材"
+		case "speech":
+			label = "生成配音素材"
+		default:
+			label = "生成视频素材"
+		}
+		disabled = a.busy.Load() || a.prompt == ""
+	case ModeLibrary:
+		label = "素材库"
+		disabled = true
 	}
 	if a.mode == ModeRecommend && channel != nil && !channel.Ready {
 		a.kit.Hint(c, "配音通道未就绪："+channel.Note)
@@ -832,8 +1002,15 @@ func (a *App) viewSubmit(c *ui.Context) {
 	if a.mode == ModeTalk {
 		a.kit.Hint(c, "逐句用本机 VoxFlow 配音，画面与合成都在本机执行，不产生模型费用。")
 	}
-	if channel != nil && !channel.Ready && a.mode != ModeRecommend && a.mode != ModeTalk {
+	if channel != nil && !channel.Ready && a.mode != ModeRecommend && a.mode != ModeTalk &&
+		a.mode != ModeExport && a.mode != ModeLibrary {
 		a.kit.Hint(c, "所选通道未就绪："+channel.Note)
+	}
+	if a.projectID == "" {
+		disabled = true
+	}
+	if a.mode == ModeLibrary {
+		return
 	}
 	button := kitButton(a.kit, c, kit.ButtonPrimary, label, disabled)
 	if button.Clicked() {
@@ -841,15 +1018,24 @@ func (a *App) viewSubmit(c *ui.Context) {
 	}
 }
 
-// viewRight 画右侧：预览、素材库、制作闭环、任务历史。
 func (a *App) viewRight(c *ui.Context) {
 	ui.Column(c).Fill().Gap(design.SpaceLG).Padding(design.SpaceXL).Children(func() {
 		ui.Scroll(c).FillWidth().Grow(1).MinHeight(0).Children(func() {
 			ui.Column(c).FillWidth().Gap(design.SpaceLG).Children(func() {
-				a.viewPreview(c)
-				a.viewAssets(c)
-				a.viewWorkflow(c)
-				a.viewJobs(c)
+				switch a.mode {
+				case ModeTalk, ModeRecommend, ModeExport:
+					// 流水线这一屏：这条流水线跑出来的视频（条数、进度、配置）。
+					a.viewPipelinePanel(c)
+				case ModeLibrary, ModeGenerate:
+					a.viewAssets(c)
+					a.viewPreview(c)
+				}
+				if a.mode == ModeRecommend {
+					a.viewWorkflow(c)
+				}
+				if a.mode == ModeLibrary || a.mode == ModeGenerate {
+					a.viewJobs(c)
+				}
 			})
 		})
 	})
@@ -902,10 +1088,16 @@ func (a *App) viewJobs(c *ui.Context) {
 }
 
 // newProject 新建项目。
-func (a *App) newProject() {
+func (a *App) newProject() { a.createProject("新项目") }
+
+func (a *App) createProject(name string) {
+	if !a.busy.CompareAndSwap(false, true) {
+		return
+	}
 	go func() {
+		defer a.busy.Store(false)
 		client := studioapi.New(a.opts.BaseURL)
-		p, err := client.NewProject("新项目")
+		p, err := client.NewProject(name)
 		if err != nil {
 			a.fail(err.Error())
 			return
@@ -928,6 +1120,10 @@ func (a *App) submit() {
 		a.submitTalk()
 		return
 	}
+	if a.mode == ModeExport {
+		a.submitExport()
+		return
+	}
 	if channel == nil {
 		a.fail("没有可用的通道")
 		return
@@ -944,14 +1140,14 @@ func (a *App) submit() {
 		"model":     a.model,
 		"profile":   a.profile,
 	}
-	if a.mode == ModeVideo {
+	if a.mode == ModeGenerate && a.libKind == "video" {
 		input["ratio"] = a.ratio
 		input["duration"] = atoi(a.duration)
 		if a.resolution != "" {
 			input["resolution"] = a.resolution
 		}
 	}
-	if a.mode == ModeSpeech {
+	if a.mode == ModeGenerate && a.libKind == "speech" {
 		if channel.ID == "voxflow" {
 			input["persona"] = a.voiceID
 		} else {
@@ -985,6 +1181,33 @@ func (a *App) submit() {
 		})
 		a.refresh()
 	}()
+}
+
+// resolveBGM 把配乐选择解析成项目里的素材 ID。
+//
+// 三种来源：曲库别名（先复制进项目）、项目里已有的音频、已经是素材 ID。
+// 认不出来就报错 —— 悄悄传一个错的 ID 下去，用户只会看到「合成失败」，
+// 根本不知道是自己选的配乐没拉到。
+func resolveBGM(client *studioapi.Client, projectID, choice string) (string, error) {
+	switch {
+	case choice == "":
+		return "", nil
+	case strings.HasPrefix(choice, "r2:"):
+		asset, err := client.PullBGM(projectID, strings.TrimPrefix(choice, "r2:"))
+		if err != nil {
+			return "", err
+		}
+		return asset.ID, nil
+	case strings.HasPrefix(choice, "asset:"):
+		return strings.TrimPrefix(choice, "asset:"), nil
+	case strings.HasPrefix(choice, "bgm:"):
+		return strings.TrimPrefix(choice, "bgm:"), nil
+	}
+	asset, err := client.PullBGM(projectID, choice)
+	if err != nil {
+		return "", fmt.Errorf("配乐「%s」拉取失败：%w", choice, err)
+	}
+	return asset.ID, nil
 }
 
 // submitRecommendation 提交一条项目推荐视频。
@@ -1044,6 +1267,55 @@ func (a *App) submitRecommendation(channel *studioapi.Channel) {
 	if len(images) > 0 {
 		input["assetIds"] = images
 	}
+	if a.recVoiceSource != "" {
+		input["voiceSource"] = a.recVoiceSource
+	}
+	if a.recTone != "" {
+		input["tone"] = a.recTone
+	}
+	if a.recSpeed != "" {
+		speed, err := parseNumberIn("语速", a.recSpeed, 0.75, 1.5)
+		if err != nil {
+			a.fail(err.Error())
+			return
+		}
+		input["speed"] = speed
+	}
+	if a.recPause != "" {
+		pause, err := parseNumberIn("镜间停顿", a.recPause, 0, 2)
+		if err != nil {
+			a.fail(err.Error())
+			return
+		}
+		input["pause"] = pause
+	}
+	if a.recImageFit != "" {
+		input["imageFit"] = a.recImageFit
+	}
+	// 旁白来源决定了要传哪一组字段：
+	//   逐镜指定 → voiceIds（每句一条，空的用 AI 配音）
+	//   整段切分 → narrationId（一条音频）
+	// 不传对应的字段，后端会在跑到一半时炸掉。
+	switch a.recVoiceSource {
+	case "scenes":
+		if ids := a.recSceneVoiceIDs(); len(ids) > 0 {
+			input["voiceIds"] = ids
+		}
+	case "audio":
+		if a.recNarrationID == "" {
+			a.fail("整段音频切分要先选一条旁白音频")
+			return
+		}
+		input["narrationId"] = a.recNarrationID
+	}
+	if a.recBGMGain != "" {
+		gain, err := parseNumberIn("BGM 音量", a.recBGMGain, 0, 50)
+		if err != nil {
+			a.fail(err.Error())
+			return
+		}
+		input["bgmGain"] = gain / 100
+	}
 
 	bgmChoice := a.recBGM
 	projectID := a.projectID
@@ -1056,41 +1328,20 @@ func (a *App) submitRecommendation(channel *studioapi.Channel) {
 	go func() {
 		client := studioapi.New(a.opts.BaseURL)
 		if bgmChoice != "" {
-			switch {
-			case strings.HasPrefix(bgmChoice, "r2:"):
-				alias := strings.TrimPrefix(bgmChoice, "r2:")
-				asset, err := client.PullBGM(projectID, alias)
-				if err != nil {
-					a.busy.Store(false)
-					a.mutate(func() {
-						a.notice = "取配乐失败：" + err.Error()
-						a.noticeErr = true
-					})
-					a.refresh()
-					return
-				}
-				input["bgmId"] = asset.ID
-			case strings.HasPrefix(bgmChoice, "asset:"):
-				input["bgmId"] = strings.TrimPrefix(bgmChoice, "asset:")
-			case strings.HasPrefix(bgmChoice, "bgm:"):
-				input["bgmId"] = strings.TrimPrefix(bgmChoice, "bgm:")
-			default:
-				// 裸 alias：只能当库里的别名解析。
-				// 解析失败就报错 —— 悄悄当成素材 ID 传下去，
-				// 后端会拿一个不存在的 ID 去合成，用户只看到「合成失败」，
-				// 根本不知道是自己选的配乐没拉到。
-				asset, err := client.PullBGM(projectID, bgmChoice)
-				if err != nil {
-					a.busy.Store(false)
-					a.mutate(func() {
-						a.notice = "配乐「" + bgmChoice + "」拉取失败：" + err.Error()
-						a.noticeErr = true
-					})
-					a.refresh()
-					return
-				}
-				input["bgmId"] = asset.ID
+			bgmID, err := resolveBGM(client, projectID, bgmChoice)
+			if err != nil {
+				a.busy.Store(false)
+				a.mutate(func() {
+					a.notice = "取配乐失败：" + err.Error()
+					a.noticeErr = true
+				})
+				a.refresh()
+				return
 			}
+			input["bgmId"] = bgmID
+		}
+		if a.recBGMGain != "" {
+			input["bgmGain"] = toFloat(a.recBGMGain)
 		}
 		job, err := client.SubmitJob(input)
 		a.busy.Store(false)
@@ -1147,12 +1398,10 @@ func (a *App) kind() string {
 		return "recommendation"
 	case ModeTalk:
 		return "talk"
-	case ModeImage:
-		return "image"
-	case ModeSpeech:
-		return "speech"
 	case ModeExport:
 		return "export"
+	case ModeGenerate:
+		return a.libKind
 	default:
 		return "video"
 	}
