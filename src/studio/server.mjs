@@ -52,7 +52,7 @@ function json(res, code, value) { res.writeHead(code, { 'content-type': 'applica
 function validate(input, store) {
   store.project(input.projectId)
   if (!['image', 'video', 'speech', 'clone', 'voice-design', 'export', 'recommendation', 'talk', 'product'].includes(input.kind)) fail('任务类型不支持')
-  const allowed = ['kind', 'projectId', 'prompt', 'ratio', 'duration', 'resolution', 'assetIds', 'audioId', 'referenceId', 'persona', 'referenceText', 'voiceName', 'template', 'captions', 'title', 'profile', 'repoUrl', 'voiceIds', 'platform', 'voiceSource', 'tone', 'emotion', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit', 'backend', 'model', 'voiceId', 'style', 'voiceBackend', 'voiceModel', 'subtitle', 'source', 'footer', 'preset', 'voiceGain', 'duck', 'normalize']
+  const allowed = ['kind', 'projectId', 'prompt', 'ratio', 'duration', 'resolution', 'assetIds', 'audioId', 'referenceId', 'persona', 'referenceText', 'voiceName', 'template', 'captions', 'title', 'profile', 'repoUrl', 'voiceIds', 'platform', 'voiceSource', 'tone', 'emotion', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit', 'backend', 'model', 'voiceId', 'style', 'voiceBackend', 'voiceModel', 'subtitle', 'source', 'footer', 'preset', 'voiceGain', 'duck', 'normalize', 'transition', 'transitionDuration']
   const value = Object.fromEntries(allowed.filter(k => input[k] !== undefined).map(k => [k, input[k]]))
   if (typeof value.prompt !== 'string' || !value.prompt.trim() || value.prompt.length > 10000) {
     if (!['export', 'recommendation', 'talk', 'product'].includes(value.kind)) fail('请输入 1–10000 字的提示词或配音文字')
@@ -93,6 +93,16 @@ function validate(input, store) {
     if (value[key] === undefined) continue
     if (typeof value[key] !== 'boolean') fail(`${key} 只能是开或关`)
   }
+  if (value.transition !== undefined) {
+    if (!['none', 'fade', 'slide-left', 'slide-right', 'zoom-in', 'dissolve'].includes(value.transition)) {
+      fail(`不支持的转场动效：${value.transition}`)
+    }
+  }
+  if (value.transitionDuration !== undefined) {
+    const dur = Number(value.transitionDuration)
+    if (!Number.isFinite(dur) || dur < 0.1 || dur > 1) fail('转场时长须为 0.1–1 秒')
+    value.transitionDuration = dur
+  }
   if (value.kind === 'voice-design' && (!value.voiceName?.trim() || value.voiceName.length > 80 || !value.tone?.trim() || value.tone.length > 500 || value.prompt.length > 45)) fail('新音色需要名称、声音描述和不超过 45 字的试听文字')
   if (value.kind === 'recommendation') {
     githubRepo(value.repoUrl)
@@ -121,8 +131,8 @@ function validate(input, store) {
     if (value.bgmId && !store.asset(value.bgmId, value.projectId).mime.startsWith('audio/')) fail('BGM 须选择音频素材')
     if (!value.persona && !value.voiceId) fail('请选择音色')
     // 没指定通道时优先用随应用自带的离线引擎 —— 它是唯一不需要任何前置条件的路。
-    value.voiceBackend = value.voiceBackend || (sherpaEngine() ? 'sherpa' : 'voxflow')
-    if (!['sherpa', 'voxflow', 'minimax'].includes(value.voiceBackend)) fail('语音通道不支持')
+    value.voiceBackend = value.voiceBackend || (sherpaEngine() ? 'sherpa' : 'edge')
+    if (!['edge', 'sherpa', 'voxflow', 'minimax'].includes(value.voiceBackend)) fail('语音通道不支持')
   }
   if (value.kind === 'product') {
     // 人物商品介绍：一句一镜，版式随画幅走（竖版出镜、横版左图右文）
@@ -135,8 +145,8 @@ function validate(input, store) {
     if (value.bgmId && !store.asset(value.bgmId, value.projectId).mime.startsWith('audio/')) fail('BGM 须选择音频素材')
     if (!value.persona && !value.voiceId) fail('请选择音色')
     // 没指定通道时优先用随应用自带的离线引擎 —— 它是唯一不需要任何前置条件的路。
-    value.voiceBackend = value.voiceBackend || (sherpaEngine() ? 'sherpa' : 'voxflow')
-    if (!['sherpa', 'voxflow', 'minimax'].includes(value.voiceBackend)) fail('语音通道不支持')
+    value.voiceBackend = value.voiceBackend || (sherpaEngine() ? 'sherpa' : 'edge')
+    if (!['edge', 'sherpa', 'voxflow', 'minimax'].includes(value.voiceBackend)) fail('语音通道不支持')
   }
   value.template = value.template || 'sticker-promo'
   if (!templateNames.includes(value.template)) fail('模板不存在')

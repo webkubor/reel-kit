@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { command, commandFull, available, jsonFetch, download, probeBytes } from './process.mjs'
 import { sherpaEngine, sherpaSynthesize } from './sherpa.mjs'
+import { EDGE_VOICES, edgeSynthesize } from '../edge-tts.mjs'
 import { loadCustomChannels, customChannelIssues, channelHeaders } from './channels.mjs'
 import { createMagpie, discoverMagpie, magpieCommand } from './magpie.mjs'
 
@@ -597,22 +598,20 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
           ],
         },
         voice: {
-          ready: Boolean(sherpa) || voiceLocalReady || minimaxReady,
+          ready: true,
           label: '语音生成',
           note: sherpa
-            ? '本机离线语音已随应用自带：不用装东西、不用登录、不花钱，声音不出本机'
-            : voiceLocalReady
-              ? '本地模型已就绪；云端通道按量计费'
-              : voice
-                ? '服务在线，Base 模型未就绪'
-                : minimaxReady
-                  ? '本机语音服务没连上；云端配音可以用'
-                  : '本机语音服务没连上，云端配音也还没配密钥：到「设置与反馈 → 云端配音密钥」填一个，或启动 VoxFlow 服务后刷新',
+            ? '本机离线语音已随应用自带：不用装东西、不用登录、不花钱；另支持微软 Edge 在线免费高保真（24kHz）与云端按量通道'
+            : '支持微软 Edge 在线免费高保真语音（24kHz），免配置开箱即用；云端按量计费通道可选',
           designReady: Boolean(voice?.[0]?.design_model),
           recordingReady: Boolean(voice?.[1]?.capabilities?.reference_text_registration),
           version: voice?.[1]?.version || 'unknown',
           personas,
           channels: [
+            channel('edge', '微软 Edge · 在线免费（高保真）', true, '免费在线神经语音，24kHz 高保真；免配置 Key，开箱即用', {
+              voices: EDGE_VOICES.map(v => ({ id: v.id, name: v.name })),
+              allowCustomVoice: true,
+            }),
             channel('sherpa', '本机 · 离线（自带）', Boolean(sherpa), sherpa
               ? '随应用一起打包，装完就能用；离线合成，不产生费用'
               : '没找到随应用分发的本机语音引擎，请重新安装应用', {
@@ -806,7 +805,24 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
       }
 
       if (['speech', 'clone', 'voice-design'].includes(input.kind)) {
-        const channelId = input.backend || (sherpaEngine() ? 'sherpa' : 'voxflow')
+        const channelId = input.backend || 'edge'
+        if (channelId === 'edge') {
+          if (input.kind !== 'speech') throw new Error('Edge 在线通道只做文字配音；录音克隆与音色设计请用本地 VoxFlow')
+          const voiceId = input.voiceId || input.persona || 'zh-CN-XiaoxiaoNeural'
+          progress(`微软 Edge 在线高保真配音正在合成（${voiceId}）…`)
+          const { bytes, mime } = await edgeSynthesize({
+            text: input.prompt,
+            voice: voiceId,
+            speed: input.speed || 1,
+            onProgress: progress,
+          })
+          const probe = await probeBytes('voice.mp3', bytes)
+          return store.addAsset(input.projectId, `配音 · ${input.prompt.slice(0, 16)}.mp3`, mime || 'audio/mpeg', bytes, {
+            source: '微软 Edge · 在线高保真', origin: 'free-online', engine: `Edge Neural TTS · ${voiceId}`, voiceBackend: 'edge',
+            prompt: input.prompt, persona: voiceId, tone: '', voiceName: input.voiceName || '',
+            requestedModel: 'edge-neural', actualModel: voiceId, ...probe,
+          })
+        }
         if (channelId === 'sherpa') {
           if (input.kind !== 'speech') throw new Error('本机离线通道只做文字配音；录音克隆与音色设计要用 VoxFlow')
           const engine = sherpaEngine()
@@ -814,7 +830,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
           const bytes = await sherpaSynthesize({ text: input.prompt, engine, onProgress: progress })
           const probe = await probeBytes('voice.wav', bytes)
           return store.addAsset(input.projectId, `配音 · ${input.prompt.slice(0, 16)}.wav`, 'audio/wav', bytes, {
-            source: '本机离线语音', origin: 'ai', engine: 'sherpa-onnx · 中文离线模型', voiceBackend: 'sherpa',
+            source: '本机离线语音', origin: 'local-offline', engine: 'sherpa-onnx · 中文离线模型', voiceBackend: 'sherpa',
             prompt: input.prompt, persona: input.voiceId || '', tone: '', voiceName: input.voiceName || '',
             requestedModel: 'sherpa-vits-zh', actualModel: 'unknown', ...probe,
           })
@@ -829,10 +845,10 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
           if (!voiceId) throw new Error('请选择音色（voice_id），或手动填写')
           const model = input.model || MINIMAX_TTS_MODELS[0].id
           progress('MiniMax 正在合成配音…')
-          const { bytes, mime } = await minimaxTts({ key: profile.key, text: input.prompt, model, voiceId })
+          const { bytes, mime } = await minimaxTts({ key: profile.key, text: input.prompt, model, voiceId, speed: input.speed || 1 })
           const probe = await probeBytes('voice.mp3', bytes)
           return store.addAsset(input.projectId, `配音 · ${input.prompt.slice(0, 16)}.mp3`, mime || 'audio/mpeg', bytes, {
-            source: 'MiniMax TTS', origin: 'ai', engine: `MiniMax TTS · ${model}`, voiceBackend: 'minimax',
+            source: 'MiniMax TTS', origin: 'cloud-paid', engine: `MiniMax TTS · ${model}`, voiceBackend: 'minimax',
             prompt: input.prompt, persona: voiceId, tone: input.tone || '', voiceName: input.voiceName || '',
             requestedModel: model, actualModel: 'unknown', profile: profile.id, ...probe,
           })

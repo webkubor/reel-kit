@@ -74,7 +74,10 @@ export async function makeRecommendation(input, store, backend, progress, report
     for (let i = 0; i < lines.length; i++) {
       const label = `旁白 ${i + 1}/${lines.length}`
       progress(`正在处理第 ${i + 1}/${lines.length} 句旁白…`)
-      const meta = await step({ id: `voice-${i}`, label, origin: narration ? 'import' : 'ai', engine: narration ? '整段素材切分' : settings.voiceBackend === 'minimax' ? 'MiniMax TTS' : 'VoxFlow 本地语音', detail: lines[i].slice(0, 40) }, async () => {
+      const voiceBackend = settings.voiceBackend || 'edge'
+      const voiceOrigin = narration ? 'import' : voiceBackend === 'edge' ? 'free-online' : voiceBackend === 'sherpa' ? 'local-offline' : 'ai'
+      const voiceEngine = narration ? '整段素材切分' : voiceBackend === 'edge' ? 'Edge 在线高保真语音' : voiceBackend === 'sherpa' ? '本机离线语音' : voiceBackend === 'minimax' ? 'MiniMax TTS' : 'VoxFlow 本地语音'
+      const meta = await step({ id: `voice-${i}`, label, origin: voiceOrigin, engine: voiceEngine, detail: lines[i].slice(0, 40) }, async () => {
         if (narration) {
           const end = i === lines.length - 1 ? narrationDuration : offset + narrationDuration * lines[i].length / totalChars
           const file = join(temp, `voice-${i}.wav`)
@@ -126,11 +129,13 @@ export async function makeRecommendation(input, store, backend, progress, report
     progress('正在混合旁白与 BGM，合成成片…')
     const out = join(temp, 'recommendation.mp4')
     const bgm = input.bgmId ? store.asset(input.bgmId, input.projectId) : undefined
-    const { _duration: outputDuration } = await step({ id: 'compose', label: '合成成片', origin: 'code', engine: 'ffmpeg 合成', detail: `${bgm ? `BGM《${bgm.name}》音量 ${Math.round(settings.bgmGain * 100)}% · ` : '无 BGM · '}${settings.width}×${settings.height}` }, async () => {
+    const transitionLabel = settings.transition && settings.transition !== 'none' ? ` · 转场: ${settings.transition}` : ''
+    const { _duration: outputDuration } = await step({ id: 'compose', label: '合成成片', origin: 'code', engine: 'ffmpeg 合成', detail: `${bgm ? `BGM《${bgm.name}》音量 ${Math.round(settings.bgmGain * 100)}%` : '无 BGM'} · ${settings.width}×${settings.height}${transitionLabel}` }, async () => {
       await compose({
         frames, durations, voiceClips, bgm: bgm && store.path(bgm),
         bgmGain: settings.bgmGain, bgmCrossfade: 0,
         voiceGain: settings.voiceGain, duck: settings.duck, normalize: settings.normalize,
+        transition: settings.transition, transitionDuration: settings.transitionDuration,
         out,
       })
       const result = await command('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', out])

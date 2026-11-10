@@ -6,46 +6,112 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-// audioKnobs 是三条流水线（口播 / 项目推荐 / 产品介绍）共用的声音调节。
+// audioKnobs 是三条流水线（口播 / 项目推荐 / 产品介绍）共用的声音与节奏调节。
 //
-// 为什么用结构体而不是三个平铺字段：这三项在三条流水线里含义完全一样，
-// 进后端也是同一组参数（voiceGain / duck / normalize）。写成结构体，
-// 三处表单共用同一段画法与同一段组装代码 —— 少抄三遍也就少错三遍。
+// 为什么用结构体而不是平铺字段：这些旋钮在三条流水线里含义完全一样，
+// 进后端也是同一组参数（preset / speed / transition / voiceGain / duck / normalize）。
+// 写成结构体，三处表单共用同一段画法与同一段组装代码 —— 少抄三遍也就少错三遍。
 //
 // 默认值与取值范围与后端 src/settings.mjs 里的 SETTING_SCHEMA 一致。
-// 两边各写一份必然会漂，改一处要记得改另一处，是最容易忘的事。
 type audioKnobs struct {
-	voiceGain string // 人声音量倍数，如 "1.35"
-	duck      bool   // 人声一开口是否把配乐压下去
-	normalize bool   // 是否把成品响度归一到固定值
+	preset     string // 预设：default / clear-speech / ambient / raw
+	speed      string // 念白语速倍数，如 "1.0"
+	transition string // 切镜转场动效，如 "none", "fade", "slide-left"
+	voiceGain  string // 人声音量倍数，如 "1.35"
+	duck       bool   // 人声一开口是否把配乐压下去
+	normalize  bool   // 是否把成品响度归一到固定值
 }
 
 // 默认值。后端也会兜底，但界面上先给一个能看见的数，用户才知道有这几个旋钮。
 func defaultAudioKnobs() audioKnobs {
-	return audioKnobs{voiceGain: "1.35", duck: true, normalize: true}
+	return audioKnobs{
+		preset:     "default",
+		speed:      "1.0",
+		transition: "none",
+		voiceGain:  "1.35",
+		duck:       true,
+		normalize:  true,
+	}
 }
 
-// viewAudioKnobs 画「声音」那一节里的三档调节。
-//
-// 放在「声音」而不是「配乐」：这三项改的都是人声与配乐的相对关系，
-// 用户找的时候想的是「念白太闷」而不是「BGM 音量」。
+// viewAudioKnobs 画「声音与节奏」那一节里的调节项。
 func (a *App) viewAudioKnobs(c *ui.Context, k *audioKnobs) {
+	presetChoices := []choice{
+		{"default", "标准平衡（人声 1.35x · 配乐 12% · 智能降乐）"},
+		{"clear-speech", "口播清晰（人声 1.5x · 配乐 8% · 深度降乐）"},
+		{"ambient", "氛围铺底（人声 1.1x · 配乐 30% · 轻微降乐）"},
+		{"raw", "原样输出（不压配乐 · 不归一化）"},
+	}
+	a.pick(c, "混音预设", "一键套用常用声音组合，选后下方数值仍可微调", presetChoices, k.preset, func(id string) {
+		k.preset = id
+		switch id {
+		case "clear-speech":
+			k.voiceGain = "1.5"
+			k.duck = true
+			k.normalize = true
+		case "ambient":
+			k.voiceGain = "1.1"
+			k.duck = true
+			k.normalize = true
+		case "raw":
+			k.voiceGain = "1"
+			k.duck = false
+			k.normalize = false
+		case "default":
+			k.voiceGain = "1.35"
+			k.duck = true
+			k.normalize = true
+		}
+	})
+
+	speedChoices := []choice{
+		{"0.85", "0.85x 沉稳深情（较慢）"},
+		{"1.0", "1.0x 标准正常（推荐）"},
+		{"1.15", "1.15x 轻快利落（稍快）"},
+		{"1.25", "1.25x 紧凑高效（快节奏）"},
+	}
+	a.pick(c, "念白语速", "0.75–1.5 倍速（支持 Edge 在线语音与 MiniMax）", speedChoices, k.speed, func(id string) {
+		k.speed = id
+	})
+
+	transitionChoices := []choice{
+		{"none", "硬切（无转场）"},
+		{"fade", "淡入淡出（柔和过渡）"},
+		{"slide-left", "向左推移（流畅连贯）"},
+		{"slide-right", "向右推移"},
+		{"zoom-in", "镜头推进（动感聚焦）"},
+		{"dissolve", "交叉溶解"},
+	}
+	a.pick(c, "切镜转场", "分镜切换时的过渡动效（基于 FFmpeg xfade 引擎）", transitionChoices, k.transition, func(id string) {
+		k.transition = id
+	})
+
 	a.kit.Field(c, "人声音量", "0.4–3 倍。念白被配乐盖住就调大，人声太冲就调小", func() {
 		a.kit.Input(c, &k.voiceGain, "1.35")
 	})
 	a.kit.Field(c, "人声时压低配乐", "人声一开口就把配乐压下去，人声停了抬回来", func() {
 		a.kit.Checkbox(c, &k.duck, "开启侧链压低")
 	})
-	a.kit.Field(c, "统一响度", "把成品推到固定响度，不同片子放一起不会一轻一重", func() {
+	a.kit.Field(c, "统一响度", "把成品推到固定响度（-14 LUFS / -1 dBTP），不同片子放一起不会忽轻忽响", func() {
 		a.kit.Checkbox(c, &k.normalize, "开启响度归一化")
 	})
 }
 
-// applyAudioKnobs 把这三档写进后端要的 input。
-//
-// 值非法时直接报错，不悄悄改数：用户填了 5 倍人声音量，
-// 默默拉回 3 倍会让人以为自己已经调过了。
+// applyAudioKnobs 把这些调节写进后端要的 input。
 func (a *App) applyAudioKnobs(input map[string]any, k audioKnobs) error {
+	if k.preset != "" {
+		input["preset"] = k.preset
+	}
+	if k.speed != "" {
+		spd, err := parseNumberIn("念白语速", k.speed, 0.75, 1.5)
+		if err != nil {
+			return err
+		}
+		input["speed"] = spd
+	}
+	if k.transition != "" {
+		input["transition"] = k.transition
+	}
 	if k.voiceGain != "" {
 		gain, err := parseNumberIn("人声音量", k.voiceGain, 0.4, 3)
 		if err != nil {
@@ -58,11 +124,20 @@ func (a *App) applyAudioKnobs(input map[string]any, k audioKnobs) error {
 	return nil
 }
 
-// audioKnobsFromConfig 从配置里读回这三档（调整生成时用）。
-//
-// 配置里存的是数字，这里要变回界面上的字符串。
+// audioKnobsFromConfig 从配置里读回调节参数（调整生成时用）。
 func audioKnobsFromConfig(config map[string]any) audioKnobs {
 	k := defaultAudioKnobs()
+	if v, ok := config["preset"].(string); ok && v != "" {
+		k.preset = v
+	}
+	if v, ok := config["speed"]; ok {
+		if spd, err := parseNumberIn("念白语速", fmt.Sprintf("%v", v), 0.75, 1.5); err == nil {
+			k.speed = fmt.Sprintf("%g", spd)
+		}
+	}
+	if v, ok := config["transition"].(string); ok && v != "" {
+		k.transition = v
+	}
 	if v, ok := config["voiceGain"]; ok {
 		if gain, err := parseNumberIn("人声音量", fmt.Sprintf("%v", v), 0.4, 3); err == nil {
 			k.voiceGain = fmt.Sprintf("%g", gain)
@@ -78,17 +153,13 @@ func audioKnobsFromConfig(config map[string]any) audioKnobs {
 }
 
 // bgmGainValue 把界面上的百分比换成后端要的比例（12% → 0.12）。
-//
-// 三条流水线共用这一处换算。以前各写一遍，其中一处（项目推荐）
-// 在协程里又写了一遍裸百分比，把这里算好的 0.12 覆盖成了 12 ——
-// 后端拿到 12 会把配乐推爆。
 func bgmGainValue(raw string) (float64, error) {
 	if raw == "" {
 		return 0, nil
 	}
-	gain, err := parseNumberIn("BGM 音量", raw, 0, 50)
+	pct, err := parseNumberIn("配乐音量", raw, 0, 50)
 	if err != nil {
 		return 0, err
 	}
-	return gain / 100, nil
+	return pct / 100, nil
 }

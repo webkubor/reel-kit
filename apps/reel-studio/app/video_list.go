@@ -178,6 +178,7 @@ func (a *App) viewVideoDetail(c *ui.Context, job studioapi.Job, kind string) {
 		}
 		return
 	}
+	a.viewJobSteps(c, job.Steps)
 	a.kit.SectionTitle(c, "生成配置", "这条视频是怎么来的", nil)
 	a.viewConfigPanel(c, kind, job.Input)
 	ui.Row(c).FillWidth().Gap(design.SpaceSM).Children(func() {
@@ -307,4 +308,52 @@ func minDuration(a, b time.Duration) time.Duration {
 		return a
 	}
 	return b
+}
+
+// originLabel 把底层工序来源翻译成清晰的人话标签。
+func originLabel(origin string) string {
+	switch origin {
+	case "code":
+		return "本地代码渲染"
+	case "free-online":
+		return "在线免费模型"
+	case "local-offline":
+		return "本机离线模型"
+	case "cloud-paid", "ai":
+		return "AI 模型生成"
+	case "import":
+		return "用户导入素材"
+	default:
+		return "本地工序"
+	}
+}
+
+// viewJobSteps 画制作这支视频经历的每一道工序。
+//
+// 让用户一眼看清：哪几步是代码执行、哪几步是 AI 模型、哪几步用了自己的素材。
+func (a *App) viewJobSteps(c *ui.Context, steps []studioapi.Step) {
+	if len(steps) == 0 {
+		return
+	}
+	a.kit.SectionTitle(c, "制作工序与分层", "底层由代码渲染、AI 模型生成与本地素材分工协作", nil)
+	ui.Column(c).FillWidth().Gap(design.SpaceXS).Children(func() {
+		for _, step := range steps {
+			ui.Row(c).FillWidth().Gap(design.SpaceSM).AlignItems(ui.Center).
+				Background(a.kit.T.Surface).Border(1, a.kit.T.Line).Radius(design.RadiusSM).
+				Padding(design.SpaceSM, design.SpaceMD).Children(func() {
+				ui.Text(c, step.Label).FontSize(design.FontSmall).TextColor(a.kit.T.Ink)
+				a.kit.Tag(c, originLabel(step.Origin), "secondary")
+				if step.Engine != "" {
+					ui.Text(c, step.Engine).FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
+				}
+				ui.Spacer(c)
+				if step.Detail != "" {
+					ui.Text(c, truncateRunes(step.Detail, 20)).FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
+				}
+				if step.MS > 0 {
+					ui.Text(c, fmt.Sprintf("%.1fs", float64(step.MS)/1000)).FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
+				}
+			})
+		}
+	})
 }

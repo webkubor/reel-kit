@@ -109,17 +109,21 @@ export async function makeProductVideo(input, store, backend, progress, report =
 
     // 逐句配音：音色相同、语气相同，只是念的内容不同
     const voiceClips = []
+    const voiceBackend = input.voiceBackend || 'edge'
+    const voiceOrigin = voiceBackend === 'edge' ? 'free-online' : voiceBackend === 'sherpa' ? 'local-offline' : 'ai'
+    const voiceEngine = voiceBackend === 'edge' ? 'Edge 在线高保真语音' : voiceBackend === 'sherpa' ? '本机离线语音' : voiceBackend === 'minimax' ? 'MiniMax TTS' : 'VoxFlow 本地语音'
     for (let i = 0; i < lines.length; i++) {
       progress(`正在为第 ${i + 1}/${lines.length} 句生成配音…`)
-      const meta = await step({ id: `voice-${i}`, label: `配音 ${i + 1}/${lines.length}`, origin: 'ai', engine: input.voiceBackend === 'minimax' ? 'MiniMax TTS' : input.voiceBackend === 'sherpa' ? '本机离线语音' : 'VoxFlow 本地语音', detail: lines[i].slice(0, 40) }, async () => {
+      const meta = await step({ id: `voice-${i}`, label: `配音 ${i + 1}/${lines.length}`, origin: voiceOrigin, engine: voiceEngine, detail: lines[i].slice(0, 40) }, async () => {
         const asset = await backend.generate({
           kind: 'speech', projectId: input.projectId,
           persona: input.persona, prompt: lines[i], tone: input.tone || '',
-          backend: input.voiceBackend || 'voxflow', model: input.voiceModel || undefined,
+          backend: voiceBackend, model: input.voiceModel || undefined,
           voiceId: input.voiceId || undefined, profile: input.profile,
+          speed: input.speed || undefined,
         }, () => {})
         if (!asset?.mime?.startsWith('audio/')) throw new Error(`第 ${i + 1} 句配音没有生成成功`)
-        return { _file: store.path(asset), _duration: await probeDuration(store.path(asset)), assetId: asset.id, origin: 'ai', engine: asset.engine || '语音合成', detail: lines[i].slice(0, 40) }
+        return { _file: store.path(asset), _duration: await probeDuration(store.path(asset)), assetId: asset.id, origin: voiceOrigin, engine: asset.engine || voiceEngine, detail: lines[i].slice(0, 40) }
       })
       voiceClips.push({ file: meta._file, duration: meta._duration })
     }
@@ -153,11 +157,13 @@ export async function makeProductVideo(input, store, backend, progress, report =
     const out = join(temp, 'product.mp4')
     const bgm = input.bgmId ? store.asset(input.bgmId, input.projectId) : undefined
     const bgmGain = settings.bgmGain
-    const { _duration: outputDuration } = await step({ id: 'compose', label: '合成成片', origin: 'code', engine: 'ffmpeg 合成', detail: `${bgm ? `BGM《${bgm.name}》音量 ${Math.round(bgmGain * 100)}% · ` : '无 BGM · '}${layout.width}×${layout.height}` }, async () => {
+    const transitionLabel = settings.transition && settings.transition !== 'none' ? ` · 转场: ${settings.transition}` : ''
+    const { _duration: outputDuration } = await step({ id: 'compose', label: '合成成片', origin: 'code', engine: 'ffmpeg 合成', detail: `${bgm ? `BGM《${bgm.name}》音量 ${Math.round(bgmGain * 100)}%` : '无 BGM'} · ${layout.width}×${layout.height}${transitionLabel}` }, async () => {
       await compose({
         frames, durations, voiceClips, bgm: bgm && store.path(bgm),
         bgmGain, bgmCrossfade: 0,
         voiceGain: settings.voiceGain, duck: settings.duck, normalize: settings.normalize,
+        transition: settings.transition, transitionDuration: settings.transitionDuration,
         out,
       })
       return { _duration: await probeDuration(out) }
@@ -168,6 +174,7 @@ export async function makeProductVideo(input, store, backend, progress, report =
       source: 'reel-kit', origin: 'code', engine: '本地合成（渲染 + ffmpeg）',
       width: layout.width, height: layout.height, duration: outputDuration, hasAudio: true,
       template: layout.template, style: '', script: lines, ratio,
+      settings,
     })
   } finally { rmSync(temp, { recursive: true, force: true }) }
 }

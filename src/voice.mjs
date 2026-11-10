@@ -146,11 +146,28 @@ export async function synthesizeCaptions({
   if (engine === 'museav') {
     throw new Error(
       'museav 配音已下线：中台的 CLI 里没有 speak 命令，这条路径从来没能跑通。\n' +
-      '  改用 --voice-engine minimax（云端 TTS，需 MINIMAX_API_KEY），或在 Reel Studio 里选 MiniMax TTS 通道。',
+      '  改用 --voice-engine edge（微软 Edge 在线免费高保真）、--voice-engine minimax（云端 TTS），或在 Reel Studio 里选相应通道。',
     )
   }
-  if (!['voxcraft', 'minimax'].includes(engine)) {
-    throw new Error(`未知的配音后端 "${engine}"；可用：voxcraft（本地）、minimax（云端 TTS）`)
+  if (!['voxcraft', 'minimax', 'edge'].includes(engine)) {
+    throw new Error(`未知的配音后端 "${engine}"；可用：edge（微软在线高保真·免费）、voxcraft（本地）、minimax（云端 TTS）`)
+  }
+  if (engine === 'edge') {
+    const { edgeSynthesize } = await import('./edge-tts.mjs')
+    const selectedVoice = voice || 'zh-CN-XiaoxiaoNeural'
+    for (let i = 0; i < captions.length; i++) {
+      onProgress?.(i + 1, captions.length, 0, { pending: true })
+      const out = join(outDir, `caption_${String(i).padStart(4, '0')}.mp3`)
+      const { bytes } = await edgeSynthesize({
+        text: captions[i],
+        voice: selectedVoice,
+      })
+      writeFileSync(out, bytes)
+      const duration = await probeDuration(out)
+      results.push({ file: out, duration })
+      onProgress?.(i + 1, captions.length, duration)
+    }
+    return results
   }
   if (engine === 'minimax' && (design || instruction)) {
     throw new Error('MiniMax TTS 只做文字配音，不支持音色设计（--design）与指令（--instruction）；这两项请用本地 voxcraft')

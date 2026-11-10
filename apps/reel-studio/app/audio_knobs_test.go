@@ -113,6 +113,7 @@ func Test配置面板能显示这三档(t *testing.T) {
 	a := newApp(t, server.URL)
 	job := map[string]any{
 		"voiceGain": 1.35, "duck": true, "normalize": false,
+		"preset": "clear-speech", "transition": "fade", "speed": 1.15,
 	}
 	if got := a.configValue("talk", "voiceGain", job); got != "1.35 倍" {
 		t.Errorf("人声音量显示不对：%q", got)
@@ -122,5 +123,37 @@ func Test配置面板能显示这三档(t *testing.T) {
 	}
 	if got := a.configValue("talk", "normalize", job); got != "关" {
 		t.Errorf("响度开关显示不对：%q", got)
+	}
+	if got := a.configValue("talk", "preset", job); got != "口播清晰" {
+		t.Errorf("预设显示不对：%q", got)
+	}
+	if got := a.configValue("talk", "transition", job); got != "淡入淡出" {
+		t.Errorf("转场显示不对：%q", got)
+	}
+}
+
+// Test预设与转场进后端输入
+func Test预设与转场进后端输入(t *testing.T) {
+	a := newApp(t, stub(t, talkJobs()).URL)
+	input := map[string]any{}
+	knobs := audioKnobs{
+		preset:     "clear-speech",
+		speed:      "1.15",
+		transition: "fade",
+		voiceGain:  "1.5",
+		duck:       true,
+		normalize:  true,
+	}
+	if err := a.applyAudioKnobs(input, knobs); err != nil {
+		t.Fatalf("写入失败：%v", err)
+	}
+	if input["preset"] != "clear-speech" {
+		t.Errorf("预设没进输入：%v", input["preset"])
+	}
+	if input["speed"] != 1.15 {
+		t.Errorf("语速没进输入：%v", input["speed"])
+	}
+	if input["transition"] != "fade" {
+		t.Errorf("转场没进输入：%v", input["transition"])
 	}
 }

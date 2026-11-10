@@ -125,6 +125,34 @@ export const SETTING_SCHEMA = {
     ],
   },
 
+  transition: {
+    group: '画面',
+    label: '切镜转场',
+    type: 'choice',
+    default: 'none',
+    options: [
+      { value: 'none', label: '硬切（无转场）' },
+      { value: 'fade', label: '淡入淡出' },
+      { value: 'slide-left', label: '向左推移' },
+      { value: 'slide-right', label: '向右推移' },
+      { value: 'zoom-in', label: '镜头推进' },
+      { value: 'dissolve', label: '溶解交叉' },
+    ],
+    hint: '分镜切换时的视觉动效',
+  },
+
+  transitionDuration: {
+    group: '画面',
+    label: '转场时长',
+    type: 'number',
+    default: 0.35,
+    min: 0.1,
+    max: 1.0,
+    step: 0.05,
+    unit: '秒',
+    hint: '转场动效持续时间',
+  },
+
   /* ── 画幅 ───────────────────────────────────────────── */
 
   platform: {

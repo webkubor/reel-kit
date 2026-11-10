@@ -52,14 +52,17 @@ func configFields(kind string) []configField {
 			{partScript, "title", "标题"},
 			{partScript, "captions", "口播脚本"},
 			{partScript, "subtitle", "副标题"},
+			{partVoice, "preset", "混音预设"},
 			{partVoice, "persona", "音色"},
 			{partVoice, "voiceBackend", "配音引擎"},
+			{partVoice, "speed", "念白语速"},
 			{partVoice, "tone", "语气"},
 			{partVoice, "pause", "镜间停顿"},
 			{partVoice, "voiceGain", "人声音量"},
 			{partVoice, "duck", "人声压低配乐"},
 			{partVoice, "normalize", "统一响度"},
 			{partVisual, "assetIds", "画面素材"},
+			{partVisual, "transition", "切镜转场"},
 			{partLayout, "style", "视觉风格"},
 			{partLayout, "template", "版式模板"},
 			{partFormat, "ratio", "画幅"},
@@ -71,6 +74,7 @@ func configFields(kind string) []configField {
 			{partScript, "repoUrl", "内容源"},
 			{partScript, "title", "标题"},
 			{partScript, "captions", "分镜口播"},
+			{partVoice, "preset", "混音预设"},
 			{partVoice, "backend", "配音通道"},
 			{partVoice, "model", "模型"},
 			{partVoice, "voiceId", "音色"},
@@ -86,6 +90,7 @@ func configFields(kind string) []configField {
 			{partVoice, "normalize", "统一响度"},
 			{partVisual, "assetIds", "分镜画面"},
 			{partVisual, "imageFit", "画面填充"},
+			{partVisual, "transition", "切镜转场"},
 			{partLayout, "template", "版式"},
 			{partFormat, "platform", "发布平台"},
 			{partFormat, "ratio", "画幅"},
@@ -108,14 +113,17 @@ func configFields(kind string) []configField {
 			{partScript, "captions", "介绍词"},
 			{partScript, "subtitle", "一句话卖点"},
 			{partScript, "footer", "片尾一句"},
+			{partVoice, "preset", "混音预设"},
 			{partVoice, "persona", "音色"},
 			{partVoice, "voiceBackend", "配音引擎"},
+			{partVoice, "speed", "念白语速"},
 			{partVoice, "tone", "语气"},
 			{partVoice, "pause", "镜间停顿"},
 			{partVoice, "voiceGain", "人声音量"},
 			{partVoice, "duck", "人声压低配乐"},
 			{partVoice, "normalize", "统一响度"},
 			{partVisual, "assetIds", "产品画面"},
+			{partVisual, "transition", "切镜转场"},
 			{partLayout, "template", "版式"},
 			{partFormat, "ratio", "画幅"},
 			{partMusic, "bgmId", "背景音乐"},
@@ -264,12 +272,44 @@ func (a *App) configValue(kind, key string, input map[string]any) string {
 	case "voiceBackend", "backend":
 		key, _ := raw.(string)
 		switch key {
+		case "edge":
+			return "微软 Edge（在线免费 · 24kHz）"
 		case "sherpa":
 			return "本机离线（自带）"
 		case "voxflow":
 			return "本机 VoxFlow"
 		case "minimax":
 			return "MiniMax TTS"
+		}
+		return orDash(key)
+	case "preset":
+		key, _ := raw.(string)
+		switch key {
+		case "clear-speech":
+			return "口播清晰"
+		case "ambient":
+			return "氛围铺底"
+		case "raw":
+			return "原样输出"
+		case "default":
+			return "标准平衡"
+		}
+		return orDash(key)
+	case "transition":
+		key, _ := raw.(string)
+		switch key {
+		case "none":
+			return "硬切"
+		case "fade":
+			return "淡入淡出"
+		case "slide-left":
+			return "向左推移"
+		case "slide-right":
+			return "向右推移"
+		case "zoom-in":
+			return "镜头推进"
+		case "dissolve":
+			return "交叉溶解"
 		}
 		return orDash(key)
 	case "pause":

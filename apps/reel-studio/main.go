@@ -80,6 +80,9 @@ func main() {
 	a := app.New(app.Options{BaseURL: base, BackendRoot: os.Getenv("REEL_STUDIO_ROOT")})
 
 	mygo.App.WhenReady(func() {
+		if v := mygo.App.Version(); v != "" {
+			app.Version = v
+		}
 		window := mygo.NewWindow(mygo.WindowOptions{
 			Title:     "Reel Studio",
 			Width:     1280,

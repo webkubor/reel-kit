@@ -29,10 +29,9 @@ type Mode int
 
 // Version 是应用版本号。
 //
-// 写死在这里而不在界面上：界面上的版本号必须跟实际发布的版本一致，
-// 写死在两处就会出现「显示 0.1.0、实际发的是 0.2.0」。
-// 打包时可以用 -ldflags "-X ...app.Version=x.y.z" 覆盖。
-var Version = "0.2.2"
+// 保持与 mygo.json 和 GitHub release 标签一致。
+// 打包时也可以用 -ldflags "-X ...app.Version=x.y.z" 覆盖。
+var Version = "1.4.0"
 
 // 模式就是左栏的导航项，分三类：视频流水线、工具、设置。
 //
