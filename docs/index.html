@@ -96,6 +96,12 @@
         Windows 同样没做代码签名，被 SmartScreen 拦时选「仍要运行」。
       </p>
       <p class="studio-meta">
+        <strong>遇到问题怎么反馈：</strong>在「设置与反馈 → 运行日志」选择「导出排障报告」，
+        检查其中是否包含私人信息后，把报告附到 <a href="https://github.com/webkubor/reel-kit/issues/new/choose">问题反馈</a>。
+        Windows 启动闪退时，可在资源管理器输入 <code>%TEMP%</code> 查找 <code>reel-studio-crash.log</code>；
+        部分启动错误可能不会生成日志。Windows 图形界面和完整上报流程仍待用户实测。
+      </p>
+      <p class="studio-meta">
         图片与视频默认走 MuseAV 中台与 MiniMax；也可以在「设置与反馈 → 模型通道」里
         填上你自己的中转站或厂商直连 —— 在设置页填一次就行，不用改配置文件，
         密钥也不会出现在界面里。
