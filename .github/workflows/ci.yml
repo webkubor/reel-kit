@@ -63,3 +63,23 @@ jobs:
         run: |
           go build ./...
           go test ./...
+
+  # Windows 是唯一一个我们没法在本地真机验证的平台：
+  # 桌面端是原生窗口，路径分隔符、日志目录、崩溃日志落点、临时目录位置
+  # 全都和 macOS 不同（%TEMP% vs /tmp，%APPDATA% vs ~/Library）。
+  # 排障链路（脱敏、导出、崩溃日志）恰恰是最吃平台差异的地方，
+  # 所以在 Windows runner 上跑同一套交互测试 —— 把「Windows 上会不会崩、
+  # 报错能不能带出来」提前到 CI，而不是等用户报错再修。
+  desktop-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache-dependency-path: apps/reel-studio/go.sum
+      - name: 桌面端构建与测试（Windows）
+        working-directory: apps/reel-studio
+        run: |
+          go build ./...
+          go test ./...

@@ -20,6 +20,10 @@ func Test真机界面(t *testing.T) {
 	}
 	a := New(Options{BaseURL: "http://127.0.0.1:4390"})
 	a.refresh()
+	// refresh 是通过 mutate 排队改状态的，状态要等渲染线程排空队列才落地。
+	// 先渲染一帧，再看状态 —— 否则这里永远读到 nil。
+	tt := ui.NewTester(a.View, 1280, 840)
+	tt.Frame()
 	if a.state == nil {
 		t.Fatal("连不上本地工作台")
 	}

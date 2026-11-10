@@ -1,6 +1,7 @@
 package app
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -135,5 +136,17 @@ func Test反馈区提供导出排障报告入口(t *testing.T) {
 	}
 	if !tt.HasText("复制诊断信息") {
 		t.Errorf("反馈区缺少「复制诊断信息」入口，实际文字：%v", tt.Texts())
+	}
+}
+
+// 日志与崩溃文件都要落在系统临时目录里：
+// Windows 上就是 %TEMP%，用户遇到闪退时按 README 说的路径就能找到。
+func Test日志与崩溃文件落在系统临时目录(t *testing.T) {
+	tmp := os.TempDir()
+	if !strings.HasPrefix(BackendLogPath(), tmp) {
+		t.Errorf("工作台日志不在临时目录：%s（临时目录 %s）", BackendLogPath(), tmp)
+	}
+	if !strings.HasPrefix(CrashLogPath(), tmp) {
+		t.Errorf("崩溃日志不在临时目录：%s（临时目录 %s）", CrashLogPath(), tmp)
 	}
 }

@@ -185,6 +185,9 @@ xattr -dr com.apple.quarantine "/Applications/Reel Studio.app"
 Windows（x64，未做代码签名，首次运行被 SmartScreen 拦一下选「仍要运行」）：下载
 `reel-studio-1.3.0-windows-amd64.tar.gz` 解压，把 `Reel Studio.exe` 和它旁边的
 `backend/` `bin/` `chrome/` `museav/` `sherpa/` 资源目录保持在同一层目录再双击。
+- **SmartScreen 蓝窗「Windows 已保护你的电脑」**：点「更多信息」→「仍要运行」；
+  如果双击没反应，先在资源管理器里选中 `Reel Studio.exe` → 右键「属性」→ 底部勾
+  「解除锁定」→「确定」，再去双击（浏览器下载的文件带「来自网络」标记时会被拦）；
 - **双击闪退无反应**：在资源管理器地址栏输入 `%TEMP%`，查看 `reel-studio-crash.log`，里面记了完整崩溃调用栈；
 - **任务失败或工作台连不上**：在应用内「设置与反馈」点「导出排障报告」，
   会生成一个 `reel-studio-diagnostics-*.txt`：里面有版本与系统、通道就绪状态、
