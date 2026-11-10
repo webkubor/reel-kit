@@ -319,7 +319,9 @@ func originLabel(origin string) string {
 		return "在线免费模型"
 	case "local-offline":
 		return "本机离线模型"
-	case "cloud-paid", "ai":
+	case "cloud-paid":
+		return "云端付费模型"
+	case "ai":
 		return "AI 模型生成"
 	case "import":
 		return "用户导入素材"
@@ -344,7 +346,9 @@ func (a *App) viewJobSteps(c *ui.Context, steps []studioapi.Step) {
 				ui.Text(c, step.Label).FontSize(design.FontSmall).TextColor(a.kit.T.Ink)
 				a.kit.Tag(c, originLabel(step.Origin), "secondary")
 				if step.Engine != "" {
-					ui.Text(c, step.Engine).FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
+					// 引擎名有长有短（带音色 ID 的能到 30 多个字符），
+					// 不截断的话这一行会把右侧面板撑破，挤掉旁边的时长。
+					ui.Text(c, truncateRunes(step.Engine, 22)).FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
 				}
 				ui.Spacer(c)
 				if step.Detail != "" {
