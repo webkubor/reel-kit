@@ -18,6 +18,7 @@
     "publicKey": "Wl/RioKt0yPxHQPc2qeekeDLTfqxpm60B3xhzxvvFLo=",
     "github": "webkubor/reel-kit",
     "tagPrefix": "app-v",
-    "deltas": 3
+    "deltas": 3,
+    "changelog": "../../CHANGELOG.md"
   }
 }
