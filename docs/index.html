@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>reel-kit · 短视频合成引擎(AI 无人值守的批量装配器)</title>
-  <meta name="description" content="reel-kit 是短视频合成引擎 · AI 无人值守的批量装配器。CLI + 库,同一条流水线。素材 + 逐句文案 + 配音/BGM,套 HTML 模板出片。本地 TTS 零成本,5 套模板,9 种转场。上游消费 AI 出视频素材(Hailuo),下游吐成品 mp4。">
-  <meta name="keywords" content="reel-kit, 短视频合成引擎, AI 无人值守, 批量装配器, video assembler, video composition engine, 视频模板, HTML 模板, ffmpeg, 本地 TTS, Qwen3-TTS, Hailuo, video template, prompt template, handdrawn, Vue, Vite">
+  <title>Reel Studio · 把文案和素材，变成一条能直接发的短视频</title>
+  <meta name="description" content="Reel Studio 是 reel-kit 的桌面版：macOS / Windows 下载即用。写好文案、选一个声音，逐句配音、自动配画面、合成导出 MP4。文字配音随包自带离线引擎，不联网、不产生费用、声音不出本机。">
+  <meta name="keywords" content="reel-kit, Reel Studio, 短视频合成, 桌面应用, 视频模板, HTML 模板, ffmpeg, 本地 TTS, 视频生成, text to speech, video composer">
   <meta name="author" content="webkubor">
 
   <meta property="og:type" content="website">
-  <meta property="og:title" content="reel-kit · 短视频合成引擎 · AI 无人值守的批量装配器">
-  <meta property="og:description" content="CLI + 库 · 上游吃 AI 出视频素材 · 下游吐成品 mp4">
+  <meta property="og:title" content="Reel Studio · 把文案和素材，变成一条能直接发的短视频">
+  <meta property="og:description" content="macOS / Windows 下载即用 · 文字配音零成本、离线、声音不出本机">
   <meta property="og:image" content="docs/preview.png">
   <meta name="twitter:card" content="summary_large_image">
 
@@ -24,28 +24,29 @@
   <!-- ───── Hero ───── -->
   <header class="hero">
     <img src="logo.svg" alt="reel-kit" class="logo">
-    <h1>短视频合成引擎</h1>
+    <h1>把文案和素材，变成一条能直接发的短视频</h1>
     <p class="tagline">
-      <b>AI 无人值守的批量装配器</b>。<br>
-      素材 + 逐句文案 + 配音/BGM,套 HTML 模板出片。<br>
-      CLI + 库,同一条流水线。
+      <b>Reel Studio</b>：下载即用的桌面应用，macOS 与 Windows。<br>
+      写好文案、选一个声音，逐句配音、自动配画面、合成导出 MP4。<br>
+      文字配音随包自带离线引擎 —— 不联网、不产生费用、声音不出本机。
     </p>
 
-    <a href="https://www.npmjs.com/package/@kubor/reel-kit" class="install">npm i -g @kubor/reel-kit</a>
+    <a href="https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/reel-studio-1.3.0-darwin-arm64.tar.gz" class="install">下载 macOS（Apple Silicon · 289 MB）</a>
+    <a href="https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/reel-studio-1.3.0-windows-amd64.tar.gz" class="install secondary">下载 Windows（x64 · 347 MB）</a>
 
     <div class="links">
       <a href="https://github.com/webkubor/reel-kit">⭐ GitHub</a>
-      <a href="https://github.com/webkubor/reel-kit/blob/main/README.md">📖 文档</a>
-      <a href="https://github.com/webkubor/reel-kit/tree/main/prompts">✍️ 模板库</a>
+      <a href="https://github.com/webkubor/reel-kit/blob/main/README.md">📖 怎么用</a>
+      <a href="https://github.com/webkubor/reel-kit/blob/main/docs/cli.md">🧑‍💻 开发者文档</a>
     </div>
   </header>
 
   <!-- ───── Reel Studio 桌面版 ───── -->
   <section class="studio" id="studio">
     <div class="studio-head">
-      <h2>Reel Studio · 桌面版</h2>
+      <h2>四条流水线，填表就能出片</h2>
       <p class="section-intro">
-        把上面的引擎装成一个能点的 macOS / Windows 应用：四条流水线，填表就能出片。
+        应用左侧是四条视频流水线，点进去中间是这条流水线的配置，右边是它跑出来的视频。
         自包含安装包内含 Node、Chrome、FFmpeg 与 MuseAV CLI；配音引擎也一起打包，不用再单独装；
         素材与成片留在你自己电脑上。
       </p>
@@ -72,7 +73,7 @@
       <a class="install" href="https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/reel-studio-1.3.0-darwin-arm64.tar.gz">下载 macOS（Apple Silicon）</a>
       <a class="install secondary" href="https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/reel-studio-1.3.0-windows-amd64.tar.gz">下载 Windows（x64，347 MB）</a>
       <p class="studio-meta">
-        v1.3.0 · macOS 289 MB / Windows 347 MB ·
+        v1.3.0 · macOS 289 MB（另有 <a href="https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/reel-studio-1.3.0-arm64.dmg">dmg 237 MB</a>）/ Windows 347 MB ·
         <a href="https://github.com/webkubor/reel-kit/releases/tag/app-v1.3.0">发布页与校验值</a> ·
         <a href="https://github.com/webkubor/reel-kit/releases/latest">历史版本</a>
       </p>
@@ -99,7 +100,7 @@
         <strong>遇到问题怎么反馈：</strong>在「设置与反馈 → 运行日志」选择「导出排障报告」，
         检查其中是否包含私人信息后，把报告附到 <a href="https://github.com/webkubor/reel-kit/issues/new/choose">问题反馈</a>。
         Windows 启动闪退时，可在资源管理器输入 <code>%TEMP%</code> 查找 <code>reel-studio-crash.log</code>；
-        部分启动错误可能不会生成日志。Windows 图形界面和完整上报流程仍待用户实测。
+        部分启动错误可能不会生成日志。Windows 版的图形界面仍在真实用户实测中，欢迎把遇到的问题直接发给我们。
       </p>
       <p class="studio-meta">
         图片与视频默认走 MuseAV 中台与 MiniMax；也可以在「设置与反馈 → 模型通道」里
@@ -113,28 +114,27 @@
 
     <!-- ───── Features ───── -->
     <section>
-      <h2>两件事,一个仓库</h2>
+      <h2>桌面应用底下，是一套能自己搭的引擎</h2>
       <p class="section-intro">
-        reel-kit 不是一个工具,是把"短视频生产"拆成两件事,各自有模块,但共享一个仓。
-        想做哪个就打开哪个,不用切换项目。
+        应用和命令行跑的是同一条流水线。想批量出片、接进自己的流程，或者改模板，都可以直接用命令行。
       </p>
       <div class="features">
         <div class="feature">
           <h3>🎬 剪辑</h3>
-          <p>命令行一行出片:<code>reel make</code>。5 套 HTML 模板、9 种 xfade 转场、长句字幕分镜、BGM 平滑接缝、念白驱动镜头时长。</p>
+          <p>命令行一行出片：<code>reel make</code>。10 套 HTML 模板、9 种 xfade 转场、长句字幕分镜、BGM 平滑接缝、念白驱动镜头时长。</p>
         </div>
         <div class="feature">
           <h3>✍️ 模板开发</h3>
-          <p>20 套手绘风格配方,模板用 HTML/CSS 写,所见即所得,改完直接用。</p>
+          <p>20 套手绘风格配方、44 套知识短视频视觉风格，模板用 HTML/CSS 写，所见即所得，改完直接用。</p>
         </div>
       </div>
     </section>
 
     <!-- ───── 模板预览 ───── -->
     <section>
-      <h2>5 套模板 <span class="small">竖版 / 方形 / 横版 / 纯文字 · 一键切换</span></h2>
+      <h2>10 套模板 <span class="small">竖版 / 方形 / 横版 / 纯文字 · 一键切换</span></h2>
       <p class="section-intro">
-        模板是 HTML/CSS 文件,改颜色、改布局、加 logo 都直接编辑。
+        模板是 HTML/CSS 文件，改颜色、改布局、加 logo 都直接编辑。
         模板作者不需懂 ffmpeg。
       </p>
       <div class="templates">
@@ -158,20 +158,41 @@
           <div class="preview wide">1920 × 1080</div>
           <div class="name">landscape-product</div>
         </div>
+        <div class="template">
+          <div class="preview">1080 × 1920</div>
+          <div class="name">knowledge-dark</div>
+        </div>
+        <div class="template">
+          <div class="preview">1080 × 1920</div>
+          <div class="name">knowledge-paper</div>
+        </div>
+        <div class="template">
+          <div class="preview">1080 × 1920</div>
+          <div class="name">knowledge-gufeng</div>
+        </div>
+        <div class="template">
+          <div class="preview">竖版 / 横版</div>
+          <div class="name">project-recommendation</div>
+        </div>
+        <div class="template">
+          <div class="preview">竖版 / 横版</div>
+          <div class="name">product-presenter</div>
+        </div>
       </div>
     </section>
 
     <!-- ───── Quick Start ───── -->
     <section>
-      <h2>30 秒上手</h2>
-      <p class="section-intro">两种形态,同一个引擎。命令行适合批处理和 CI,工作台适合人工调整和创作。</p>
+      <h2>命令行一行出片</h2>
+      <p class="section-intro">
+        准备一个图片目录，和一份一行一句的文案就能跑。完整参数见
+        <a href="https://github.com/webkubor/reel-kit/blob/main/docs/cli.md">开发者文档</a>。
+      </p>
       <div class="split">
         <div class="card">
           <div class="label">CLI</div>
-          <h3>命令行一行出片</h3>
-<pre><code>npm i -g @kubor/reel-kit
-
-reel make \
+          <h3>不需要先安装</h3>
+<pre><code>npx github:webkubor/reel-kit make \
   --template sticker-promo \
   --title "新功能" \
   --assets ./shots \

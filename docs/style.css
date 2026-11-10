@@ -54,6 +54,13 @@ pre code { display: block; padding: 16px 20px; overflow-x: auto; }
   margin: 0 8px 16px;
 }
 .hero .install:hover { background: var(--brand); text-decoration: none; }
+.hero .install.secondary {
+  background: transparent; color: var(--ink);
+  border: 1px solid var(--line-strong, var(--ink));
+}
+.hero .install.secondary:hover {
+  background: var(--ink); color: #fff; border-color: var(--ink);
+}
 .hero .links { margin-top: 24px; }
 .hero .links a {
   display: inline-block; margin: 0 12px;
