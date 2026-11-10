@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { createStore, id, now } from './store.mjs'
 import { createProviders } from './providers.mjs'
+import { sherpaEngine } from './sherpa.mjs'
 import { exportVideo } from './export.mjs'
 import { redact, command, jsonFetch, download, probeBytes } from './process.mjs'
 import { projectDraft, makeRecommendation, githubRepo } from './recommendation.mjs'
@@ -89,8 +90,9 @@ function validate(input, store) {
     for (const id of value.assetIds) if (!store.asset(id, value.projectId).mime.startsWith('image/')) fail('画面素材必须是图片')
     if (value.bgmId && !store.asset(value.bgmId, value.projectId).mime.startsWith('audio/')) fail('BGM 须选择音频素材')
     if (!value.persona && !value.voiceId) fail('请选择音色')
-    value.voiceBackend = value.voiceBackend || 'voxflow'
-    if (!['voxflow', 'minimax'].includes(value.voiceBackend)) fail('语音通道不支持')
+    // 没指定通道时优先用随应用自带的离线引擎 —— 它是唯一不需要任何前置条件的路。
+    value.voiceBackend = value.voiceBackend || (sherpaEngine() ? 'sherpa' : 'voxflow')
+    if (!['sherpa', 'voxflow', 'minimax'].includes(value.voiceBackend)) fail('语音通道不支持')
   }
   if (value.kind === 'product') {
     // 人物商品介绍：一句一镜，版式随画幅走（竖版出镜、横版左图右文）
@@ -102,8 +104,9 @@ function validate(input, store) {
     for (const id of value.assetIds) if (!store.asset(id, value.projectId).mime.startsWith('image/')) fail('产品或人物画面必须是图片')
     if (value.bgmId && !store.asset(value.bgmId, value.projectId).mime.startsWith('audio/')) fail('BGM 须选择音频素材')
     if (!value.persona && !value.voiceId) fail('请选择音色')
-    value.voiceBackend = value.voiceBackend || 'voxflow'
-    if (!['voxflow', 'minimax'].includes(value.voiceBackend)) fail('语音通道不支持')
+    // 没指定通道时优先用随应用自带的离线引擎 —— 它是唯一不需要任何前置条件的路。
+    value.voiceBackend = value.voiceBackend || (sherpaEngine() ? 'sherpa' : 'voxflow')
+    if (!['sherpa', 'voxflow', 'minimax'].includes(value.voiceBackend)) fail('语音通道不支持')
   }
   value.template = value.template || 'sticker-promo'
   if (!templateNames.includes(value.template)) fail('模板不存在')

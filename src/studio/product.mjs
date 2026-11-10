@@ -110,7 +110,7 @@ export async function makeProductVideo(input, store, backend, progress, report =
     const voiceClips = []
     for (let i = 0; i < lines.length; i++) {
       progress(`正在为第 ${i + 1}/${lines.length} 句生成配音…`)
-      const meta = await step({ id: `voice-${i}`, label: `配音 ${i + 1}/${lines.length}`, origin: 'ai', engine: input.voiceBackend === 'minimax' ? 'MiniMax TTS' : 'VoxFlow 本地语音', detail: lines[i].slice(0, 40) }, async () => {
+      const meta = await step({ id: `voice-${i}`, label: `配音 ${i + 1}/${lines.length}`, origin: 'ai', engine: input.voiceBackend === 'minimax' ? 'MiniMax TTS' : input.voiceBackend === 'sherpa' ? '本机离线语音' : 'VoxFlow 本地语音', detail: lines[i].slice(0, 40) }, async () => {
         const asset = await backend.generate({
           kind: 'speech', projectId: input.projectId,
           persona: input.persona, prompt: lines[i], tone: input.tone || '',

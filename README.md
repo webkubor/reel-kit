@@ -79,13 +79,15 @@ Agent 工作流里也可通过 [cs-mcp](https://github.com/webkubor/cs-mcp) 调�
 
 ## 本地可视化工作台
 
-运行 `npm run studio`，打开 <http://127.0.0.1:4390>。工作台当前主打 **GitHub 项目推荐视频**：输入仓库地址，本地读取 README 与截图、逐句配音（VoxFlow）、渲染合成，产出可直接发布的竖屏/横屏成片；成片经过自动检测（画幅/时长/音轨/完整解码）与人工审片清单确认后才能记录发布，发布后可回填表现、复盘并保存为新版制作方法（SOP），下一次制作自动绑定所选版本，未改动的旁白句复用已生成配音。
+运行 `npm run studio`，打开 <http://127.0.0.1:4390>。工作台当前主打 **GitHub 项目推荐视频**：输入仓库地址，本地读取 README 与截图、逐句配音（本机离线引擎）、渲染合成，产出可直接发布的竖屏/横屏成片；成片经过自动检测（画幅/时长/音轨/完整解码）与人工审片清单确认后才能记录发布，发布后可回填表现、复盘并保存为新版制作方法（SOP），下一次制作自动绑定所选版本，未改动的旁白句复用已生成配音。
+
+原生界面与网页版共用同一套本地 HTTP 接口，第三方可以拿它做自己的批量出片工具 —— 清单见 [本地 HTTP 接口](docs/studio-api.md)。
 
 其余能力保持可用：项目和素材管理、MuseAV 图片生成、MiniMax H3 视频生成、VoxFlow 音色设计与配音、图片或视频合成导出。项目和生成的素材保存在 `~/.reel-kit/studio/`。
 
-**录制自己的声音**：在全局「声音库」填写名字、照读短句，结束后试听并保存；也可导入音频并填写其中实际说的原文。建议 3–15 秒，最多 30 秒 / 20 MB。保存一次即可在所有项目选择这个音色。需要 VoxFlow **0.10.1 或更新版本**；工作台会检查注册能力，旧服务须升级并重启。音频、原文与 MLX 推理均在本机，不上传云端。
+**录制自己的声音**：在全局「声音库」填写名字、照读短句，结束后试听并保存；也可导入音频并填写其中实际说的原文。建议 3–15 秒，最多 30 秒 / 20 MB。保存一次即可在所有项目选择这个音色。这一步需要 VoxFlow **0.10.1 或更新版本**（只有 macOS · Apple 芯片可用），音频、原文与 MLX 推理均在本机，不上传云端；只是要文字配音的话不需要它，随应用自带的本机离线引擎就够。工作台会检查注册能力，旧服务须升级并重启。
 
-图片生成需要安装并登录 `museav`；语音功能需要启动本机 VoxFlow 服务；合成需要 FFmpeg 和 Chrome。视频使用 MiniMax 的视频 API：启动时通过凭据管理工具注入 `MINIMAX_API_KEY`，可额外注入 `MINIMAX_API_KEY_2` 供第二账户选择。密钥不应写入项目文件。视频生成会消耗账户额度，能否调用以实际权限及接口返回为准。
+图片生成由随应用分发的 MuseAV CLI 完成（用户只需在应用里登录一次）；**文字配音用随应用自带的本机离线引擎**，不用装任何东西、不用登录、不产生费用，macOS 与 Windows 同一套；合成需要 FFmpeg 与 Chrome（桌面版都自带）。视频使用 MiniMax 的视频 API：启动时通过凭据管理工具注入 `MINIMAX_API_KEY`，可额外注入 `MINIMAX_API_KEY_2` 供第二账户选择。密钥不应写入项目文件。视频生成会消耗账户额度，能否调用以实际权限及接口返回为准。
 
 例如，本机 Kyvault 已保存主账户时可运行：
 
@@ -101,7 +103,8 @@ kyvault run --env MINIMAX_API_KEY=secret://minimax/api-key -- reel studio
 |---|---|---|
 | **MuseAV 中台** | 图片与视频（含 Seedance、Kling、Wan 等中台可用模型） | 按中台额度 |
 | **MiniMax 直连** | H3 视频、speech-02-hd 配音 | 按你自己的 MiniMax 账户 |
-| **本地 VoxFlow** | 音色设计、配音、克隆自己的声音 | 本地推理，不产生模型费用 |
+| **本机离线引擎** | 文字配音（随应用自带，macOS 与 Windows 都有） | 离线合成，不产生费用 |
+| **本地 VoxFlow** | 音色设计、克隆自己的声音 | 本地推理，不产生模型费用 |
 | **自定义通道** | 任意兼容的生图 / 视频接口 | 按你自己的账户 |
 
 规则：**不静默换供应商、不静默换账户**。你选的那条通道没就绪，工作台会禁用生成并写明原因，不会悄悄改用另一条（可能另一家的付费）通道。模型、音色、账户是三件独立的事，界面分开设置。
@@ -131,7 +134,7 @@ kyvault run --env MINIMAX_API_KEY=secret://minimax/api-key -- reel studio
 - `kind`：`image` 或 `video`。`protocol`：`openai`（一次 POST 生图）或 `ark-task`（提交任务再轮询，视频用）。
 - `env` 是环境变量名；启动工作台时注入即可：`REEL_STUDIO_HOME=... ARK_API_KEY=... reel studio`。
 - 配置有问题时，「连接状态」里会逐条列出是哪一项不对，而不是让通道悄悄消失。
-- 自定义 TTS 尚未实现，请用 MiniMax TTS 或本地 VoxFlow。
+- 自定义 TTS 尚未实现，请用随应用自带的本机离线引擎、MiniMax TTS 或本地 VoxFlow。
 
 ## 🎬 桌面应用（MyGo 原生界面）
 
@@ -140,14 +143,18 @@ kyvault run --env MINIMAX_API_KEY=secret://minimax/api-key -- reel studio
 下载安装（macOS Apple Silicon）：
 
 ```bash
-curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v1.1.3/install.sh | sh
+curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v1.2.0/install.sh | sh
 ```
 
 Windows（x64，未做代码签名，首次运行被 SmartScreen 拦一下选「仍要运行」）：下载
-`reel-studio-1.1.3-windows-amd64.tar.gz` 解压，把 `Reel Studio.exe` 和它旁边的
-`backend/` `bin/` `chrome/` `museav/` 资源目录保持在同一层目录再双击。
+`reel-studio-1.2.0-windows-amd64.tar.gz` 解压，把 `Reel Studio.exe` 和它旁边的
+`backend/` `bin/` `chrome/` `museav/` `sherpa/` 资源目录保持在同一层目录再双击。
 
-**第一次用要先装本机语音服务**（配音、克隆自己的声音都要它；本机推理，不产生模型费用）：
+**装完就能配音**：文字配音用随应用自带的本机离线引擎（sherpa-onnx + 中文模型），
+不联网、不产生费用，macOS 与 Windows 同一套，也不用装 Python、clone 仓库或登录账号。
+
+**只有「克隆自己的声音」和「设计音色」需要另外装 VoxFlow**（仅 macOS · Apple 芯片，
+本机推理，不产生模型费用）：
 
 ```bash
 git clone https://github.com/webkubor/voxflow.git && cd voxflow
@@ -158,8 +165,8 @@ source .venv/bin/activate && voice web
 服务默认就在 `127.0.0.1:8866`。忘了起也不要紧：应用里会直接把这两条命令摆出来，
 点「复制安装命令 / 复制启动命令」贴到终端就行。
 
-**Windows 上没有本机语音服务**（VoxFlow 只在 Apple 芯片上跑）：桌面版的「声音」这一段
-可以改选云端 **MiniMax TTS**，配音按量计费、画面与合成仍在本机。密钥在应用里
+**想要更好的音色就换云端**：桌面版的「声音」这一段可以改选云端 **MiniMax TTS**，
+配音按量计费、画面与合成仍在本机。密钥在应用里
 「设置与反馈 → 云端配音密钥」填，保存后应用会重启本机工作台让它生效（工作台要是你自己起的，就得自己重启一次）；
 密钥只写在本机 `~/.reel-kit/config.json`（权限 0600），不进日志也不上传。
 
@@ -185,6 +192,8 @@ go tool mygo build    # 打包成 .app
 ```
 
 原生界面与网页版共用同一套本地 HTTP 接口（`src/studio/server.mjs`），数据、素材、成片都还在 `~/.reel-kit/studio/`。
+端点清单与调用示例见 [本地 HTTP 接口](docs/studio-api.md) —— 想把它接进自己的工具，
+接的是工作台本身，不是某一条命令。
 
 打包进应用的后端是发版那一刻的源码快照（`scripts/prepare-resources.sh`）。改了后端源码却没重新刷新快照，
 装出来的应用就会少功能 —— `scripts/check-bundle-freshness.mjs` 会拦住这种发版（已接进 `pnpm check`）。

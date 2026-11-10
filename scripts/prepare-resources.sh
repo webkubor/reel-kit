@@ -21,6 +21,14 @@ NODE_VERSION="22.14.0"
 CHROME_VERSION="157.0.8103.38"
 MUSEAV_VERSION="3.16.0"
 
+# 本机离线语音引擎：sherpa-onnx 的官方预编译包 + 一个中文模型。
+#
+# 随应用一起打包，用户装完就能配音 —— 不用 clone 仓库、不用装 Python、
+# 不用登录、不花钱，macOS 与 Windows 是同一套模型、同一个调用方式。
+SHERPA_VERSION="v2.0.1"
+SHERPA_MODEL="vits-zh-hf-fanchen-C"
+SHERPA_BASE="https://github.com/k2-fsa/sherpa-onnx/releases/download"
+
 case "$PLATFORM" in
   darwin-arm64)
     NODE_ARCHIVE="node-v${NODE_VERSION}-darwin-arm64.tar.gz"
@@ -28,6 +36,8 @@ case "$PLATFORM" in
     CHROME_PLATFORM="mac-arm64"
     FFMPEG_PKG="@ffmpeg-installer/darwin-arm64"; FFMPEG_VER="4.1.5"
     FFPROBE_PKG="@ffprobe-installer/darwin-arm64"; FFPROBE_VER="5.0.1"
+    SHERPA_ARCHIVE="sherpa-onnx-${SHERPA_VERSION}-osx-arm64-shared.tar.bz2"
+    SHERPA_LIB_ARCHIVE="sherpa-onnx-${SHERPA_VERSION}-osx-arm64-shared-lib.tar.bz2"
     ;;
   darwin-amd64)
     NODE_ARCHIVE="node-v${NODE_VERSION}-darwin-x64.tar.gz"
@@ -35,6 +45,8 @@ case "$PLATFORM" in
     CHROME_PLATFORM="mac-x64"
     FFMPEG_PKG="@ffmpeg-installer/darwin-x64"; FFMPEG_VER="4.1.0"
     FFPROBE_PKG="@ffprobe-installer/darwin-x64"; FFPROBE_VER="5.1.0"
+    SHERPA_ARCHIVE="sherpa-onnx-${SHERPA_VERSION}-osx-x64-shared.tar.bz2"
+    SHERPA_LIB_ARCHIVE="sherpa-onnx-${SHERPA_VERSION}-osx-x64-shared-lib.tar.bz2"
     ;;
   windows-amd64)
     NODE_ARCHIVE="node-v${NODE_VERSION}-win-x64.zip"
@@ -42,6 +54,8 @@ case "$PLATFORM" in
     CHROME_PLATFORM="win64"
     FFMPEG_PKG="@ffmpeg-installer/win32-x64"; FFMPEG_VER="4.1.0"
     FFPROBE_PKG="@ffprobe-installer/win32-x64"; FFPROBE_VER="5.1.0"
+    SHERPA_ARCHIVE="sherpa-onnx-${SHERPA_VERSION}-win-x64-shared-MD-Release.tar.bz2"
+    SHERPA_LIB_ARCHIVE="sherpa-onnx-${SHERPA_VERSION}-win-x64-shared-MD-Release-lib.tar.bz2"
     ;;
   "")
     echo "用法：bash scripts/prepare-resources.sh <darwin-arm64|darwin-amd64|windows-amd64>" >&2
@@ -175,6 +189,47 @@ exec "$here/node" "$here/../museav/node_modules/museav-cli/dist/index.js" "$@"
 EOF
   chmod +x "$out/bin/museav"
 fi
+
+# ── 本机离线语音引擎（随应用分发） ─────────────────────────
+# 装到 resources/<platform>/sherpa/：
+#   bin/   引擎二进制（Windows 上 DLL 放这里，和 exe 同目录才找得到）
+#   lib/   macOS 的动态库（运行时用 DYLD_LIBRARY_PATH 指过去）
+#   model/ 中文模型
+#
+# 后端按自己所在位置往上找三层：<resources>/backend/src/studio → <resources>/sherpa。
+sherpa_dir="$CACHE/sherpa-$PLATFORM"
+if [ ! -d "$sherpa_dir/model" ]; then
+  rm -rf "$sherpa_dir"; mkdir -p "$sherpa_dir"
+  fetch "$SHERPA_BASE/$SHERPA_VERSION/$SHERPA_ARCHIVE" "$CACHE/$SHERPA_ARCHIVE"
+  fetch "$SHERPA_BASE/$SHERPA_VERSION/$SHERPA_LIB_ARCHIVE" "$CACHE/$SHERPA_LIB_ARCHIVE"
+  tar xjf "$CACHE/$SHERPA_ARCHIVE" -C "$sherpa_dir" --strip-components=1
+  tar xjf "$CACHE/$SHERPA_LIB_ARCHIVE" -C "$sherpa_dir" --strip-components=1
+  fetch "$SHERPA_BASE/tts-models/${SHERPA_MODEL}.tar.bz2" "$CACHE/${SHERPA_MODEL}.tar.bz2"
+  mkdir -p "$sherpa_dir/model"
+  tar xjf "$CACHE/${SHERPA_MODEL}.tar.bz2" -C "$sherpa_dir/model" --strip-components=1
+fi
+rm -rf "$out/sherpa"
+mkdir -p "$out/sherpa/bin" "$out/sherpa/model"
+# 只留用得上的那一个二进制：官方包里还带着几十个识别、说话人工具，
+# 全塞进安装包会白白多出一百多兆。
+if [ -f "$sherpa_dir/bin/sherpa-onnx-offline-tts" ]; then
+  cp "$sherpa_dir/bin/sherpa-onnx-offline-tts" "$out/sherpa/bin/"
+elif [ -f "$sherpa_dir/bin/sherpa-onnx-offline-tts.exe" ]; then
+  cp "$sherpa_dir/bin/sherpa-onnx-offline-tts.exe" "$out/sherpa/bin/"
+else
+  echo "找不到 sherpa-onnx-offline-tts，引擎包没下全" >&2
+  exit 1
+fi
+cp -R "$sherpa_dir/model/." "$out/sherpa/model/"
+if [ -d "$sherpa_dir/lib" ]; then
+  mkdir -p "$out/sherpa/lib"
+  # macOS 的动态库靠 DYLD_LIBRARY_PATH 找；Windows 只认 exe 同目录。
+  find "$sherpa_dir/lib" -maxdepth 1 \( -name 'libonnxruntime*.dylib' -o -name '*.dll' \) -exec cp {} "$out/sherpa/lib/" \;
+  if [ "$PLATFORM" = "windows-amd64" ]; then
+    find "$sherpa_dir/lib" -maxdepth 1 -name '*.dll' -exec cp {} "$out/sherpa/bin/" \; 2>/dev/null || true
+  fi
+fi
+chmod +x "$out/sherpa/bin/sherpa-onnx-offline-tts" 2>/dev/null || true
 
 echo "完成：$out"
 du -sh "$out"

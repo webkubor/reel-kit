@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -174,6 +175,81 @@ func Test提交时带上选中的配音通道(t *testing.T) {
 	}
 	if submitted["persona"] != "female-shaonv" {
 		t.Errorf("提交时音色不对，实际 %v", submitted["persona"])
+	}
+}
+
+// Test默认走随应用自带的离线通道
+//
+// 「下载下来直接用」这条底线：装完应用就该能配音，
+// 不该要求用户先 clone 一个仓库、装 Python，或者先填一个云端密钥。
+// 离线通道排在最前且就绪时，它就该是默认。
+func Test默认走随应用自带的离线通道(t *testing.T) {
+	server := stubVoiceChannels(t, []map[string]any{
+		{"id": "sherpa", "label": "本机 · 离线（自带）", "ready": true,
+			"voices": []map[string]any{{"id": "zh-fanchen-c", "name": "中文女声 · 离线"}}},
+		{"id": "voxflow", "label": "VoxFlow · 本地", "ready": false, "note": "服务未启动",
+			"voices": []map[string]any{}},
+		{"id": "minimax", "label": "MiniMax TTS", "ready": false, "note": "还没配密钥",
+			"voices": []map[string]any{}},
+	})
+	a := newApp(t, server.URL)
+	a.mode = ModeTalk
+	tt := ui.NewTester(a.View, 1280, 840)
+	tt.Frame()
+	if a.talkVoice != "sherpa" {
+		t.Errorf("默认该选随应用自带的离线通道，实际 %q", a.talkVoice)
+	}
+	if a.talkPersona != "zh-fanchen-c" {
+		t.Errorf("默认音色该是离线音色，实际 %q", a.talkPersona)
+	}
+	if !tt.HasText("中文女声 · 离线") {
+		t.Errorf("离线音色没出现在界面上，实际文字：%q", tt.Texts())
+	}
+}
+
+// Test离线通道说清楚不花钱不联网
+//
+// 选了哪条通道，界面就得说清这条通道的钱和隐私成本。
+// 离线通道的说法要跟「随应用自带、离线合成」对得上。
+func Test离线通道说清楚不花钱不联网(t *testing.T) {
+	if !strings.Contains(voiceChannelHelp("sherpa"), "不产生费用") {
+		t.Errorf("离线通道的帮助文字没说清费用：%q", voiceChannelHelp("sherpa"))
+	}
+	if !strings.Contains(voiceChannelHelp("sherpa"), "不联网") {
+		t.Errorf("离线通道的帮助文字没说清隐私：%q", voiceChannelHelp("sherpa"))
+	}
+	server := stubVoiceChannels(t, []map[string]any{
+		{"id": "sherpa", "label": "本机 · 离线（自带）", "ready": true,
+			"voices": []map[string]any{{"id": "zh-fanchen-c", "name": "中文女声 · 离线"}}},
+	})
+	a := newApp(t, server.URL)
+	a.mode = ModeTalk
+	tt := ui.NewTester(a.View, 1280, 840)
+	tt.Frame()
+	if !strings.Contains(a.voicePipelineHint("sherpa"), "不产生费用") {
+		t.Errorf("流水线的配音说明没说清费用：%q", a.voicePipelineHint("sherpa"))
+	}
+}
+
+// TestVoxFlow没连上不再说配音用不了
+//
+// 以前 VoxFlow 没起来就直接说「配音、克隆自己的声音都用不了」。
+// 现在出片靠随应用自带的离线引擎，VoxFlow 只管克隆声音和设计音色 ——
+// 再说「用不了」就是把用户往一条死路上引。
+func TestVoxFlow没连上不再说配音用不了(t *testing.T) {
+	server := stubVoiceChannels(t, []map[string]any{
+		{"id": "voxflow", "label": "VoxFlow · 本地", "ready": false, "note": "服务未启动",
+			"voices": []map[string]any{}},
+	})
+	a := newApp(t, server.URL)
+	a.mode = ModeTalk
+	tt := ui.NewTester(a.View, 1280, 840)
+	tt.Frame()
+	if tt.HasText("都用不了") {
+		t.Errorf("还写着「都用不了」，实际文字：%q", tt.Texts())
+	}
+	if !tt.HasText("出片不受影响") {
+		t.Errorf("该说明 VoxFlow 缺失不影响出片，实际文字：%q", tt.Texts())
 	}
 }
 

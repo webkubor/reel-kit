@@ -66,8 +66,13 @@ func Test配音通道说明不说反话(t *testing.T) {
 	if strings.Contains(joined, "不出声") {
 		t.Errorf("界面里还有「不出声」这种把意思说反的写法：%q", texts)
 	}
-	if !strings.Contains(joined, "声音不出本机") {
-		t.Errorf("配音通道说明没写「声音不出本机」，实际文字：%q", texts)
+	if !strings.Contains(joined, "不出本机") {
+		t.Errorf("配音通道说明没写「不出本机」，实际文字：%q", texts)
+	}
+	// 通道多了以后，说明里必须还留着「不花钱」这句 ——
+	// 用户选本机通道，图的就是不花钱。
+	if !strings.Contains(joined, "不花钱") {
+		t.Errorf("配音通道说明没写「不花钱」，实际文字：%q", texts)
 	}
 }
 

@@ -40,14 +40,19 @@ func (a *App) localVoiceChannel() *studioapi.Channel {
 
 // voxflowHint 在本机语音服务没就绪时画一段能照着做的提示。
 //
+// 现在出片不再依赖 VoxFlow：随应用自带的本机离线引擎已经能配音。
+// VoxFlow 只剩两件事是它能干 —— 克隆自己的声音、设计新音色 ——
+// 所以这段提示讲的是「你可能不需要它」，而不是「没有它你用不了」。
+//
 // 服务就绪时不画任何东西 —— 正常用户不该看见这段。
 func (a *App) voxflowHint(c *ui.Context) {
 	ch := a.localVoiceChannel()
 	if ch == nil || ch.Ready {
 		return
 	}
-	a.kit.Notice(c, "本机语音服务没连上：配音、克隆自己的声音都用不了。", "error")
-	a.kit.Hint(c, "装它（第一次要下模型，5.8 GB）：\n"+voxflowInstall+
+	a.kit.Notice(c, "VoxFlow 没连上：这只影响「克隆自己的声音」和「设计音色」，出片不受影响。", "")
+	a.kit.Hint(c, "配音用随应用自带的本机离线引擎就行，Windows 也能用。\n"+
+		"只有你要克隆自己的声音或设计音色时才需要 VoxFlow（仅 macOS · Apple 芯片，要装 Python 和模型，5.8 GB）：\n"+voxflowInstall+
 		"\n\n启动它（装完每次开机起一次）：\n"+voxflowStart+
 		"\n\n服务默认就在 127.0.0.1:8866，起来后回这个窗口重试。")
 	ui.Row(c).Gap(design.SpaceSM).Children(func() {

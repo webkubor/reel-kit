@@ -255,6 +255,8 @@ func (a *App) configValue(kind, key string, input map[string]any) string {
 	case "voiceBackend", "backend":
 		key, _ := raw.(string)
 		switch key {
+		case "sherpa":
+			return "本机离线（自带）"
 		case "voxflow":
 			return "本机 VoxFlow"
 		case "minimax":

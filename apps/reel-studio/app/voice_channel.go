@@ -91,7 +91,7 @@ func (a *App) viewVoicePicker(c *ui.Context, backend *string, voiceID *string) {
 		}
 		choices = append(choices, choice{ch.ID, label})
 	}
-	a.pick(c, "配音通道", "本机推理：声音不出本机、不花钱；云端按量计费，任何机器都能用", choices, *backend, func(id string) {
+	a.pick(c, "配音通道", "本机离线：随应用自带、不联网不花钱；VoxFlow 可克隆自己的声音（仅 macOS）；云端按量计费", choices, *backend, func(id string) {
 		if id != *backend {
 			*voiceID = "" // 换通道等于换音色列表，旧音色不再有意义
 		}
@@ -128,6 +128,8 @@ func voiceChannelHelp(id string) string {
 	switch id {
 	case "minimax":
 		return "MiniMax 云端音色，按量计费；文字会发到云端"
+	case "sherpa":
+		return "本机离线音色，随应用自带；不联网、不产生费用"
 	default:
 		return "本机音色，推理不出本机、不产生模型费用"
 	}
@@ -138,10 +140,14 @@ func voiceChannelHelp(id string) string {
 // 通道能换了，这句话就不能写死「本机」——
 // 用户选了云端却看见「不产生模型费用」，那是骗人。
 func (a *App) voicePipelineHint(backend string) string {
-	if backend == "minimax" {
+	switch backend {
+	case "minimax":
 		return "逐句用 MiniMax TTS 配音（按量计费，文字发到云端），画面与合成仍在本机执行。"
+	case "sherpa":
+		return "逐句用随应用自带的本机离线引擎配音（不联网、不产生费用），画面与合成都在本机执行。"
+	default:
+		return "逐句用本机 VoxFlow 配音，画面与合成都在本机执行，不产生模型费用。"
 	}
-	return "逐句用本机 VoxFlow 配音，画面与合成都在本机执行，不产生模型费用。"
 }
 
 // voiceNameFor 按配音通道找音色的显示名。

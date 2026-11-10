@@ -121,6 +121,9 @@ func (a *App) viewModelPicker(c *ui.Context) {
 		if ch.ID == "voxflow" {
 			label = "本地音色"
 		}
+		if ch.ID == "sherpa" {
+			label = "离线音色"
+		}
 		a.pick(c, label, "", choices, a.voiceID, func(id string) { a.voiceID = id })
 	}
 	if ch.ID == "minimax" && a.providers != nil && len(a.providers.Video.Profiles) > 0 {

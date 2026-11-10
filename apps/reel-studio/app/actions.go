@@ -22,7 +22,7 @@ func (a *App) submitTalk() {
 	}
 	backend := a.talkVoice
 	if backend == "" {
-		backend = "voxflow"
+		backend = a.defaultVoiceChannel()
 	}
 	if !a.voiceChannelReady(backend) {
 		a.fail("配音通道没就绪：" + a.voiceChannelNote(backend))
@@ -130,7 +130,7 @@ func (a *App) submitProduct() {
 	}
 	backend := a.prodVoice
 	if backend == "" {
-		backend = "voxflow"
+		backend = a.defaultVoiceChannel()
 	}
 	if !a.voiceChannelReady(backend) {
 		a.fail("配音通道没就绪：" + a.voiceChannelNote(backend))

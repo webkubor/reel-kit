@@ -45,8 +45,9 @@ func stubNoLocalVoice(t *testing.T) *httptest.Server {
 
 // Test本机语音没连上时给出装法
 //
-// 桌面上没有网页可点：用户看到空的音色列表，光说「还没连上」没有用，
-// 必须告诉他去哪儿装、装完怎么启动。
+// 随应用自带的离线引擎兜住了出片，VoxFlow 变成可选（用于克隆声音与设计音色）。
+// 提示要告诉用户：没连上不影响出片，只有需要克隆声音时才去装；
+// 装与起的命令依然摆出来，点复制就能走。
 func Test本机语音没连上时给出装法(t *testing.T) {
 	server := stubNoLocalVoice(t)
 	a := newApp(t, server.URL)
@@ -54,7 +55,7 @@ func Test本机语音没连上时给出装法(t *testing.T) {
 	tt := ui.NewTester(a.View, 1280, 840)
 	tt.Frame()
 	for _, want := range []string{
-		"本机语音服务没连上",
+		"出片不受影响",
 		"install.sh",
 		"voice web",
 		"复制安装命令",

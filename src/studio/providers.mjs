@@ -4,6 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { command, commandFull, available, jsonFetch, download, probeBytes } from './process.mjs'
+import { sherpaEngine, sherpaSynthesize } from './sherpa.mjs'
 
 const H3_BASE = 'https://api.minimaxi.com'
 const MINIMAX_TTS_URL = 'https://api.minimaxi.com/v1/t2a_v2'
@@ -470,6 +471,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
       const customVideoChannels = custom.filter(c => c.kind === 'video')
       const customImageChannels = custom.filter(c => c.kind === 'image')
       const voiceLocalReady = Boolean(voice?.[0]?.base_model)
+      const sherpa = sherpaEngine()
 
       const channel = (id, label, ready, note, extra = {}) => ({ id, label, ready, note, models: [], voices: [], allowCustomModel: false, allowCustomVoice: false, ...extra })
 
@@ -510,20 +512,27 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
           ],
         },
         voice: {
-          ready: voiceLocalReady || minimaxReady,
+          ready: Boolean(sherpa) || voiceLocalReady || minimaxReady,
           label: '语音生成',
-          note: voiceLocalReady
-            ? '本地模型已就绪；云端通道按量计费'
-            : voice
-              ? '服务在线，Base 模型未就绪'
-              : minimaxReady
-                ? '本机语音服务没连上；云端配音可以用'
-                : '本机语音服务没连上，云端配音也还没配密钥：到「设置与反馈 → 云端配音密钥」填一个，或启动 VoxFlow 服务后刷新',
+          note: sherpa
+            ? '本机离线语音已随应用自带：不用装东西、不用登录、不花钱，声音不出本机'
+            : voiceLocalReady
+              ? '本地模型已就绪；云端通道按量计费'
+              : voice
+                ? '服务在线，Base 模型未就绪'
+                : minimaxReady
+                  ? '本机语音服务没连上；云端配音可以用'
+                  : '本机语音服务没连上，云端配音也还没配密钥：到「设置与反馈 → 云端配音密钥」填一个，或启动 VoxFlow 服务后刷新',
           designReady: Boolean(voice?.[0]?.design_model),
           recordingReady: Boolean(voice?.[1]?.capabilities?.reference_text_registration),
           version: voice?.[1]?.version || 'unknown',
           personas,
           channels: [
+            channel('sherpa', '本机 · 离线（自带）', Boolean(sherpa), sherpa
+              ? '随应用一起打包，装完就能用；离线合成，不产生费用'
+              : '没找到随应用分发的本机语音引擎，请重新安装应用', {
+              voices: [{ id: 'zh-fanchen-c', name: '中文女声 · 离线' }],
+            }),
             channel('voxflow', 'VoxFlow · 本地', voiceLocalReady, voiceLocalReady
               ? '本地模型已就绪，本地推理不产生模型费用'
               : voice
@@ -681,7 +690,19 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
       }
 
       if (['speech', 'clone', 'voice-design'].includes(input.kind)) {
-        const channelId = input.backend || 'voxflow'
+        const channelId = input.backend || (sherpaEngine() ? 'sherpa' : 'voxflow')
+        if (channelId === 'sherpa') {
+          if (input.kind !== 'speech') throw new Error('本机离线通道只做文字配音；录音克隆与音色设计要用 VoxFlow（macOS）')
+          const engine = sherpaEngine()
+          if (!engine) throw new Error('本机语音引擎没找到，请重新安装应用')
+          const bytes = await sherpaSynthesize({ text: input.prompt, engine, onProgress: progress })
+          const probe = await probeBytes('voice.wav', bytes)
+          return store.addAsset(input.projectId, `配音 · ${input.prompt.slice(0, 16)}.wav`, 'audio/wav', bytes, {
+            source: '本机离线语音', origin: 'ai', engine: 'sherpa-onnx · 中文离线模型', voiceBackend: 'sherpa',
+            prompt: input.prompt, persona: input.voiceId || '', tone: '', voiceName: input.voiceName || '',
+            requestedModel: 'sherpa-vits-zh', actualModel: 'unknown', ...probe,
+          })
+        }
         if (channelId === 'minimax') {
           if (input.kind !== 'speech') throw new Error('MiniMax TTS 只支持文字配音；录音克隆与音色设计请用本地 VoxFlow')
           const profile = profiles.find(p => p.id === (input.profile || 'primary'))
