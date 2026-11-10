@@ -69,35 +69,30 @@
       </div>
     </div>
     <div class="studio-download">
-      <a class="install" href="https://github.com/webkubor/reel-kit/releases/download/app-v1.1.3/reel-studio-1.1.3-darwin-arm64.tar.gz">下载 macOS（Apple Silicon）</a>
-      <a class="install secondary" href="https://github.com/webkubor/reel-kit/releases/download/app-v1.1.3/reel-studio-1.1.3-windows-amd64.tar.gz">下载 Windows（x64，219 MB）</a>
+      <a class="install" href="https://github.com/webkubor/reel-kit/releases/download/app-v1.2.0/reel-studio-1.2.0-darwin-arm64.tar.gz">下载 macOS（Apple Silicon）</a>
+      <a class="install secondary" href="https://github.com/webkubor/reel-kit/releases/download/app-v1.2.0/reel-studio-1.2.0-windows-amd64.tar.gz">下载 Windows（x64，347 MB）</a>
       <p class="studio-meta">
-        v1.1.3 · macOS 169 MB / Windows 219 MB ·
-        <a href="https://github.com/webkubor/reel-kit/releases/tag/app-v1.1.3">发布页与校验值</a> ·
+        v1.2.0 · macOS 289 MB / Windows 347 MB ·
+        <a href="https://github.com/webkubor/reel-kit/releases/tag/app-v1.2.0">发布页与校验值</a> ·
         <a href="https://github.com/webkubor/reel-kit/releases/latest">历史版本</a>
       </p>
     </div>
     <div class="studio-firstrun">
-      <h3>第一次用，多做一件事：装本机语音服务</h3>
+      <h3>第一次用，不用再装任何东西</h3>
       <p>
-        配音用的是你自己电脑上的
+        配音引擎随应用一起打包，下载解压就能出声：<strong>不联网、不产生费用、
+        声音不出本机</strong>。macOS 与 Windows 是同一套模型、同一个调用方式。
+      </p>
+      <p class="studio-meta">
+        只有「克隆自己的声音」和「设计音色」这两件事需要
         <a href="https://github.com/webkubor/voxflow" target="_blank" rel="noopener">VoxFlow</a>
-        （Apple Silicon，本机推理，不产生模型费用），所以它要单独装一次、
-        每次开机起一次：
-      </p>
-      <pre><code>git clone https://github.com/webkubor/voxflow.git &amp;&amp; cd voxflow
-chmod +x install.sh &amp;&amp; ./install.sh --yes
-source .venv/bin/activate &amp;&amp; voice web</code></pre>
-      <p class="studio-meta">
-        忘了起也没关系：应用里会直接把这两条命令摆出来，点一下就能复制。
-        图片生成另需登录 MuseAV 中台，视频生成走 MiniMax 额度，两项都在
-        「设置与反馈」里能看到当前状态。
+        （Apple 芯片的 Mac，本机推理）。它是可选的 —— 装不装都不影响出片，
+        也不影响自带引擎配音。
       </p>
       <p class="studio-meta">
-        <strong>Windows 用户：</strong>VoxFlow 只在 Apple 芯片的 Mac 上跑得起来，
-        Windows 上的配音走云端 MiniMax TTS —— 在「设置与反馈 → 云端配音密钥」里
-        填一个 MiniMax API Key，保存后应用会重启本机工作台让它生效（工作台要是你自己起的，就得自己重启一次）。
-        配音按量计费，画面与合成仍然全在本机。
+        图片与视频默认走 MuseAV 中台与 MiniMax；也可以在「设置与反馈 → 模型通道」里
+        填上你自己的中转站或厂商直连 —— 在设置页填一次就行，不用改配置文件，
+        密钥也不会出现在界面里。
       </p>
     </div>
   </section>
