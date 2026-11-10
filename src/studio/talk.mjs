@@ -18,6 +18,7 @@ import { command, redact } from './process.mjs'
 import { renderFrames } from '../render.mjs'
 import { compose, probeDuration } from '../compose.mjs'
 import { getStyle } from '../knowledge-styles.mjs'
+import { resolveSettings } from '../settings.mjs'
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
@@ -99,7 +100,8 @@ export async function makeTalkVideo(input, store, backend, progress, report = ()
       voiceClips.push({ file: meta._file, duration: meta._duration })
     }
 
-    const pause = Number.isFinite(Number(input.pause)) ? Math.max(0, Math.min(2, Number(input.pause))) : 0.45
+    const settings = resolveSettings('talk', input)
+    const pause = settings.pause
     const durations = voiceClips.map(v => v.duration + pause)
 
     progress('正在渲染画面帧…')
@@ -120,9 +122,14 @@ export async function makeTalkVideo(input, store, backend, progress, report = ()
     progress('正在合成成片…')
     const out = join(temp, 'talk.mp4')
     const bgm = input.bgmId ? store.asset(input.bgmId, input.projectId) : undefined
-    const bgmGain = Number.isFinite(Number(input.bgmGain)) ? Math.max(0, Math.min(1, Number(input.bgmGain))) : 0.12
+    const bgmGain = settings.bgmGain
     const { _duration: outputDuration } = await step({ id: 'compose', label: '合成成片', origin: 'code', engine: 'ffmpeg 合成', detail: `${bgm ? `BGM《${bgm.name}》音量 ${Math.round(bgmGain * 100)}% · ` : '无 BGM · '}${WIDTH}×${HEIGHT}` }, async () => {
-      await compose({ frames, durations, voiceClips, bgm: bgm && store.path(bgm), bgmGain, bgmCrossfade: 0, out })
+      await compose({
+        frames, durations, voiceClips, bgm: bgm && store.path(bgm),
+        bgmGain, bgmCrossfade: 0,
+        voiceGain: settings.voiceGain, duck: settings.duck, normalize: settings.normalize,
+        out,
+      })
       return { _duration: await probeDuration(out) }
     })
 

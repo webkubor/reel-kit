@@ -13,6 +13,7 @@ import { makeTalkVideo, TALK_TEMPLATES } from './talk.mjs'
 import { makeProductVideo, PRODUCT_LAYOUTS } from './product.mjs'
 import { KNOWLEDGE_STYLES } from '../knowledge-styles.mjs'
 import { recommendationSettings } from './video-settings.mjs'
+import { PRESETS } from '../settings.mjs'
 import { listBgm, resolveBgmEntry, bgmConfigured } from '../bgm-library.mjs'
 import { initializeWorkflow, snapshotSop, workflowAction, remakeProject } from './workflow.mjs'
 import { limitsFor, saveLimits } from './platform-limits.mjs'
@@ -51,7 +52,7 @@ function json(res, code, value) { res.writeHead(code, { 'content-type': 'applica
 function validate(input, store) {
   store.project(input.projectId)
   if (!['image', 'video', 'speech', 'clone', 'voice-design', 'export', 'recommendation', 'talk', 'product'].includes(input.kind)) fail('任务类型不支持')
-  const allowed = ['kind', 'projectId', 'prompt', 'ratio', 'duration', 'resolution', 'assetIds', 'audioId', 'referenceId', 'persona', 'referenceText', 'voiceName', 'template', 'captions', 'title', 'profile', 'repoUrl', 'voiceIds', 'platform', 'voiceSource', 'tone', 'emotion', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit', 'backend', 'model', 'voiceId', 'style', 'voiceBackend', 'voiceModel', 'subtitle', 'source', 'footer']
+  const allowed = ['kind', 'projectId', 'prompt', 'ratio', 'duration', 'resolution', 'assetIds', 'audioId', 'referenceId', 'persona', 'referenceText', 'voiceName', 'template', 'captions', 'title', 'profile', 'repoUrl', 'voiceIds', 'platform', 'voiceSource', 'tone', 'emotion', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit', 'backend', 'model', 'voiceId', 'style', 'voiceBackend', 'voiceModel', 'subtitle', 'source', 'footer', 'preset', 'voiceGain', 'duck', 'normalize']
   const value = Object.fromEntries(allowed.filter(k => input[k] !== undefined).map(k => [k, input[k]]))
   if (typeof value.prompt !== 'string' || !value.prompt.trim() || value.prompt.length > 10000) {
     if (!['export', 'recommendation', 'talk', 'product'].includes(value.kind)) fail('请输入 1–10000 字的提示词或配音文字')
@@ -79,6 +80,19 @@ function validate(input, store) {
   value.assetIds.forEach(assetId => store.asset(assetId, value.projectId))
   for (const key of ['referenceId', 'audioId', 'bgmId', 'narrationId']) if (value[key]) store.asset(value[key], value.projectId)
   for (const key of ['persona', 'referenceText', 'voiceName', 'captions', 'title', 'profile', 'tone', 'emotion', 'style', 'subtitle', 'source', 'footer', 'voiceBackend', 'voiceModel']) if (value[key] !== undefined && (typeof value[key] !== 'string' || value[key].length > 10000)) fail(`${key} 格式无效`)
+  // 预设与声音三档：范围写在这里，越界直接报错，别让人填了 5 倍人声音量才发现。
+  if (value.preset !== undefined) {
+    if (!PRESETS[value.preset]) fail(`没有这个预设：${value.preset}。可选：${Object.keys(PRESETS).join(' / ')}`)
+  }
+  if (value.voiceGain !== undefined) {
+    const gain = Number(value.voiceGain)
+    if (!Number.isFinite(gain) || gain < 0.4 || gain > 3) fail('人声音量须为 0.4–3 倍')
+    value.voiceGain = gain
+  }
+  for (const key of ['duck', 'normalize']) {
+    if (value[key] === undefined) continue
+    if (typeof value[key] !== 'boolean') fail(`${key} 只能是开或关`)
+  }
   if (value.kind === 'voice-design' && (!value.voiceName?.trim() || value.voiceName.length > 80 || !value.tone?.trim() || value.tone.length > 500 || value.prompt.length > 45)) fail('新音色需要名称、声音描述和不超过 45 字的试听文字')
   if (value.kind === 'recommendation') {
     githubRepo(value.repoUrl)

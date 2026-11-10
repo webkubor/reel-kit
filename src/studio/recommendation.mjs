@@ -127,7 +127,12 @@ export async function makeRecommendation(input, store, backend, progress, report
     const out = join(temp, 'recommendation.mp4')
     const bgm = input.bgmId ? store.asset(input.bgmId, input.projectId) : undefined
     const { _duration: outputDuration } = await step({ id: 'compose', label: '合成成片', origin: 'code', engine: 'ffmpeg 合成', detail: `${bgm ? `BGM《${bgm.name}》音量 ${Math.round(settings.bgmGain * 100)}% · ` : '无 BGM · '}${settings.width}×${settings.height}` }, async () => {
-      await compose({ frames, durations, voiceClips, bgm: bgm && store.path(bgm), bgmGain: settings.bgmGain, bgmCrossfade: 0, out })
+      await compose({
+        frames, durations, voiceClips, bgm: bgm && store.path(bgm),
+        bgmGain: settings.bgmGain, bgmCrossfade: 0,
+        voiceGain: settings.voiceGain, duck: settings.duck, normalize: settings.normalize,
+        out,
+      })
       const result = await command('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', out])
       const probe = JSON.parse(result), video = probe.streams?.find(s => s.codec_type === 'video')
       if (!probe.streams?.some(s => s.codec_type === 'audio') || !(Number(probe.format?.duration) > 1) || video?.width !== settings.width || video?.height !== settings.height) throw new Error('导出文件的画幅、音轨或时长校验失败')
