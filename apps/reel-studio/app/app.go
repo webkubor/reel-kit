@@ -829,7 +829,7 @@ func (a *App) viewSettingsAndFeedback(c *ui.Context) {
 					}
 					exportDiag := kitButton(a.kit, c, kit.ButtonSecondary, "导出排障报告", false)
 					if exportDiag.Clicked() {
-						go a.ExportDiagnostics()
+						a.ExportDiagnostics()
 					}
 				})
 				if tail := a.BackendLogTail(8); tail != "" {

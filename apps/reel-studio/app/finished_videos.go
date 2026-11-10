@@ -66,9 +66,6 @@ func (a *App) saveFinishedVideo(asset studioapi.Asset) {
 	if path == "" {
 		return
 	}
-	if !strings.HasSuffix(strings.ToLower(path), ".mp4") {
-		path += ".mp4"
-	}
 	client := &http.Client{Timeout: 10 * time.Minute}
 	res, err := client.Get(strings.TrimRight(a.opts.BaseURL, "/") + "/media/" + url.PathEscape(asset.ID) + "?download=1")
 	if err != nil {

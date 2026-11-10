@@ -78,7 +78,7 @@ func (a *App) DiagnosticReport() string {
 			fmt.Fprintf(&b, "任务 %s｜流水线 %s｜状态 %s｜时间 %s\n",
 				j.ID, jobKind(j), j.Status, jobCreatedAt(j))
 			if j.Message != "" {
-				fmt.Fprintf(&b, "    提示：%s\n", truncateRunes(j.Message, 300))
+				fmt.Fprintf(&b, "    提示：%s\n", truncateRunes(redactDiagnostic(j.Message), 300))
 			}
 			if j.Error != "" {
 				fmt.Fprintf(&b, "    报错：%s\n", truncateRunes(redactDiagnostic(j.Error), 800))
@@ -116,7 +116,7 @@ func (a *App) DiagnosticReport() string {
 		fmt.Fprintf(&b, "\n--- 桌面端界面近期日志（末尾 25 行）---\n%s\n", tail)
 	}
 
-	fmt.Fprintf(&b, "\n（以上内容已自动脱敏：密钥、令牌、签名 URL 与用户名路径均已遮盖）\n")
+	fmt.Fprintf(&b, "\n（已尝试遮盖常见凭据和用户名；日志可能仍包含私密内容，分享前请检查。）\n")
 	return b.String()
 }
 
@@ -190,9 +190,6 @@ func (a *App) ExportDiagnostics() {
 	}
 	if path == "" {
 		return
-	}
-	if !strings.HasSuffix(strings.ToLower(path), ".txt") {
-		path += ".txt"
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		a.feedback.submitted = "导出失败：" + err.Error()

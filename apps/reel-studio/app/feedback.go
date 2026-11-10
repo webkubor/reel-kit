@@ -161,7 +161,7 @@ func (a *App) viewFeedback(c *ui.Context) {
 		a.kit.Field(c, "详情", "发生了什么、期望是什么", func() {
 			a.kit.TextArea(c, &a.feedback.detail, "尽量写清楚复现步骤", 96)
 		})
-		a.kit.Field(c, "诊断信息", "勾上会把版本、系统、失败任务的报错原文与最近排障日志（已自动脱敏）一并带上，省去来回索要日志", func() {
+		a.kit.Field(c, "诊断信息", "包含失败任务和近期日志；会尝试遮盖常见凭据，分享前请检查私人信息", func() {
 			a.kit.Checkbox(c, &a.feedback.include, "附上诊断信息与排障日志")
 		})
 		ui.Row(c).Gap(design.SpaceSM).Children(func() {
@@ -175,7 +175,7 @@ func (a *App) viewFeedback(c *ui.Context) {
 			}
 			exportDiag := kitButton(a.kit, c, kit.ButtonSecondary, "导出排障报告", false)
 			if exportDiag.Clicked() {
-				go a.ExportDiagnostics()
+				a.ExportDiagnostics()
 			}
 		})
 		if a.feedback.submitted != "" {
