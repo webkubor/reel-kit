@@ -3,14 +3,17 @@
 #
 #   scripts/publish-desktop-release.sh app-v0.2.3 --notes /tmp/notes.md
 #   scripts/publish-desktop-release.sh app-v0.2.3 --dry-run    # 只检查不发布
+#   scripts/publish-desktop-release.sh app-v1.5.0 --platform darwin/arm64 --carry windows/amd64
 #
-# 它替你做四件容易漏的事：
+# 它替你做五件容易漏的事：
 #   1. 版本与 tag 对不上就停：tag 必须是 mygo.json 里版本号加 tagPrefix，
 #      清单里的版本号也必须等于当前版本（旧构建留下的清单不许混进去）。
 #   2. 按清单把该发的归档找齐，缺一个就停，并验一遍每个归档的 Ed25519 签名。
 #   3. 同一个产物只发一次：清单点名的东西不再被后面的通配符重复收集。
 #   4. 把所有产物的校验和写进 SHA256SUMS，文件名用发布页上的扁平名字，
 #      用户下完就能 shasum -c 验。
+#   5. --platform 只发部分平台、--carry 沿用其他平台已发布的清单：
+#      只发 macOS 时，Windows 用户仍能在新发布页上查到自己的更新清单。
 #
 # 需要：gh 已登录；签名私钥在发版那一步用 kyvault 注入（见 README）。
 set -euo pipefail
@@ -23,6 +26,8 @@ tag="${1:-}"
 notes=""
 skip_build=""
 dry_run=""
+platforms=""
+carried=""
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--notes)
@@ -37,13 +42,21 @@ while [ $# -gt 0 ]; do
 		dry_run=1
 		shift
 		;;
+	--platform)
+		platforms="$platforms $2"
+		shift 2
+		;;
+	--carry)
+		carried="$carried $2"
+		shift 2
+		;;
 	*)
 		shift
 		;;
 	esac
 done
 [ -n "$tag" ] || {
-	echo "用法: scripts/publish-desktop-release.sh <tag> [--notes 文件] [--skip-build] [--dry-run]" >&2
+	echo "用法: scripts/publish-desktop-release.sh <tag> [--notes 文件] [--skip-build] [--platform 目标] [--carry 目标] [--dry-run]" >&2
 	exit 2
 }
 
@@ -61,18 +74,33 @@ fi
 
 if [ -z "$skip_build" ]; then
 	echo "== 构建 $version"
-	kyvault run --env MYGO_UPDATER_PRIVATE_KEY=secret://mygo/reel-studio-update-key -- \
-		env GOTOOLCHAIN=go1.27.3 "$(command -v mygo || echo "$HOME/go/bin/mygo")" build
-	kyvault run --env MYGO_UPDATER_PRIVATE_KEY=secret://mygo/reel-studio-update-key -- \
-		env GOTOOLCHAIN=go1.27.3 "$(command -v mygo || echo "$HOME/go/bin/mygo")" build -platform windows/amd64 -skip-installer
+	if [ -n "$platforms" ]; then
+		# 只发哪个平台就只构建哪个平台：别为了发 macOS 再构建一遍 Windows。
+		for p in $platforms; do
+			kyvault run --env MYGO_UPDATER_PRIVATE_KEY=secret://mygo/reel-studio-update-key -- \
+				env GOTOOLCHAIN=go1.27.3 "$(command -v mygo || echo "$HOME/go/bin/mygo")" build -platform "$p"
+		done
+	else
+		kyvault run --env MYGO_UPDATER_PRIVATE_KEY=secret://mygo/reel-studio-update-key -- \
+			env GOTOOLCHAIN=go1.27.3 "$(command -v mygo || echo "$HOME/go/bin/mygo")" build
+		kyvault run --env MYGO_UPDATER_PRIVATE_KEY=secret://mygo/reel-studio-update-key -- \
+			env GOTOOLCHAIN=go1.27.3 "$(command -v mygo || echo "$HOME/go/bin/mygo")" build -platform windows/amd64 -skip-installer
+	fi
 fi
 
 # 收集产物：名字（发布页上的名字）、本地路径、签名（清单里才有）。
 # 只认带清单的构建目录，清单版本必须等于当前版本。
-python3 - "$version" >/tmp/reel-studio-assets.tsv <<'PY'
+#
+# --platform 只发部分平台时用：没点名的平台目录整目录跳过（连它的清单也不带），
+#   点名的平台仍然要求版本等于当前版本 —— 「旧构建混进来」这道防线不因为只发一个平台就失效。
+# --carry 沿用某个平台已发布的清单，原样带上，不改内容：只发 macOS 时，
+#   Windows 用户要能在新发布页上查到自己的清单，否则他们的「检查更新」会变成 404 报错。
+python3 - "$version" "$platforms" "$carried" >/tmp/reel-studio-assets.tsv <<'PY'
 import glob, json, os, sys
 
 version = sys.argv[1]
+wanted = {t.strip().replace("/", "-") for t in sys.argv[2].split() if t.strip()}
+carried = {t.strip().replace("/", "-") for t in sys.argv[3].split() if t.strip()}
 rows = []
 seen = {}
 
@@ -90,8 +118,17 @@ def add(name, path, sig=""):
 for d in sorted(glob.glob("build/*")):
     if not os.path.isdir(d):
         continue
-    manifest = os.path.join(d, "update-%s.json" % os.path.basename(d))
+    target = os.path.basename(d)
+    manifest = os.path.join(d, "update-%s.json" % target)
     if not os.path.isfile(manifest):
+        continue
+    if target in carried:
+        # 沿用旧清单：内容一个字都不改，它指向的归档在旧发布页上仍然有效。
+        print("沿用 %s 的旧清单（本次不发布这个平台的安装包）" % target, file=sys.stderr)
+        add(os.path.basename(manifest), manifest)
+        continue
+    if wanted and target not in wanted:
+        print("跳过 %s：本次只发 %s" % (target, "、".join(sorted(wanted))), file=sys.stderr)
         continue
     m = json.load(open(manifest))
     if m.get("version") != version:

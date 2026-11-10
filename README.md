@@ -46,7 +46,7 @@
 
 ## 下载
 
-macOS 当前版本 **v1.5.0**（2026-11-11 发布）。[发布页与历史版本](https://github.com/webkubor/reel-kit/releases/tag/app-v1.5.0) · [官网](https://webkubor.github.io/reel-kit/)
+macOS 当前版本 **v1.5.0**（2026-11-10 发布）。[发布页与历史版本](https://github.com/webkubor/reel-kit/releases/tag/app-v1.5.0) · [官网](https://webkubor.github.io/reel-kit/)
 
 | 平台 | 下载 | 大小 | 装完在哪 |
 |---|---|---|---|

@@ -47,7 +47,7 @@
 
 ## Download
 
-macOS current version **v1.5.0** (released 2026-11-11). [Releases & checksums](https://github.com/webkubor/reel-kit/releases/tag/app-v1.5.0) · [Website](https://webkubor.github.io/reel-kit/)
+macOS current version **v1.5.0** (released 2026-11-10). [Releases & checksums](https://github.com/webkubor/reel-kit/releases/tag/app-v1.5.0) · [Website](https://webkubor.github.io/reel-kit/)
 
 | Platform | Download | Size | Where it lands |
 |---|---|---|---|

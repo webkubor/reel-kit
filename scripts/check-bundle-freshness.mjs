@@ -20,12 +20,17 @@ const platforms = ['darwin-arm64', 'darwin-amd64', 'windows-amd64']
 // 仓库里的哪些文件会进包，以及它们在包里对应的位置。
 const pairs = []
 const add = (repoPath, bundlePath) => pairs.push([repoPath, bundlePath])
-for (const name of readdirSync(join(root, 'src/studio'))) {
-  if (name.endsWith('.mjs')) add(join('src/studio', name), join('src/studio', name))
+// src/ 下其余的 .mjs（motion.mjs、edge-tts.mjs、vendor/ 里的打包件…）也进包，
+// 这里一次性扫全：手写名单一落伍，新文件就会静默地不进包 ——
+// 本地跑源码一切正常，装上安装包的用户却拿到旧后端。
+const walk = dir => {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) walk(full)
+    else if (/\.(mjs|cjs)$/.test(entry.name)) add(relative(root, full), relative(root, full))
+  }
 }
-for (const name of ['render.mjs', 'compose.mjs', 'voice.mjs', 'bgm-library.mjs', 'knowledge-styles.mjs', 'audio-mix.mjs', 'settings.mjs']) {
-  if (existsSync(join(root, 'src', name))) add(join('src', name), join('src', name))
-}
+walk(join(root, 'src'))
 for (const name of readdirSync(join(root, 'templates'))) {
   if (name.endsWith('.html')) add(join('templates', name), join('templates', name))
 }
