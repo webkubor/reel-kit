@@ -185,6 +185,8 @@ xattr -dr com.apple.quarantine "/Applications/Reel Studio.app"
 Windows（x64，未做代码签名，首次运行被 SmartScreen 拦一下选「仍要运行」）：下载
 `reel-studio-1.2.0-windows-amd64.tar.gz` 解压，把 `Reel Studio.exe` 和它旁边的
 `backend/` `bin/` `chrome/` `museav/` `sherpa/` 资源目录保持在同一层目录再双击。
+- **双击闪退无反应**：在资源管理器地址栏输入 `%TEMP%`，查看 `reel-studio-crash.log`，里面记了完整崩溃调用栈；
+- **任务失败或工作台连不上**：在应用内「设置与反馈」点击「复制完整诊断与近期日志」，或点「打开工作台日志」（对应 `%TEMP%\reel-studio-backend.log`），所有 Node/FFmpeg/离线语音错误都在里面。
 
 **装完就能配音**：文字配音用随应用自带的本机离线引擎（sherpa-onnx + 中文模型），
 不联网、不产生费用，macOS 与 Windows 同一套，也不用装 Python、clone 仓库或登录账号。

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -46,18 +45,19 @@ const (
 	feedbackLabel = "app-feedback"
 )
 
-// Diagnostics 收集排障需要的环境信息。
+// Diagnostics 收集排障需要的环境信息与最近报错日志。
 //
-// 只放版本、平台与连接状态，绝不放密钥、素材路径与用户内容。
+// 自动带上系统版本、通道连接状态，以及工作台与桌面端最近的日志片段，
+// 并自动对 API 密钥等敏感字段进行脱敏，绝不包含用户私有素材路径与密钥明文。
 func (a *App) Diagnostics() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "版本：%s\n", mygo.App.Version())
 	fmt.Fprintf(&b, "系统：%s/%s\n", runtime.GOOS, runtime.GOARCH)
 	fmt.Fprintf(&b, "Go：%s\n", runtime.Version())
 	fmt.Fprintf(&b, "时间：%s\n", time.Now().Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(&b, "后端：%s\n", a.backendState.State)
+	fmt.Fprintf(&b, "工作台状态：%s\n", a.backendState.State)
 	if a.backendState.Note != "" {
-		fmt.Fprintf(&b, "后端说明：%s\n", a.backendState.Note)
+		fmt.Fprintf(&b, "工作台说明：%s\n", a.backendState.Note)
 	}
 	if a.providers != nil {
 		fmt.Fprintf(&b, "视频通道就绪：%t\n", a.providers.Video.Ready)
@@ -65,8 +65,25 @@ func (a *App) Diagnostics() string {
 		fmt.Fprintf(&b, "配音通道就绪：%t\n", a.providers.Voice.Ready)
 	}
 	if path := a.LogFilePath(); path != "" {
-		fmt.Fprintf(&b, "日志文件：%s\n", filepath.Base(path))
+		fmt.Fprintf(&b, "桌面端日志文件：%s\n", path)
 	}
+	backendPath := BackendLogPath()
+	fmt.Fprintf(&b, "工作台日志文件：%s\n", backendPath)
+
+	// 1. 本地工作台与引擎日志（Node / FFmpeg / 离线语音等所有真实错误都在这里）
+	backendTail := sanitizeDiagnosticLog(readTail(backendPath, 35))
+	if strings.TrimSpace(backendTail) != "" {
+		fmt.Fprintf(&b, "\n--- 工作台与引擎近期日志（末尾 35 行）---\n%s\n", backendTail)
+	} else {
+		fmt.Fprintf(&b, "\n--- 工作台与引擎近期日志：文件暂未生成或为空 ---\n")
+	}
+
+	// 2. 桌面端应用日志
+	appTail := sanitizeDiagnosticLog(readTail(a.LogFilePath(), 20))
+	if strings.TrimSpace(appTail) != "" {
+		fmt.Fprintf(&b, "\n--- 桌面端界面近期日志（末尾 20 行）---\n%s\n", appTail)
+	}
+
 	return b.String()
 }
 
@@ -177,8 +194,8 @@ func (a *App) viewFeedback(c *ui.Context) {
 		a.kit.Field(c, "详情", "发生了什么、期望是什么", func() {
 			a.kit.TextArea(c, &a.feedback.detail, "尽量写清楚复现步骤", 96)
 		})
-		a.kit.Field(c, "诊断信息", "勾上会把版本、系统与通道状态一起带上（不含密钥与素材路径）", func() {
-			a.kit.Checkbox(c, &a.feedback.include, "附上诊断信息")
+		a.kit.Field(c, "诊断信息", "勾上会把版本、系统与最近排障日志（已自动脱敏）一并带上，省去来回索要日志", func() {
+			a.kit.Checkbox(c, &a.feedback.include, "附上诊断信息与排障日志")
 		})
 		ui.Row(c).Gap(design.SpaceSM).Children(func() {
 			submit := kitButton(a.kit, c, kit.ButtonPrimary, "准备反馈并打开 Issue", a.feedback.title == "")
@@ -196,9 +213,8 @@ func (a *App) viewFeedback(c *ui.Context) {
 	})
 }
 
-// logTail 读日志末尾若干行，给「打开日志」旁边的预览用。
-func (a *App) logTail(lines int) string {
-	path := a.LogFilePath()
+// readTail 读指定文件末尾若干行。
+func readTail(path string, lines int) string {
 	if path == "" {
 		return ""
 	}
@@ -211,7 +227,7 @@ func (a *App) logTail(lines int) string {
 	if err != nil || info.Size() == 0 {
 		return ""
 	}
-	const maxRead = 32 * 1024
+	const maxRead = 64 * 1024
 	offset := int64(0)
 	size := info.Size()
 	if size > maxRead {
@@ -227,4 +243,34 @@ func (a *App) logTail(lines int) string {
 		all = all[len(all)-lines:]
 	}
 	return strings.Join(all, "\n")
+}
+
+// sanitizeDiagnosticLog 对诊断日志进行脱敏处理，遮蔽包含密钥、令牌的行。
+func sanitizeDiagnosticLog(s string) string {
+	if s == "" {
+		return ""
+	}
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "bearer ") ||
+			strings.Contains(lower, "authorization:") ||
+			strings.Contains(lower, "api-key") ||
+			strings.Contains(lower, "apikey") ||
+			strings.Contains(lower, "channelkeys") ||
+			strings.Contains(lower, "sk-") {
+			lines[i] = "[脱敏处理：该行含敏感凭据信息已自动遮盖]"
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// logTail 读桌面端日志末尾若干行，给界面预览用。
+func (a *App) logTail(lines int) string {
+	return readTail(a.LogFilePath(), lines)
+}
+
+// BackendLogTail 读工作台日志末尾若干行，给界面预览用。
+func (a *App) BackendLogTail(lines int) string {
+	return readTail(BackendLogPath(), lines)
 }

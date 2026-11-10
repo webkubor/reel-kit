@@ -781,19 +781,43 @@ func (a *App) viewSettingsAndFeedback(c *ui.Context) {
 			a.viewChannels(c)
 
 			// 4. 运行日志
-			a.kit.SectionTitle(c, "运行日志", "查看本地排障日志与文件位置", nil)
+			a.kit.SectionTitle(c, "运行日志", "查看本地排障日志；遇到问题时复制诊断信息即可快速定位", nil)
 			a.kit.Card(c, func() {
+				// 4.1 本地工作台与引擎日志（Node/FFmpeg/离线语音/生成）
+				ui.Text(c, "本地工作台日志（Node/FFmpeg/离线语音/生成报错）：").FontSize(design.FontBody).Bold().TextColor(a.kit.T.Ink)
+				backendLog := BackendLogPath()
+				ui.Text(c, backendLog).FontSize(design.FontSmall).TextColor(a.kit.T.Muted)
+				ui.Row(c).Gap(design.SpaceSM).Children(func() {
+					openBackend := kitButton(a.kit, c, kit.ButtonSecondary, "打开工作台日志", false)
+					if openBackend.Clicked() {
+						revealPath(backendLog)
+					}
+					copyDiag := kitButton(a.kit, c, kit.ButtonPrimary, "复制完整诊断与近期日志", false)
+					if copyDiag.Clicked() {
+						a.CopyDiagnostics()
+					}
+				})
+				if tail := a.BackendLogTail(8); tail != "" {
+					a.kit.Field(c, "工作台近期记录（最后 8 行）", "", func() {
+						ui.Text(c, tail).FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
+					})
+				}
+
+				a.kit.Divider(c)
+
+				// 4.2 桌面端界面日志
+				ui.Text(c, "桌面端界面日志（窗口与界面状态）：").FontSize(design.FontBody).Bold().TextColor(a.kit.T.Ink)
 				if path := a.LogFilePath(); path != "" {
-					ui.Text(c, "日志文件路径："+path).FontSize(design.FontSmall).TextColor(a.kit.T.Muted)
+					ui.Text(c, path).FontSize(design.FontSmall).TextColor(a.kit.T.Muted)
 				}
 				ui.Row(c).Gap(design.SpaceSM).Children(func() {
-					openBtn := kitButton(a.kit, c, kit.ButtonSecondary, "在文件管理器中打开", false)
+					openBtn := kitButton(a.kit, c, kit.ButtonSecondary, "打开界面日志", false)
 					if openBtn.Clicked() {
 						revealPath(a.LogFilePath())
 					}
 				})
-				if tail := a.logTail(10); tail != "" {
-					a.kit.Field(c, "近期记录（最后 10 行）", "", func() {
+				if tail := a.logTail(6); tail != "" {
+					a.kit.Field(c, "界面近期记录（最后 6 行）", "", func() {
 						ui.Text(c, tail).FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
 					})
 				}

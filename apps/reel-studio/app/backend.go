@@ -129,6 +129,14 @@ func (b *Backend) findNode() (string, error) {
 	return "", fmt.Errorf("找不到 Node.js 运行时，请确保已安装 Node（如 brew install node）")
 }
 
+// BackendLogPath 返回本地工作台（Node 后端）日志路径。
+//
+// 无论 macOS 还是 Windows，均放在系统临时目录的 reel-studio-backend.log 中。
+// 离线语音、FFmpeg、Chrome 渲染与通道转发的所有标准输出与错误均汇入这里。
+func BackendLogPath() string {
+	return filepath.Join(os.TempDir(), "reel-studio-backend.log")
+}
+
 // spawn 起一个 Node 进程跑工作台。
 func (b *Backend) spawn() error {
 	b.mu.Lock()
@@ -170,7 +178,7 @@ func (b *Backend) spawn() error {
 	}
 	cmd.Env = env
 	// 输出的行数不限，但要落盘：出问题时用户能自己看到原因。
-	logPath := filepath.Join(os.TempDir(), "reel-studio-backend.log")
+	logPath := BackendLogPath()
 	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err == nil {
 		cmd.Stdout = file

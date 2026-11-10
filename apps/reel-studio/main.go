@@ -12,15 +12,45 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"runtime/debug"
+	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/webkubor/reel-kit/apps/reel-studio/app"
 )
 
+// dumpCrash 在发生未捕获 panic 时把调用栈写入磁盘。
+//
+// Windows GUI 模式下 stderr 默认会被系统吞掉，双击崩溃时用户屏幕上没有任何提示。
+// 把调用栈写在临时目录与可执行文件同级，出问题时用户只需把 crash.log 贴出来就能定位。
+func dumpCrash(r any) {
+	msg := fmt.Sprintf("[%s] Reel Studio 异常退出 (Crash):\n%v\n\n调用栈:\n%s\n",
+		time.Now().Format("2006-01-02 15:04:05"), r, debug.Stack())
+	// 1. 系统临时目录（如 Windows 的 %TEMP%\reel-studio-crash.log）
+	tmpFile := filepath.Join(os.TempDir(), "reel-studio-crash.log")
+	_ = os.WriteFile(tmpFile, []byte(msg), 0o644)
+	// 2. 可执行文件同级目录
+	if exe, err := os.Executable(); err == nil {
+		exeCrash := filepath.Join(filepath.Dir(exe), "reel-studio-crash.log")
+		_ = os.WriteFile(exeCrash, []byte(msg), 0o644)
+	}
+	_ = os.WriteFile("reel-studio-crash.log", []byte(msg), 0o644)
+	log.Print(msg)
+}
+
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			dumpCrash(r)
+			panic(r)
+		}
+	}()
+
 	// 界面里所有动作都要能回到主线程改状态，所以状态与窗口都放在 app 包里，
 	// 由它在收到后端数据时驱动重绘。
 	base := os.Getenv("REEL_STUDIO_URL")
@@ -42,6 +72,7 @@ func main() {
 		a.Start()
 	})
 	if err := mygo.App.Run(); err != nil {
+		dumpCrash(err)
 		log.Fatal(err)
 	}
 	// 只停自己起的工作台：别人在终端里跑的那个不动。
