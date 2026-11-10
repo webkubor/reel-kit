@@ -19,6 +19,7 @@ import { renderFrames } from '../render.mjs'
 import { compose, probeDuration } from '../compose.mjs'
 import { getStyle } from '../knowledge-styles.mjs'
 import { resolveSettings } from '../settings.mjs'
+import { voiceChannelInfo } from './voice-origin.mjs'
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
@@ -87,8 +88,7 @@ export async function makeTalkVideo(input, store, backend, progress, report = ()
     // 逐句配音：音色相同、语气相同，只是念的内容不同
     const voiceClips = []
     const voiceBackend = input.voiceBackend || 'edge'
-    const voiceOrigin = voiceBackend === 'edge' ? 'free-online' : voiceBackend === 'sherpa' ? 'local-offline' : 'ai'
-    const voiceEngine = voiceBackend === 'edge' ? 'Edge 在线高保真语音' : voiceBackend === 'sherpa' ? '本机离线语音' : voiceBackend === 'minimax' ? 'MiniMax TTS' : 'VoxFlow 本地语音'
+    const { origin: voiceOrigin, engine: voiceEngine } = voiceChannelInfo(voiceBackend)
     for (let i = 0; i < lines.length; i++) {
       progress(`正在为第 ${i + 1}/${lines.length} 句生成配音…`)
       const meta = await step({ id: `voice-${i}`, label: `配音 ${i + 1}/${lines.length}`, origin: voiceOrigin, engine: voiceEngine, detail: lines[i].slice(0, 40) }, async () => {

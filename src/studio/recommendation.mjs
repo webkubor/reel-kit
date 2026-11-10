@@ -6,6 +6,7 @@ import { command, redact } from './process.mjs'
 import { renderFrames } from '../render.mjs'
 import { compose, probeDuration } from '../compose.mjs'
 import { recommendationSettings, reusableVoice } from './video-settings.mjs'
+import { voiceChannelInfo } from './voice-origin.mjs'
 
 const template = fileURLToPath(new URL('../../templates/project-recommendation.html', import.meta.url))
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -75,8 +76,8 @@ export async function makeRecommendation(input, store, backend, progress, report
       const label = `旁白 ${i + 1}/${lines.length}`
       progress(`正在处理第 ${i + 1}/${lines.length} 句旁白…`)
       const voiceBackend = settings.voiceBackend || 'edge'
-      const voiceOrigin = narration ? 'import' : voiceBackend === 'edge' ? 'free-online' : voiceBackend === 'sherpa' ? 'local-offline' : 'ai'
-      const voiceEngine = narration ? '整段素材切分' : voiceBackend === 'edge' ? 'Edge 在线高保真语音' : voiceBackend === 'sherpa' ? '本机离线语音' : voiceBackend === 'minimax' ? 'MiniMax TTS' : 'VoxFlow 本地语音'
+      const voiceOrigin = narration ? 'import' : voiceChannelInfo(voiceBackend).origin
+      const voiceEngine = narration ? '整段素材切分' : voiceChannelInfo(voiceBackend).engine
       const meta = await step({ id: `voice-${i}`, label, origin: voiceOrigin, engine: voiceEngine, detail: lines[i].slice(0, 40) }, async () => {
         if (narration) {
           const end = i === lines.length - 1 ? narrationDuration : offset + narrationDuration * lines[i].length / totalChars

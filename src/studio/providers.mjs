@@ -880,7 +880,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
             if (!result?.url?.startsWith('/api/audio/')) throw new Error('VoxFlow 未返回音频文件')
             const { bytes } = await safeDownload(new URL(result.url, voiceBase))
             const probe = await probeBytes('voice.wav', bytes)
-            return store.addAsset(input.projectId, designing ? `${input.voiceName} · 样音.wav` : `配音 · ${input.prompt.slice(0, 16)}.wav`, 'audio/wav', bytes, { source: 'VoxFlow', origin: 'ai', engine: 'VoxFlow 本地语音', voiceBackend: 'voxflow', prompt: input.prompt, persona: result.persona_key || persona, tone: input.tone || '', voiceName: input.voiceName || '', requestedModel: 'voxflow-local', actualModel: 'unknown', ...probe })
+            return store.addAsset(input.projectId, designing ? `${input.voiceName} · 样音.wav` : `配音 · ${input.prompt.slice(0, 16)}.wav`, 'audio/wav', bytes, { source: 'VoxFlow', origin: 'local-offline', engine: 'VoxFlow 本地语音', voiceBackend: 'voxflow', prompt: input.prompt, persona: result.persona_key || persona, tone: input.tone || '', voiceName: input.voiceName || '', requestedModel: 'voxflow-local', actualModel: 'unknown', ...probe })
           }
         }
         throw new Error('语音生成超时，请检查 VoxFlow 任务列表')

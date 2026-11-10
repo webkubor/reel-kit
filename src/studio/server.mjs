@@ -433,7 +433,7 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
           const task = (data.tasks || []).find(t => t.id === input.taskId && t.status === 'done' && t.result?.url?.startsWith('/api/audio/'))
           if (!task) fail('声音作品不存在或尚未完成')
           const { bytes } = await download(new URL(task.result.url, base))
-          const asset = store.addAsset(input.projectId, task.result.filename || '声音作品.wav', 'audio/wav', bytes, { source: 'VoxFlow', origin: 'ai', engine: 'VoxFlow 本地语音', prompt: task.result.text || '', persona: task.result.persona || '', sourceTaskId: task.id })
+          const asset = store.addAsset(input.projectId, task.result.filename || '声音作品.wav', 'audio/wav', bytes, { source: 'VoxFlow', origin: 'local-offline', engine: 'VoxFlow 本地语音', prompt: task.result.text || '', persona: task.result.persona || '', sourceTaskId: task.id })
           const probe = await probeBytes(asset.file, bytes)
           Object.assign(asset, probe); store.save()
           return json(res, 201, store.publicAsset(asset))
