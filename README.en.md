@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/stars/webkubor/reel-kit?style=flat-square&color=cc584d" alt="Stars" />
   <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-cc584d?style=flat-square" alt="macOS" />
   <img src="https://img.shields.io/badge/Windows-x64-cc584d?style=flat-square" alt="Windows" />
-  <img src="https://img.shields.io/badge/voice-free%20%C2%B7%20offline-cc584d?style=flat-square" alt="free offline voice" />
+  <img src="https://img.shields.io/badge/voice-free%20online%20%C2%B7%20offline-ready-cc584d?style=flat-square" alt="free voice, offline ready" />
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
   <br />
   A desktop app you download and run — macOS and Windows. Write the script, pick a voice, and it handles the rest: per-line voice-over, matched frames, one finished MP4.
   <br />
-  <sub>The voice engine ships with the app and runs offline — no network, no per-minute cost, your audio never leaves your machine.</sub>
+  <sub>Text voice-over defaults to Microsoft Edge online neural TTS (free, nothing to install); an offline engine ships with the app too, so you can keep every word on your machine.</sub>
 </p>
 
 <p align="center">
@@ -79,12 +79,14 @@ If you were given ten thousand taels of gold, but had to do corvée labour for t
 ```
 
 **Step 2 · Pick a voice**
-Choose one of the built-in local timbres under "Voice". No login, no extra install, no cost. Once a voice is picked, every line is spoken and each shot is timed to its own narration — slow lines get longer frames, fast lines get shorter ones.
+Pick a channel under "Voice". The default is Microsoft Edge online neural TTS — free, nothing to install, and currently not billed per call, though your text goes to Microsoft. The bundled offline engine is in the same list if you would rather keep everything on your machine. Once a voice is picked, every line is spoken and each shot is timed to its own narration — slow lines get longer frames, fast lines get shorter ones.
 
 **Step 3 · Export**
 When the finished video shows up in the list on the right, play it or "save to local" as an MP4. The same configuration can generate another take, which makes A/B comparisons easy.
 
 You don't need assets to start: the layout and palette follow the chosen visual style (44 available). Import your own images or clips under "Library" in the left column.
+
+The picture moves: images push in gently inside each shot, captions fade up, and shots can be cross-faded or slid. Both live under "Picture", and you can switch either off.
 
 ## The four pipelines
 
@@ -99,7 +101,8 @@ You don't need assets to start: the layout and palette follow the chosen visual 
 
 | What you want | Where it runs | Cost | What you need |
 |---|---|---|---|
-| **Standard voice-over** (default) | The offline engine bundled with the app | Free | Nothing — same engine on macOS and Windows |
+| **Standard voice-over** (default channel) | Microsoft Edge online neural TTS | Free today, billed by Microsoft if that changes | Nothing to install; your text goes to Microsoft |
+| **Standard voice-over** (offline) | The offline engine bundled with the app | Free | Nothing — same engine on macOS and Windows; audio never leaves the machine |
 | **Clone your own voice** / design a timbre | VoxFlow, on your machine | Free | VoxFlow on an Apple Silicon Mac, or running it on another machine |
 | **A better cloud timbre** | MiniMax TTS | Billed by usage | A MiniMax key, once, under Settings → Cloud voice key |
 | **Generate images / video** | MuseAV, the Magpie gateway, MiniMax direct, or your own channel | Billed by that account | Log into MuseAV once in the app, have Magpie running locally, add a vendor key, or add your own gateway |
