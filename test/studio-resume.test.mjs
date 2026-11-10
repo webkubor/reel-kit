@@ -113,8 +113,15 @@ test('自定义通道：配置有问题要说得出来，配错的通道不出�
     { id: 'tts-one', kind: 'tts', baseUrl: 'https://example.com', model: 'm', env: 'REEL_TEST_IMAGE_KEY' },
   ] }))
   const previous = process.env.HOME
+  const previousProfile = process.env.USERPROFILE
   process.env.HOME = root
-  t.after(() => { process.env.HOME = previous })
+  if (process.platform === 'win32') process.env.USERPROFILE = root
+  t.after(() => {
+    if (previous === undefined) delete process.env.HOME
+    else process.env.HOME = previous
+    if (previousProfile === undefined) delete process.env.USERPROFILE
+    else process.env.USERPROFILE = previousProfile
+  })
   // 配置路径取自 homedir()，改 HOME 后重新读取
   const channels = loadCustomChannels()
   assert.equal(channels.some(c => c.id === 'good-image'), true, '配置正确的通道应当出现')
@@ -131,8 +138,15 @@ test('自定义生图通道：模型以用户填的为准发出', async t => {
   const root = mkdtempSync(join(tmpdir(), 'reel-custom-image-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const previous = process.env.HOME
+  const previousProfile = process.env.USERPROFILE
   process.env.HOME = root
-  t.after(() => { process.env.HOME = previous })
+  if (process.platform === 'win32') process.env.USERPROFILE = root
+  t.after(() => {
+    if (previous === undefined) delete process.env.HOME
+    else process.env.HOME = previous
+    if (previousProfile === undefined) delete process.env.USERPROFILE
+    else process.env.USERPROFILE = previousProfile
+  })
   mkdirSync(join(root, '.reel-kit'), { recursive: true })
   writeFileSync(join(root, '.reel-kit', 'providers.json'), JSON.stringify({ channels: [
     { id: 'seedream', kind: 'image', protocol: 'openai', baseUrl: 'https://example.com', model: 'seedream-4', env: 'REEL_TEST_IMAGE_KEY' },

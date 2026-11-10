@@ -45,13 +45,9 @@ function withEnv(t, name, value) {
 /** 把 HOME 指到临时目录，用来测「密钥存在设置页」这条路径 */
 function withHome(t) {
   const dir = mkdtempSync(join(tmpdir(), 'reel-home-'))
-  const previous = process.env.HOME
-  process.env.HOME = dir
-  t.after(() => {
-    if (previous === undefined) delete process.env.HOME
-    else process.env.HOME = previous
-    rmSync(dir, { recursive: true, force: true })
-  })
+  withEnv(t, 'HOME', dir)
+  if (process.platform === 'win32') withEnv(t, 'USERPROFILE', dir)
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
   return dir
 }
 

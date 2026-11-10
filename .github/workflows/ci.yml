@@ -98,5 +98,7 @@ jobs:
         with: { version: 10 }
       - name: 装依赖
         run: pnpm install --frozen-lockfile
+      - name: 安装视频测试依赖
+        run: choco install ffmpeg -y --no-progress
       - name: 后端工作台用例（Windows）
         run: pnpm test:studio
