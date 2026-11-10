@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -289,7 +290,16 @@ func Test保存密钥只动一个键(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if perm := info.Mode().Perm(); perm != 0o600 {
+	// Unix 上配置文件是 0600（只有本人能读）。
+	// Windows 没有 Unix 权限位，Go 报出来的是 0666 —— 那里靠的是 ACL：
+	// 配置写在用户自己的家目录里，继承 %USERPROFILE% 的默认 ACL（本人 + SYSTEM + 管理员），
+	// 别的用户读不到。所以权限这条只在 Unix 上断言，Windows 上改断言位置。
+	if runtime.GOOS == "windows" {
+		home, _ := os.UserHomeDir()
+		if !strings.HasPrefix(reelConfigPath(), home) {
+			t.Errorf("Windows 上配置应写在用户家目录里（靠 ACL 保护），实际 %s", reelConfigPath())
+		}
+	} else if perm := info.Mode().Perm(); perm != 0o600 {
 		t.Errorf("配置文件权限应是 0600，实际 %o", perm)
 	}
 	configured, tail := minimaxKeyConfigured()

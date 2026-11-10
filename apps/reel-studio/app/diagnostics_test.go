@@ -14,10 +14,10 @@ func Test排障报告包含失败任务的报错原文(t *testing.T) {
 	server := stub(t, []map[string]any{{
 		"id":        "j_bad",
 		"status":    "failed",
-		"error":    "upstream 401: invalid api key",
-		"message":  "生成失败",
+		"error":     "upstream 401: invalid api key",
+		"message":   "生成失败",
 		"createdAt": "2026-11-10T10:00:00Z",
-		"input":    map[string]any{"kind": "talk"},
+		"input":     map[string]any{"kind": "talk"},
 		"steps": []map[string]any{{
 			"id": "s1", "label": "生成配音", "status": "failed", "error": "ffmpeg exited with code 1",
 		}},

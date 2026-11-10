@@ -113,9 +113,11 @@ func Test本机语音没连上时给出装法(t *testing.T) {
 			t.Errorf("这台机器装不了 VoxFlow，不该出现 %q，实际文字：%q", unwanted, tt.Texts())
 		}
 	}
-	for _, want := range []string{"随应用自带的本机离线引擎", "这台机器用不了"} {
+	// 「本机装不了」和「远端能跑」都要说清楚：
+	// 只说装不了，用户会以为整条路断了；只说远端能跑，用户不知道远端是什么。
+	for _, want := range []string{"随应用自带的本机离线引擎", "Apple 芯片的 Mac 装得起来", "REEL_VOXFLOW_URL"} {
 		if !tt.HasText(want) {
-			t.Errorf("这台机器用不了 VoxFlow 时该说明白，少了 %q，实际文字：%q", want, tt.Texts())
+			t.Errorf("这台机器装不了 VoxFlow 时该说明白，少了 %q，实际文字：%q", want, tt.Texts())
 		}
 	}
 }
