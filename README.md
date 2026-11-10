@@ -174,6 +174,14 @@ kyvault run --env MINIMAX_API_KEY=secret://minimax/api-key -- reel studio
 curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v1.2.0/install.sh | sh
 ```
 
+macOS 这个包**没做苹果公证**（`codesign` 只有 ad-hoc 签名），从 dmg 或浏览器解压的归档
+第一次双击会被 Gatekeeper 拦一下，报「无法验证开发者」。两条路都行：右键点应用选
+「打开」再点「打开」，或者终端里执行
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Reel Studio.app"
+```
+
 Windows（x64，未做代码签名，首次运行被 SmartScreen 拦一下选「仍要运行」）：下载
 `reel-studio-1.2.0-windows-amd64.tar.gz` 解压，把 `Reel Studio.exe` 和它旁边的
 `backend/` `bin/` `chrome/` `museav/` `sherpa/` 资源目录保持在同一层目录再双击。

@@ -90,6 +90,12 @@
         也不影响自带引擎配音。
       </p>
       <p class="studio-meta">
+        <strong>macOS 第一次打开会被 Gatekeeper 拦一下</strong>（这个包没做苹果公证）：
+        右键点应用选「打开」再点「打开」就行，或在终端里执行
+        <code>xattr -dr com.apple.quarantine "/Applications/Reel Studio.app"</code>。
+        Windows 同样没做代码签名，被 SmartScreen 拦时选「仍要运行」。
+      </p>
+      <p class="studio-meta">
         图片与视频默认走 MuseAV 中台与 MiniMax；也可以在「设置与反馈 → 模型通道」里
         填上你自己的中转站或厂商直连 —— 在设置页填一次就行，不用改配置文件，
         密钥也不会出现在界面里。
