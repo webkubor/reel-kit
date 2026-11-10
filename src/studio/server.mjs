@@ -13,7 +13,7 @@ import { makeTalkVideo, TALK_TEMPLATES } from './talk.mjs'
 import { makeProductVideo, PRODUCT_LAYOUTS } from './product.mjs'
 import { KNOWLEDGE_STYLES } from '../knowledge-styles.mjs'
 import { recommendationSettings } from './video-settings.mjs'
-import { PRESETS } from '../settings.mjs'
+import { PRESETS, SETTING_SCHEMA } from '../settings.mjs'
 import { listBgm, resolveBgmEntry, bgmConfigured } from '../bgm-library.mjs'
 import { initializeWorkflow, snapshotSop, workflowAction, remakeProject } from './workflow.mjs'
 import { limitsFor, saveLimits } from './platform-limits.mjs'
@@ -23,6 +23,8 @@ const web = fileURLToPath(new URL('../../studio/', import.meta.url))
 const templates = fileURLToPath(new URL('../../templates/', import.meta.url))
 const templateNames = readdirSync(templates).filter(f => f.endsWith('.html') && f !== 'project-recommendation.html').map(f => f.slice(0, -5))
 const uuid = /^[a-f\d-]{36}$/
+// 转场白名单跟着界面走（settings.mjs 是唯一定义处）
+const TRANSITION_VALUES = new Set(SETTING_SCHEMA.transition.options.map(o => o.value))
 function fail(message, status = 400) { throw Object.assign(new Error(message), { status }) }
 
 /** 自定义通道给界面看的清单：不含密钥，只说这条通道的密钥从哪来、有没有配 */
@@ -94,7 +96,9 @@ function validate(input, store) {
     if (typeof value[key] !== 'boolean') fail(`${key} 只能是开或关`)
   }
   if (value.transition !== undefined) {
-    if (!['none', 'fade', 'slide-left', 'slide-right', 'zoom-in', 'dissolve'].includes(value.transition)) {
+    // 白名单跟着界面走（settings.mjs 是唯一定义处）：以前这里写死 6 个，
+    // 界面给的「向上推移 / 向下推移 / 擦除」到服务端会被判非法，选了就出不了片。
+    if (!TRANSITION_VALUES.has(value.transition)) {
       fail(`不支持的转场动效：${value.transition}`)
     }
   }

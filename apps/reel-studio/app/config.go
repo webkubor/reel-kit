@@ -318,6 +318,14 @@ func (a *App) configValue(kind, key string, input map[string]any) string {
 			return "向左推移"
 		case "slide-right":
 			return "向右推移"
+		case "slide-up":
+			return "向上推移"
+		case "slide-down":
+			return "向下推移"
+		case "wipe-left":
+			return "向左擦除"
+		case "wipe-right":
+			return "向右擦除"
 		case "zoom-in":
 			return "镜头推进"
 		case "dissolve":
