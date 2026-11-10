@@ -171,7 +171,7 @@ kyvault run --env MINIMAX_API_KEY=secret://minimax/api-key -- reel studio
 下载安装（macOS Apple Silicon）：
 
 ```bash
-curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v1.2.0/install.sh | sh
+curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/install.sh | sh
 ```
 
 macOS 这个包**没做苹果公证**（`codesign` 只有 ad-hoc 签名），从 dmg 或浏览器解压的归档
@@ -183,10 +183,15 @@ xattr -dr com.apple.quarantine "/Applications/Reel Studio.app"
 ```
 
 Windows（x64，未做代码签名，首次运行被 SmartScreen 拦一下选「仍要运行」）：下载
-`reel-studio-1.2.0-windows-amd64.tar.gz` 解压，把 `Reel Studio.exe` 和它旁边的
+`reel-studio-1.3.0-windows-amd64.tar.gz` 解压，把 `Reel Studio.exe` 和它旁边的
 `backend/` `bin/` `chrome/` `museav/` `sherpa/` 资源目录保持在同一层目录再双击。
 - **双击闪退无反应**：在资源管理器地址栏输入 `%TEMP%`，查看 `reel-studio-crash.log`，里面记了完整崩溃调用栈；
-- **任务失败或工作台连不上**：在应用内「设置与反馈」点击「复制完整诊断与近期日志」，或点「打开工作台日志」（对应 `%TEMP%\reel-studio-backend.log`），所有 Node/FFmpeg/离线语音错误都在里面。
+- **任务失败或工作台连不上**：在应用内「设置与反馈」点「导出排障报告」，
+  会生成一个 `reel-studio-diagnostics-*.txt`：里面有版本与系统、通道就绪状态、
+  **失败任务的报错原文与卡住的那一步**、工作台与界面最近几十行日志，
+  密钥与令牌已自动遮盖。把它作为附件传到 Issue，我们就能直接定位；
+  也可以点「复制完整诊断与近期日志」贴到 Issue 正文。
+  工作台日志本体在 `%TEMP%\reel-studio-backend.log`，点「打开工作台日志」直接打开。
 
 **装完就能配音**：文字配音用随应用自带的本机离线引擎（sherpa-onnx + 中文模型），
 不联网、不产生费用，macOS 与 Windows 同一套，也不用装 Python、clone 仓库或登录账号。

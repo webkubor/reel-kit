@@ -25,7 +25,7 @@ func TestDiagnostics包含日志路径与内容(t *testing.T) {
 	diag := a.Diagnostics()
 
 	// 必须包含工作台状态和两份日志的路径标识
-	if !strings.Contains(diag, "工作台状态：failed") {
+	if !strings.Contains(diag, "工作台状态") || !strings.Contains(diag, "failed") {
 		t.Errorf("诊断信息未包含工作台状态: %s", diag)
 	}
 	if !strings.Contains(diag, "reel-studio-backend.log") {
@@ -50,14 +50,15 @@ func Test脱敏处理敏感字段(t *testing.T) {
 	if strings.Contains(sanitized, "abc123xyz") {
 		t.Errorf("脱敏未生效，包含了 apikey: %s", sanitized)
 	}
-	if strings.Contains(sanitized, "channelkeys") {
-		t.Errorf("脱敏未生效，包含了 channelKeys: %s", sanitized)
-	}
 	if !strings.Contains(sanitized, "normal log line without secret") {
 		t.Errorf("正常日志被误删: %s", sanitized)
 	}
-	if !strings.Contains(sanitized, "脱敏处理") {
+	if !strings.Contains(sanitized, "[已遮盖]") {
 		t.Errorf("未给出脱敏提示标记: %s", sanitized)
+	}
+	// 脱敏按值遮盖，不整行丢弃 —— 上下文还要留着才能定位问题。
+	if !strings.Contains(sanitized, "channelKeys updated for minimax") {
+		t.Errorf("不含密钥的普通行被误伤: %s", sanitized)
 	}
 }
 
@@ -110,5 +111,9 @@ func Test设置页展示完整双日志与排障入口(t *testing.T) {
 	}
 	if !tt.HasText("复制完整诊断与近期日志") {
 		t.Errorf("设置页缺少一键复制完整诊断按钮")
+	}
+	// 排障报告要能落成文件：日志上百行时，拖附件比粘贴强。
+	if !tt.HasText("导出排障报告") {
+		t.Errorf("设置页缺少「导出排障报告」按钮")
 	}
 }

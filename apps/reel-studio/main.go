@@ -24,6 +24,18 @@ import (
 	"github.com/webkubor/reel-kit/apps/reel-studio/app"
 )
 
+// crashLogFile 打开崩溃日志文件（追加写）。
+//
+// 写不进去也不能让程序起不来：崩了就崩了，别再因为日志路径不对二次崩溃。
+func crashLogFile() *os.File {
+	path := filepath.Join(os.TempDir(), "reel-studio-crash.log")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return nil
+	}
+	return f
+}
+
 // dumpCrash 在发生未捕获 panic 时把调用栈写入磁盘。
 //
 // Windows GUI 模式下 stderr 默认会被系统吞掉，双击崩溃时用户屏幕上没有任何提示。
@@ -50,6 +62,14 @@ func main() {
 			panic(r)
 		}
 	}()
+
+	// 未捕获的 panic（包含其它 goroutine 里的）也落盘。
+	// 只靠 main 的 recover 只能盖住主协程：后台轮询、媒体播放这些 goroutine
+	// 里一旦 panic，Windows 上用户看到的就是「双击没反应」，什么线索都没有。
+	if f := crashLogFile(); f != nil {
+		debug.SetCrashOutput(f, debug.CrashOptions{})
+		defer f.Close()
+	}
 
 	// 界面里所有动作都要能回到主线程改状态，所以状态与窗口都放在 app 包里，
 	// 由它在收到后端数据时驱动重绘。

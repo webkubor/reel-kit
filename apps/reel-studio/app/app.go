@@ -74,6 +74,9 @@ type App struct {
 	providers *studioapi.Providers
 	bgm       *studioapi.BGMLibrary
 
+	// seenFailed 记录已经写进界面日志的失败任务，避免每两秒重复记一遍。
+	seenFailed map[string]bool
+
 	// backend 状态
 	backendProc  *Backend
 	backendState BackendStatus
@@ -420,6 +423,7 @@ func (a *App) poll() {
 			changed := a.state == nil || len(state.Jobs) != len(a.state.Jobs) ||
 				len(state.Assets) != len(a.state.Assets) || jobSummary(state.Jobs) != jobSummary(a.state.Jobs)
 			a.state = state
+			a.logNewFailures(state.Jobs)
 			if changed && a.win != nil {
 				a.redraw()
 			}
@@ -470,6 +474,33 @@ func jobSummary(jobs []studioapi.Job) string {
 		b.WriteString(j.AssetID)
 	}
 	return b.String()
+}
+
+// logNewFailures 把新出现的失败任务写进界面日志。
+//
+// 失败原因往往只出现在任务记录里，界面日志之外的地方查不到；
+// 记下来，用户导出排障报告时就能直接看到「哪条任务、报了什么」。
+func (a *App) logNewFailures(jobs []studioapi.Job) {
+	if a.seenFailed == nil {
+		a.seenFailed = map[string]bool{}
+	}
+	for _, j := range jobs {
+		if j.Status != "failed" && j.Status != "error" {
+			continue
+		}
+		if a.seenFailed[j.ID] {
+			continue
+		}
+		a.seenFailed[j.ID] = true
+		detail := j.Error
+		if detail == "" {
+			detail = j.Message
+		}
+		if detail == "" {
+			detail = "（任务失败但没有报错信息）"
+		}
+		a.logf("任务失败 %s（%s）：%s", j.ID, jobKind(j), detail)
+	}
 }
 
 // redraw 请求重绘。
@@ -795,6 +826,10 @@ func (a *App) viewSettingsAndFeedback(c *ui.Context) {
 					copyDiag := kitButton(a.kit, c, kit.ButtonPrimary, "复制完整诊断与近期日志", false)
 					if copyDiag.Clicked() {
 						a.CopyDiagnostics()
+					}
+					exportDiag := kitButton(a.kit, c, kit.ButtonSecondary, "导出排障报告", false)
+					if exportDiag.Clicked() {
+						go a.ExportDiagnostics()
 					}
 				})
 				if tail := a.BackendLogTail(8); tail != "" {

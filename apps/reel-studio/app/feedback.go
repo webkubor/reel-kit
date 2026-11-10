@@ -6,7 +6,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/transfer"
@@ -47,44 +46,10 @@ const (
 
 // Diagnostics 收集排障需要的环境信息与最近报错日志。
 //
-// 自动带上系统版本、通道连接状态，以及工作台与桌面端最近的日志片段，
-// 并自动对 API 密钥等敏感字段进行脱敏，绝不包含用户私有素材路径与密钥明文。
+// 自动带上系统版本、通道连接状态、失败任务的报错原文，以及工作台与桌面端
+// 最近的日志片段，并自动遮盖密钥、令牌、签名 URL 与家目录用户名。
 func (a *App) Diagnostics() string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "版本：%s\n", mygo.App.Version())
-	fmt.Fprintf(&b, "系统：%s/%s\n", runtime.GOOS, runtime.GOARCH)
-	fmt.Fprintf(&b, "Go：%s\n", runtime.Version())
-	fmt.Fprintf(&b, "时间：%s\n", time.Now().Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(&b, "工作台状态：%s\n", a.backendState.State)
-	if a.backendState.Note != "" {
-		fmt.Fprintf(&b, "工作台说明：%s\n", a.backendState.Note)
-	}
-	if a.providers != nil {
-		fmt.Fprintf(&b, "视频通道就绪：%t\n", a.providers.Video.Ready)
-		fmt.Fprintf(&b, "图片通道就绪：%t\n", a.providers.Image.Ready)
-		fmt.Fprintf(&b, "配音通道就绪：%t\n", a.providers.Voice.Ready)
-	}
-	if path := a.LogFilePath(); path != "" {
-		fmt.Fprintf(&b, "桌面端日志文件：%s\n", path)
-	}
-	backendPath := BackendLogPath()
-	fmt.Fprintf(&b, "工作台日志文件：%s\n", backendPath)
-
-	// 1. 本地工作台与引擎日志（Node / FFmpeg / 离线语音等所有真实错误都在这里）
-	backendTail := sanitizeDiagnosticLog(readTail(backendPath, 35))
-	if strings.TrimSpace(backendTail) != "" {
-		fmt.Fprintf(&b, "\n--- 工作台与引擎近期日志（末尾 35 行）---\n%s\n", backendTail)
-	} else {
-		fmt.Fprintf(&b, "\n--- 工作台与引擎近期日志：文件暂未生成或为空 ---\n")
-	}
-
-	// 2. 桌面端应用日志
-	appTail := sanitizeDiagnosticLog(readTail(a.LogFilePath(), 20))
-	if strings.TrimSpace(appTail) != "" {
-		fmt.Fprintf(&b, "\n--- 桌面端界面近期日志（末尾 20 行）---\n%s\n", appTail)
-	}
-
-	return b.String()
+	return a.DiagnosticReport()
 }
 
 // SubmitFeedback 生成反馈内容并复制到剪贴板，同时给出 GitHub Issue 链接。
@@ -106,22 +71,24 @@ func (a *App) SubmitFeedback() {
 	}
 	body := fmt.Sprintf("## %s\n\n%s\n", kindLabel, detail)
 	if fb.include {
-		body += "\n---\n\n### 诊断信息\n\n```\n" + a.Diagnostics() + "```\n"
+		body += "\n---\n\n### 诊断信息\n\n```\n" + a.DiagnosticReport() + "```\n"
 	}
 
 	clipErr := mygo.Clipboard.Write(transfer.TextData(body))
 
-	// URL 长度安全截断，防止浏览器拒绝超长 GET URL
-	urlBody := body
-	if len(urlBody) > 2500 {
-		urlBody = urlBody[:2500] + "\n\n...（诊断已超长，完整内容已复制到剪贴板，可直接粘贴覆盖）\n"
+	// Issue 的 URL 里只放短摘要：完整日志可能有上百 KB，塞进查询串浏览器
+	// 会直接拒绝，而且日志进了 URL 也会留在浏览器历史里。完整内容放在
+	// 剪贴板（用户自己粘贴），需要存档时在设置里导出成文件附在 Issue 上。
+	summary := fmt.Sprintf("## %s\n\n%s\n", kindLabel, detail)
+	if fb.include {
+		summary += fmt.Sprintf("\n> 版本 %s｜%s/%s\n> 完整诊断信息已复制到剪贴板，可直接粘贴到本 Issue 正文；\n> 也可在「设置 → 运行日志 → 导出排障报告」导出文件后作为附件上传。\n",
+			mygo.App.Version(), runtime.GOOS, runtime.GOARCH)
 	}
-
 	issueURL := fmt.Sprintf(
 		"https://github.com/%s/issues/new?title=%s&body=%s&labels=%s",
 		feedbackRepo,
 		url.QueryEscape(fmt.Sprintf("[%s] %s", kindLabel, title)),
-		url.QueryEscape(urlBody),
+		url.QueryEscape(summary),
 		url.QueryEscape(feedbackLabel),
 	)
 	if err := openURL(issueURL); err != nil {
@@ -194,7 +161,7 @@ func (a *App) viewFeedback(c *ui.Context) {
 		a.kit.Field(c, "详情", "发生了什么、期望是什么", func() {
 			a.kit.TextArea(c, &a.feedback.detail, "尽量写清楚复现步骤", 96)
 		})
-		a.kit.Field(c, "诊断信息", "勾上会把版本、系统与最近排障日志（已自动脱敏）一并带上，省去来回索要日志", func() {
+		a.kit.Field(c, "诊断信息", "勾上会把版本、系统、失败任务的报错原文与最近排障日志（已自动脱敏）一并带上，省去来回索要日志", func() {
 			a.kit.Checkbox(c, &a.feedback.include, "附上诊断信息与排障日志")
 		})
 		ui.Row(c).Gap(design.SpaceSM).Children(func() {
@@ -205,6 +172,10 @@ func (a *App) viewFeedback(c *ui.Context) {
 			diag := kitButton(a.kit, c, kit.ButtonSecondary, "复制诊断信息", false)
 			if diag.Clicked() {
 				a.CopyDiagnostics()
+			}
+			exportDiag := kitButton(a.kit, c, kit.ButtonSecondary, "导出排障报告", false)
+			if exportDiag.Clicked() {
+				go a.ExportDiagnostics()
 			}
 		})
 		if a.feedback.submitted != "" {
@@ -245,32 +216,20 @@ func readTail(path string, lines int) string {
 	return strings.Join(all, "\n")
 }
 
-// sanitizeDiagnosticLog 对诊断日志进行脱敏处理，遮蔽包含密钥、令牌的行。
+// sanitizeDiagnosticLog 对诊断日志进行脱敏处理。
+//
+// 旧实现是「整行替换」：日志里只要出现 api-key 就丢掉整行，连上下文也没了。
+// 现在改成按值遮盖（见 diagnostics.go 的 redactDiagnostic），既不泄密也留线索。
 func sanitizeDiagnosticLog(s string) string {
-	if s == "" {
-		return ""
-	}
-	lines := strings.Split(s, "\n")
-	for i, line := range lines {
-		lower := strings.ToLower(line)
-		if strings.Contains(lower, "bearer ") ||
-			strings.Contains(lower, "authorization:") ||
-			strings.Contains(lower, "api-key") ||
-			strings.Contains(lower, "apikey") ||
-			strings.Contains(lower, "channelkeys") ||
-			strings.Contains(lower, "sk-") {
-			lines[i] = "[脱敏处理：该行含敏感凭据信息已自动遮盖]"
-		}
-	}
-	return strings.Join(lines, "\n")
+	return redactDiagnostic(s)
 }
 
 // logTail 读桌面端日志末尾若干行，给界面预览用。
 func (a *App) logTail(lines int) string {
-	return readTail(a.LogFilePath(), lines)
+	return redactDiagnostic(readTail(a.LogFilePath(), lines))
 }
 
 // BackendLogTail 读工作台日志末尾若干行，给界面预览用。
 func (a *App) BackendLogTail(lines int) string {
-	return readTail(BackendLogPath(), lines)
+	return redactDiagnostic(readTail(BackendLogPath(), lines))
 }
