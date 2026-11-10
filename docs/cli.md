@@ -76,6 +76,7 @@ reel make --template sticker-promo \
 | `--accent1/--accent2 <色>` | 左上 / 右下圆弧色 |
 | `--transition <名>` | 转场，默认 `none`（硬切）；可选 `fade` `slide-left/right/up/down` `wipe-left/right` `dissolve` `zoom-in` |
 | `--transition-duration <秒>` | 转场时长，默认 0.4 |
+| `--motion <名>` | 镜内动效，默认 `gentle`（图片缓慢推进、字幕入场，逐帧渲染，更慢）；`none` 为静态画面 |
 | `--keep-frames` | 保留中间产物，调版式用 |
 | `--voice <音色>` | 开启配音，镜头时长改由念白决定 |
 | `--voice-engine <名>` | `voxcraft`（默认，本地 Qwen3-TTS，免费）\| `minimax`（云端 TTS，按量计费） |

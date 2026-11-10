@@ -133,19 +133,19 @@ func (a *App) viewVoicePicker(c *ui.Context, backend *string, voiceID *string) {
 // Windows 一样能克隆 —— 所以这句按工作台实际连上的通道写，不按本机系统写。
 func (a *App) voiceChannelPickerHelp() string {
 	if a.voiceCloneAvailable() {
-		return "微软 Edge：在线免费高保真（24kHz）；本机离线：自带不联网不花钱；VoxFlow：克隆自己的声音；云端按量计费"
+		return "微软 Edge：在线免费高保真（24kHz，文字发往微软）；本机离线：自带不联网不花钱；VoxFlow：克隆自己的声音；云端按量计费"
 	}
 	if voxflowRunsHere() {
-		return "微软 Edge：在线免费高保真（24kHz）；本机离线：自带不联网不花钱；VoxFlow：需先启动服务；云端按量计费"
+		return "微软 Edge：在线免费高保真（24kHz，文字发往微软）；本机离线：自带不联网不花钱；VoxFlow：需先启动服务；云端按量计费"
 	}
-	return "微软 Edge：在线免费高保真（24kHz，首选）；本机离线：随应用自带、不花钱；云端按量计费"
+	return "微软 Edge：在线免费高保真（24kHz，首选，文字发往微软）；本机离线：随应用自带、不花钱；云端按量计费"
 }
 
 // voiceChannelHelp 写清楚这条通道的钱和隐私成本。
 func voiceChannelHelp(id string) string {
 	switch id {
 	case "edge":
-		return "微软 Edge 高保真神经语音（24kHz），在线免费、无需 API Key"
+		return "微软 Edge 高保真神经语音（24kHz），在线免费、无需 API Key；文字会发到微软的服务器"
 	case "minimax":
 		return "MiniMax 云端音色，按量计费；文字会发到云端"
 	case "sherpa":
@@ -162,7 +162,7 @@ func voiceChannelHelp(id string) string {
 func (a *App) voicePipelineHint(backend string) string {
 	switch backend {
 	case "edge":
-		return "逐句用微软 Edge 高保真神经语音配音（在线免费、24kHz），画面与合成都在本机执行。"
+		return "逐句用微软 Edge 高保真神经语音配音（在线免费、24kHz，文字发往微软），画面与合成都在本机执行。"
 	case "minimax":
 		return "逐句用 MiniMax TTS 配音（按量计费，文字发到云端），画面与合成仍在本机执行。"
 	case "sherpa":

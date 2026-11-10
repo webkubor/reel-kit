@@ -47,13 +47,13 @@
 
 ## Download
 
-Current version **v1.3.0** (released 2026-11-10). [Releases & checksums](https://github.com/webkubor/reel-kit/releases/tag/app-v1.3.0) · [Website](https://webkubor.github.io/reel-kit/)
+macOS current version **v1.5.0** (released 2026-11-11). [Releases & checksums](https://github.com/webkubor/reel-kit/releases/tag/app-v1.5.0) · [Website](https://webkubor.github.io/reel-kit/)
 
 | Platform | Download | Size | Where it lands |
 |---|---|---|---|
-| **macOS** (Apple Silicon) | [reel-studio-1.3.0-arm64.dmg](https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/reel-studio-1.3.0-arm64.dmg) | 237 MB | Drag into Applications |
-| **macOS** (Apple Silicon) | [reel-studio-1.3.0-darwin-arm64.tar.gz](https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/reel-studio-1.3.0-darwin-arm64.tar.gz) | 289 MB | Unpack, then drag `Reel Studio.app` into Applications |
-| **Windows** (x64) | [reel-studio-1.3.0-windows-amd64.tar.gz](https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/reel-studio-1.3.0-windows-amd64.tar.gz) | 347 MB | Unpack, then run `Reel Studio.exe` |
+| **macOS** (Apple Silicon) | [reel-studio-1.5.0-arm64.dmg](https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/reel-studio-1.5.0-arm64.dmg) | — | Drag into Applications |
+| **macOS** (Apple Silicon) | [reel-studio-1.5.0-darwin-arm64.tar.gz](https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/reel-studio-1.5.0-darwin-arm64.tar.gz) | — | Unpack, then drag `Reel Studio.app` into Applications |
+| **Windows** (x64) | [reel-studio-1.4.0-windows-amd64.tar.gz](https://github.com/webkubor/reel-kit/releases/download/app-v1.4.0/reel-studio-1.4.0-windows-amd64.tar.gz) | 347 MB | Unpack, then run `Reel Studio.exe` (Windows stays on 1.4.0 this round) |
 
 **Keep the folder layout on Windows**: `Reel Studio.exe` and the folders `backend/`, `bin/`, `chrome/`, `museav/`, `sherpa/` must sit side by side — the app won't start if one is missing.
 
@@ -62,7 +62,7 @@ The first launch is blocked by macOS Gatekeeper or Windows SmartScreen, because 
 macOS can also install from the command line:
 
 ```bash
-curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/install.sh | sh
+curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/install.sh | sh
 ```
 
 Linux users, or anyone who prefers the terminal: see [For developers](#for-developers).

@@ -23368,6 +23368,11 @@ var require_MsEdgeTTS = __commonJS({
       messageTypes2["SSML"] = "ssml";
     })(messageTypes || (messageTypes = {}));
     var MsEdgeTTS = class _MsEdgeTTS {
+      // TRUSTED_CLIENT_TOKEN 是微软 Edge 朗读协议的公开常量（上游 msedge-tts 里同样是硬编码），
+      // 不是任何用户的凭据，也不承载账号权限。它被拆成两段拼接，只因为凭据扫描器
+      // （CortexOS 的 scan-credentials.py）会把「常量赋值」当成密钥字面量拦下来。
+      // 正确的收尾是：在扫描器的豁免表里登记这条常量并还原成上游写法，
+      // 而不是继续把字符串藏得更深 —— 藏得越深，读代码的人越不知道它是什么。
       static TRUSTED_CLIENT_TOKEN = ["6A5AA1D4EAFF4E9F", "B37E23D68491D6F4"].join("");
       static VOICES_URL = `https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=${_MsEdgeTTS.TRUSTED_CLIENT_TOKEN}`;
       static WSS_URL = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1";

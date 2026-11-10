@@ -31,7 +31,7 @@ type Mode int
 //
 // 保持与 mygo.json 和 GitHub release 标签一致。
 // 打包时也可以用 -ldflags "-X ...app.Version=x.y.z" 覆盖。
-var Version = "1.4.0"
+var Version = "1.5.0"
 
 // 模式就是左栏的导航项，分三类：视频流水线、工具、设置。
 //

@@ -46,13 +46,13 @@
 
 ## 下载
 
-当前版本 **v1.3.0**（2026-11-10 发布）。[发布页与历史版本](https://github.com/webkubor/reel-kit/releases/tag/app-v1.3.0) · [官网](https://webkubor.github.io/reel-kit/)
+macOS 当前版本 **v1.5.0**（2026-11-11 发布）。[发布页与历史版本](https://github.com/webkubor/reel-kit/releases/tag/app-v1.5.0) · [官网](https://webkubor.github.io/reel-kit/)
 
 | 平台 | 下载 | 大小 | 装完在哪 |
 |---|---|---|---|
-| **macOS**（Apple Silicon） | [reel-studio-1.3.0-arm64.dmg](https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/reel-studio-1.3.0-arm64.dmg) | 237 MB | 拖进「应用程序」 |
-| **macOS**（Apple Silicon） | [reel-studio-1.3.0-darwin-arm64.tar.gz](https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/reel-studio-1.3.0-darwin-arm64.tar.gz) | 289 MB | 解压后把 `Reel Studio.app` 拖进「应用程序」 |
-| **Windows**（x64） | [reel-studio-1.3.0-windows-amd64.tar.gz](https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/reel-studio-1.3.0-windows-amd64.tar.gz) | 347 MB | 解压后双击 `Reel Studio.exe` |
+| **macOS**（Apple Silicon） | [reel-studio-1.5.0-arm64.dmg](https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/reel-studio-1.5.0-arm64.dmg) | — | 拖进「应用程序」 |
+| **macOS**（Apple Silicon） | [reel-studio-1.5.0-darwin-arm64.tar.gz](https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/reel-studio-1.5.0-darwin-arm64.tar.gz) | — | 解压后把 `Reel Studio.app` 拖进「应用程序」 |
+| **Windows**（x64） | [reel-studio-1.4.0-windows-amd64.tar.gz](https://github.com/webkubor/reel-kit/releases/download/app-v1.4.0/reel-studio-1.4.0-windows-amd64.tar.gz) | 347 MB | 解压后双击 `Reel Studio.exe`（Windows 版这轮没更新，仍是 1.4.0） |
 
 **Windows 解压后请保持目录结构**：`Reel Studio.exe` 和它旁边的 `backend/`、`bin/`、`chrome/`、`museav/`、`sherpa/` 五个目录要在同一层，少一个应用就起不来。
 
@@ -61,7 +61,7 @@
 macOS 也可以用一行命令装：
 
 ```bash
-curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v1.3.0/install.sh | sh
+curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/install.sh | sh
 ```
 
 Linux 或喜欢命令行的用户，看[开发者文档](#开发者文档)。
