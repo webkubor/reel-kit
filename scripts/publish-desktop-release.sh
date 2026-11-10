@@ -124,7 +124,12 @@ for d in sorted(glob.glob("build/*")):
         continue
     if target in carried:
         # 沿用旧清单：内容一个字都不改，它指向的归档在旧发布页上仍然有效。
-        print("沿用 %s 的旧清单（本次不发布这个平台的安装包）" % target, file=sys.stderr)
+        carried_manifest = json.load(open(manifest))
+        if carried_manifest.get("version") == version:
+            print("%s 的清单版本也是 %s，不该沿用（本次就是要发这个版本）" % (manifest, version), file=sys.stderr)
+            sys.exit(7)
+        print("沿用 %s 的旧清单：版本 %s，指向 %s（本次不发布这个平台的安装包）"
+              % (target, carried_manifest.get("version"), carried_manifest.get("url")), file=sys.stderr)
         add(os.path.basename(manifest), manifest)
         continue
     if wanted and target not in wanted:
