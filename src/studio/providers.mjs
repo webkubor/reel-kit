@@ -5,6 +5,11 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { command, commandFull, available, jsonFetch, download, probeBytes } from './process.mjs'
 import { sherpaEngine, sherpaSynthesize } from './sherpa.mjs'
+import { loadCustomChannels, customChannelIssues, channelHeaders } from './channels.mjs'
+
+// 通道配置的解析与校验住在 channels.mjs（CLI、设置页、后端三处共用），
+// 这里转出去是为了不打断已有的引用。
+export { loadCustomChannels, customChannelIssues }
 
 const H3_BASE = 'https://api.minimaxi.com'
 const MINIMAX_TTS_URL = 'https://api.minimaxi.com/v1/t2a_v2'
@@ -157,85 +162,6 @@ export async function listMuseavImageModels() {
   } catch { return [] }
 }
 
-/**
- * 自定义通道配置（可选）。
- *
- * 用户自己买了套餐的供应商写在这里，工作台就能把它当第三条通道来选。
- * 关键点：**baseUrl、模型名、密钥环境变量全由使用者给** —— 我们不内置任何
- * 一家的默认地址（猜错了就是别人的服务、别人的账单）。
- *
- * 两种协议：
- *   openai    —— 一次 POST 拿结果（OpenAI 兼容的生图接口都是这个形状）
- *   ark-task  —— 提交任务拿 ID，再轮询到出结果（任务式视频接口）
- */
-export function loadCustomChannels() {
-  let raw
-  try { raw = JSON.parse(readFileSync(CUSTOM_CONFIG(), 'utf8')) } catch { return [] }
-  const list = Array.isArray(raw) ? raw : (raw?.channels || [])
-  const out = []
-  for (const item of list) {
-    const id = String(item?.id || '').trim()
-    const baseUrl = String(item?.baseUrl || '').trim().replace(/\/+$/, '')
-    const model = String(item?.model || '').trim()
-    const env = String(item?.env || '').trim()
-    // 缺任何一项都不算一条可用通道 —— 宁可界面上不出现，也不给一个必然失败的选项
-    if (!id || !baseUrl || !model || !env) continue
-    // 自定义 TTS 还没实现：把它降级成生图通道，比明确拒绝更糟 —— 会生成出错的图
-    if (item?.kind === 'tts') continue
-    const kind = item?.kind === 'video' ? 'video' : 'image'
-    // 协议要和类型对得上：ark-task 是「先提交任务再轮询」，
-    // 只适用于视频；生图是一次 POST，用 openai 那套。
-    const protocol = item?.protocol === 'ark-task' ? 'ark-task' : 'openai'
-    if (kind === 'video' && protocol !== 'ark-task') continue
-    out.push({
-      id,
-      label: String(item?.label || id).trim(),
-      kind,
-      protocol,
-      baseUrl,
-      model,
-      env,
-      key: process.env[env] || '',
-      imagePath: String(item?.imagePath || '/images/generations').trim(),
-      taskPath: String(item?.taskPath || '/contents/generations/tasks').trim(),
-      voiceId: String(item?.voiceId || '').trim(),
-    })
-  }
-  return out
-}
-
-/**
- * 自定义通道配置的问题清单。
- *
- * 配置错了却一声不吭，用户只会看到「这个通道不存在」——
- * 必须把原因摆出来：哪一条、哪一项、为什么不能用。
- */
-export function customChannelIssues() {
-  let raw
-  try { raw = JSON.parse(readFileSync(CUSTOM_CONFIG(), 'utf8')) } catch (error) {
-    return { file: CUSTOM_CONFIG(), problems: error.code === 'ENOENT' ? [] : [`配置文件无法解析：${error.message}`] }
-  }
-  const list = Array.isArray(raw) ? raw : (raw?.channels || [])
-  const problems = []
-  if (!Array.isArray(list)) return { file: CUSTOM_CONFIG(), problems: ['channels 必须是数组'] }
-  const seen = new Set()
-  list.forEach((item, index) => {
-    const id = String(item?.id || '').trim()
-    const label = id || `第 ${index + 1} 条`
-    if (!id) problems.push(`${label}：缺少 id`)
-    else if (seen.has(id)) problems.push(`${label}：id 重复`)
-    else seen.add(id)
-    if (!String(item?.baseUrl || '').trim()) problems.push(`${label}：缺少 baseUrl`)
-    if (!String(item?.model || '').trim()) problems.push(`${label}：缺少 model`)
-    if (!String(item?.env || '').trim()) problems.push(`${label}：缺少 env（环境变量名）`)
-    else if (!process.env[String(item.env).trim()]) problems.push(`${label}：环境变量 ${item.env} 未注入，调用会被拒绝`)
-    if (item?.kind && !['image', 'video', 'tts'].includes(item.kind)) problems.push(`${label}：kind 只支持 image / video / tts`)
-    if (item?.kind === 'tts') problems.push(`${label}：自定义 TTS 通道尚未实现，请改用 MiniMax TTS 或本地 VoxFlow`)
-    if (item?.kind === 'video' && item?.protocol && item.protocol !== 'ark-task') problems.push(`${label}：视频通道目前只支持 ark-task 协议`)
-  })
-  return { file: CUSTOM_CONFIG(), problems }
-}
-
 /** 画幅 → 像素尺寸（生图接口用） */
 function sizeFor(ratio) {
   if (ratio === '16:9') return '1920x1080'
@@ -262,7 +188,7 @@ function readReelConfig() {
   }
 }
 
-export function createProviders(store, { fetcher = fetch, pause = delay } = {}) {
+export function createProviders(store, { fetcher = fetch, pause = delay, download: downloadAsset = download } = {}) {
   const voiceBase = process.env.REEL_VOXFLOW_URL || 'http://127.0.0.1:8866'
   const cfg = readReelConfig()
   const primaryKey = process.env.MINIMAX_API_KEY || cfg.minimaxApiKey || ''
@@ -301,7 +227,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
   }
 
   const safeDownload = async url => {
-    try { return await download(url) } catch (error) { throw withCause(error, '下载素材') }
+    try { return await downloadAsset(url) } catch (error) { throw withCause(error, '下载素材') }
   }
   /** MiniMax 文字转语音：返回音频字节 */
   const minimaxTts = async ({ key, text, model, voiceId, speed = 1 }) => {
@@ -328,11 +254,18 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
     return { bytes, mime: 'audio/mpeg' }
   }
 
-  /** 自定义通道：一次 POST 出图的 OpenAI 兼容形状 */
+  /**
+   * 自定义通道出图。三种协议形状，各自的请求体与回执都不一样：
+   *   openai        —— 一次 POST 拿结果（OpenAI 兼容的生图接口）
+   *   minimax-image —— 厂商直连，用 aspect_ratio 而不是 size
+   *   museav        —— 中台：先提交拿任务 ID，再轮询任务
+   */
   const customImage = async ({ channel, prompt, ratio }) => {
+    if (channel.protocol === 'minimax-image') return minimaxImage({ channel, prompt, ratio })
+    if (channel.protocol === 'museav') return museavImage({ channel, prompt, ratio })
     const response = await fetcher(channel.baseUrl + channel.imagePath, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${channel.key}`, 'Content-Type': 'application/json' },
+      headers: channelHeaders(channel),
       body: JSON.stringify({ model: channel.model, prompt, size: sizeFor(ratio), response_format: 'url' }),
       signal: AbortSignal.timeout(180000),
     })
@@ -344,11 +277,120 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
     throw new Error('自定义通道未返回图片地址')
   }
 
+  /** 厂商直连生图（MiniMax）：画幅用 aspect_ratio，图片地址在 data.image_urls */
+  const minimaxImage = async ({ channel, prompt, ratio }) => {
+    const response = await fetcher(channel.baseUrl + channel.imagePath, {
+      method: 'POST',
+      headers: channelHeaders(channel),
+      body: JSON.stringify({ model: channel.model, prompt, aspect_ratio: ratio, response_format: 'url' }),
+      signal: AbortSignal.timeout(180000),
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(`MiniMax HTTP ${response.status}${result?.base_resp?.status_msg ? `：${result.base_resp.status_msg}` : ''}`)
+    if (result?.base_resp?.status_code) throw new Error(`MiniMax 拒绝请求（${result.base_resp.status_code}）：${result.base_resp.status_msg || '请核对权限或额度'}`)
+    const url = result?.data?.image_urls?.[0]
+    if (url) return safeDownload(url)
+    const base64 = result?.data?.image_base64
+    if (base64) return { bytes: Buffer.from(base64, 'base64'), mime: 'image/png' }
+    throw new Error('MiniMax 未返回图片地址')
+  }
+
+  /** 中台出图：提交拿任务 ID，再轮询到出结果 */
+  const museavImage = async ({ channel, prompt, ratio }) => {
+    const submitted = await museavBatchSubmit(channel, channel.imagePath, {
+      items: [{ prompt, model: channel.model || undefined, ratio }],
+    })
+    const jobId = submitted.jobId
+    if (!jobId) throw new Error(`中台没有受理这次出图：${submitted.error || '未知原因'}；请先到中台核对，别重复提交`)
+    const job = await museavAwait(channel, jobId, channel.imageJobPath, ['done', 'succeeded'])
+    const url = job?.cdn_url || job?.cdnUrl || job?.url
+    if (!url) throw new Error(`中台任务 ${jobId} 已完成，但未返回下载地址`)
+    return safeDownload(url)
+  }
+
+  /**
+   * 中台批量出图的回执：任务 ID 在 results 数组里，**不在顶层**。
+   *
+   * 只读顶层会拿到空字符串 —— 每次提交都白花钱还不报错。
+   * 遇到没有 results 也没有顶层 ID 的回执，必须当成「可能已经受理」：
+   * 这时候再提交一次就是重复扣费。
+   */
+  const museavBatchSubmit = async (channel, path, body) => {
+    const response = await fetcher(channel.baseUrl + path, {
+      method: 'POST',
+      headers: channelHeaders(channel),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60000),
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(`中台 HTTP ${response.status}${result?.error?.message ? `：${result.error.message}` : ''}`)
+    const items = Array.isArray(result?.results) ? result.results : null
+    if (!items) {
+      const top = result?.jobId || result?.job_id || result?.id
+      if (top) return { jobId: String(top) }
+      throw new Error('中台回执里既没有 results 也没有任务 ID；这次可能已经受理，请先到中台核对，别重复提交')
+    }
+    const first = items[0] || {}
+    if (first.ok === false) return { jobId: '', error: first.error || '未知原因' }
+    const jobId = first.jobId || first.job_id || first.id
+    if (!jobId) return { jobId: '', error: first.error || '没有返回任务 ID' }
+    return { jobId: String(jobId) }
+  }
+
+  /** 中台视频：POST /api/videos，回执是 job_id / id */
+  const museavVideoSubmit = async (channel, path, body) => {
+    const response = await fetcher(channel.baseUrl + path, {
+      method: 'POST',
+      headers: channelHeaders(channel),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60000),
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(`中台 HTTP ${response.status}${result?.error?.message ? `：${result.error.message}` : ''}`)
+    const jobId = result?.job_id || result?.jobId || result?.id
+    if (!jobId) throw new Error('中台没有返回视频任务 ID；请先到中台核对，别重复提交')
+    return { jobId: String(jobId) }
+  }
+
+  /**
+   * 中台任务轮询。
+   *
+   * 出图查 /api/jobs、出视频查 /api/videos —— 两个端点各管各的，
+   * 拿图片的端点去查视频任务，永远查不到。
+   */
+  const museavAwait = async (channel, jobId, jobPath, doneStatuses) => {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      await pause(3000)
+      const polled = await fetcher(`${channel.baseUrl}${jobPath}?id=${encodeURIComponent(jobId)}`, {
+        headers: channelHeaders(channel),
+        signal: AbortSignal.timeout(30000),
+      })
+      const body = await polled.json().catch(() => ({}))
+      if (!polled.ok) throw new Error(`中台 HTTP ${polled.status}${body?.error?.message ? `：${body.error.message}` : ''}`)
+      const status = body?.status
+      if (doneStatuses.includes(status)) return body
+      if (['failed', 'cancelled', 'canceled'].includes(status)) throw new Error(`中台任务 ${jobId} 失败：${body?.error || '未知原因'}`)
+    }
+    throw new Error(`中台任务 ${jobId} 仍在处理中，已停止轮询；请核对上游后再操作`)
+  }
+
   /** 自定义通道：提交任务 + 轮询的形状 */
   const customVideo = async ({ channel, prompt, ratio, duration, onSubmitted }) => {
+    if (channel.protocol === 'museav') {
+      const submitted = await museavVideoSubmit(channel, channel.taskPath, {
+        prompt, model: channel.model || undefined, ratio, duration: duration || undefined,
+      })
+      const jobId = submitted.jobId
+      if (!jobId) throw new Error('中台未返回任务 ID；请先核对上游，不要重复提交')
+      onSubmitted?.(String(jobId))
+      const job = await museavAwait(channel, jobId, channel.videoJobPath, ['completed', 'done', 'succeeded'])
+      const url = job?.cdn_url || job?.cdnUrl || job?.url
+      if (!url) throw new Error(`中台任务 ${jobId} 已完成，但未返回下载地址`)
+      return safeDownload(url)
+    }
     const submit = await fetcher(channel.baseUrl + channel.taskPath, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${channel.key}`, 'Content-Type': 'application/json' },
+      headers: channelHeaders(channel),
       body: JSON.stringify({
         model: channel.model,
         content: [{ type: 'text', text: prompt }],
@@ -366,14 +408,14 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
     for (let attempt = 0; attempt < 180; attempt++) {
       await pause(5000)
       const polled = await fetcher(`${channel.baseUrl}${channel.taskPath}/${encodeURIComponent(taskId)}`, {
-        headers: { Authorization: `Bearer ${channel.key}` },
+        headers: channelHeaders(channel),
         signal: AbortSignal.timeout(30000),
       })
       const body = await polled.json().catch(() => ({}))
       const status = body?.status || body?.data?.status
       if (['failed', 'cancelled', 'canceled'].includes(status)) throw new Error(`任务 ${taskId} 失败：${body?.error?.message || body?.error || status}`)
       if (status === 'succeeded') {
-        const url = body?.content?.video_url || body?.content?.video_url || body?.data?.content?.video_url
+        const url = body?.content?.video_url || body?.data?.content?.video_url
         if (!url) throw new Error(`任务 ${taskId} 已完成，但未返回下载地址`)
         return safeDownload(url)
       }
@@ -430,8 +472,28 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
       if (!target) throw new Error(`未知的通道「${upstream.channel}」，无法继续取回`)
       if (!target.key) throw new Error(`通道 ${target.label} 缺少环境变量 ${target.env}，无法查询该任务`)
       progress(`正在查询 ${target.label} 任务 ${upstream.taskId}…`)
+      // 中台的任务查询接口形状不同（/api/jobs?id=），别拿任务式的路径去拼
+      if (target.protocol === 'museav') {
+        const polled = await fetcher(`${target.baseUrl}/api/jobs?id=${encodeURIComponent(upstream.taskId)}`, {
+          headers: channelHeaders(target), signal: AbortSignal.timeout(30000),
+        })
+        const body = await polled.json().catch(() => ({}))
+        if (!polled.ok) throw new Error(`中台 HTTP ${polled.status}`)
+        if (body?.status === 'failed') throw new Error(`中台任务 ${upstream.taskId} 失败：${body?.error || '未知原因'}`)
+        if (!['done', 'succeeded', 'completed'].includes(body?.status)) throw new Error(`中台任务 ${upstream.taskId} 仍是「${body?.status || '处理中'}」，尚未出片；过一会儿再试取回，不必重新提交`)
+        const cdn = body?.cdn_url || body?.cdnUrl || body?.url
+        if (!cdn) throw new Error(`中台任务 ${upstream.taskId} 没有可下载的产物地址`)
+        progress('上游已出片，正在下载…')
+        const { bytes } = await safeDownload(cdn)
+        const probe = await probeBytes('video.mp4', bytes)
+        return store.addAsset(input.projectId, `${target.label} 视频.mp4`, 'video/mp4', bytes, {
+          source: target.label, origin: 'ai', engine: `${target.label} 出视频 · ${upstream.model || target.model}`,
+          prompt: input.prompt || '', requestedModel: upstream.model || target.model, actualModel: 'unknown',
+          upstreamTaskId: String(upstream.taskId), ...probe,
+        })
+      }
       const polled = await fetcher(`${target.baseUrl}${target.taskPath}/${encodeURIComponent(upstream.taskId)}`, {
-        headers: { Authorization: `Bearer ${target.key}` }, signal: AbortSignal.timeout(30000),
+        headers: channelHeaders(target), signal: AbortSignal.timeout(30000),
       })
       const body = await polled.json().catch(() => ({}))
       if (!polled.ok) throw new Error(`自定义通道 HTTP ${polled.status}`)
@@ -470,7 +532,11 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
       const custom = loadCustomChannels()
       const customVideoChannels = custom.filter(c => c.kind === 'video')
       const customImageChannels = custom.filter(c => c.kind === 'image')
-      const voiceLocalReady = Boolean(voice?.[0]?.base_model)
+      // VoxFlow 现在报的是本地 MLX 权重在不在（base_model）。
+      // 它是通用声音工坊，别的后端（付费 TTS 等）以后会由它自己报上来 ——
+      // 在那之前，这里只认眼下真有的字段，不替它猜。
+      const voiceStatus = voice?.[0] || {}
+      const voiceLocalReady = Boolean(voiceStatus.base_model)
       const sherpa = sherpaEngine()
 
       const channel = (id, label, ready, note, extra = {}) => ({ id, label, ready, note, models: [], voices: [], allowCustomModel: false, allowCustomVoice: false, ...extra })
@@ -537,7 +603,9 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
               ? '本地模型已就绪，本地推理不产生模型费用'
               : voice
                 ? '服务在线，Base 模型未就绪'
-                : '没连上本机语音服务：启动 VoxFlow 服务后刷新', {
+                : process.platform === 'darwin'
+                  ? '没连上本机语音服务：启动 VoxFlow 服务后刷新'
+                  : '没连上本机语音服务：VoxFlow 现在的语音后端只跑在 Apple 芯片的 Mac 上，这台机器用不了；文字配音用随应用自带的离线引擎', {
               voices: personas.map(p => ({ id: p.key, name: p.name })),
             }),
             channel('minimax', 'MiniMax TTS', minimaxReady, minimaxReady
@@ -562,7 +630,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
         const channelId = input.backend || 'museav'
         if (channelId !== 'museav') {
           const target = customOf(channelId)
-          if (!target || target.kind !== 'image' || target.protocol !== 'openai') throw new Error(`未知或不支持的图片通道「${channelId}」`)
+          if (!target || target.kind !== 'image' || !['openai', 'minimax-image', 'museav'].includes(target.protocol)) throw new Error(`未知或不支持的图片通道「${channelId}」`)
           if (input.referenceId) throw new Error('此图片通道尚不支持参考图')
           if (!target.key) throw new Error(`通道 ${target.label} 缺少环境变量 ${target.env}，无法调用`)
           progress(`${target.label} 正在生成图片…`)
@@ -637,7 +705,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
         }
         if (channelId !== 'minimax') {
           const target = customOf(channelId)
-          if (!target || target.kind !== 'video' || target.protocol !== 'ark-task') throw new Error(`未知或不支持的视频通道「${channelId}」`)
+          if (!target || target.kind !== 'video' || !['ark-task', 'museav'].includes(target.protocol)) throw new Error(`未知或不支持的视频通道「${channelId}」`)
           if (input.referenceId) throw new Error('此视频通道尚不支持参考图')
           if (!target.key) throw new Error(`通道 ${target.label} 缺少环境变量 ${target.env}，无法调用`)
           progress(`${target.label} 正在提交视频任务…`)
@@ -692,7 +760,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay } = {}) 
       if (['speech', 'clone', 'voice-design'].includes(input.kind)) {
         const channelId = input.backend || (sherpaEngine() ? 'sherpa' : 'voxflow')
         if (channelId === 'sherpa') {
-          if (input.kind !== 'speech') throw new Error('本机离线通道只做文字配音；录音克隆与音色设计要用 VoxFlow（macOS）')
+          if (input.kind !== 'speech') throw new Error('本机离线通道只做文字配音；录音克隆与音色设计要用 VoxFlow')
           const engine = sherpaEngine()
           if (!engine) throw new Error('本机语音引擎没找到，请重新安装应用')
           const bytes = await sherpaSynthesize({ text: input.prompt, engine, onProgress: progress })

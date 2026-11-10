@@ -61,7 +61,11 @@ const (
 	RadiusMD    = 7.0
 	RadiusLG    = 10.0
 	ControlHigh = 39.0 // 输入框、下拉
-	ButtonHigh  = 38.0
+	// ButtonHigh 是按钮高度。
+	//
+	// 从 38 降到 34：按钮跟输入框（39）同高时，一行里并排三个按钮
+	// 会显得又高又笨；34 仍然好点按，但一屏能多放下内容。
+	ButtonHigh = 34.0
 )
 
 // Tokens 是一套完整的界面令牌：色板 + 尺度。
@@ -72,6 +76,7 @@ type Tokens struct {
 	Paper      ui.Color // 窗口底色
 	Surface    ui.Color // 卡片、面板
 	SurfaceAlt ui.Color // 次级面（输入框、标签块）
+	Hover      ui.Color // 悬停底色（导航项、弱按钮）
 	Ink        ui.Color // 主文字
 	Muted      ui.Color // 次要文字
 	Line       ui.Color // 分隔线、描边
@@ -90,6 +95,7 @@ func Light() Tokens {
 		Paper:      ui.Hex(PaperHex),
 		Surface:    ui.Hex(SurfaceHex),
 		SurfaceAlt: ui.Hex(FieldFillHex),
+		Hover:      ui.Hex(SurfaceHex).Mix(ui.Hex(MutedHex), 0.07),
 		Ink:        ui.Hex(InkHex),
 		Muted:      ui.Hex(MutedHex),
 		Line:       ui.Hex(LineHex),
@@ -109,6 +115,7 @@ func Dark() Tokens {
 		Paper:      ui.Hex("#1c1e1b"),
 		Surface:    ui.Hex("#242723"),
 		SurfaceAlt: ui.Hex("#2b2e29"),
+		Hover:      ui.Hex("#242723").Mix(ui.Hex("#9aa094"), 0.12),
 		Ink:        ui.Hex("#e8eae3"),
 		Muted:      ui.Hex("#9aa094"),
 		Line:       ui.Hex("#3a3e37"),

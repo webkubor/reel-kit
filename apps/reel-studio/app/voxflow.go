@@ -6,6 +6,8 @@ package app
 // 并且允许把命令复制走。
 
 import (
+	"runtime"
+
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
@@ -51,8 +53,17 @@ func (a *App) voxflowHint(c *ui.Context) {
 		return
 	}
 	a.kit.Notice(c, "VoxFlow 没连上：这只影响「克隆自己的声音」和「设计音色」，出片不受影响。", "")
+	if runtime.GOOS != "darwin" {
+		// VoxFlow 现在的语音后端是 Apple 芯片上的本地 MLX 模型，
+		// 这台机器跑不起来 —— 再给安装命令就是把人往坑里引。
+		a.kit.Hint(c, "配音用随应用自带的本机离线引擎就行，任何机器都能用。\n"+
+			"想换个更好的音色：在「设置与反馈 → 云端配音密钥」填一个 MiniMax 密钥，走云端按量计费。\n"+
+			"想克隆自己的声音：VoxFlow 现在的语音后端只跑在 Apple 芯片的 Mac 上，这台机器用不了。\n"+
+			"它后续会接别的语音后端（"+voxflowRepo+" 看进展）；在那之前，这台机器上没有本地克隆。")
+		return
+	}
 	a.kit.Hint(c, "配音用随应用自带的本机离线引擎就行，Windows 也能用。\n"+
-		"只有你要克隆自己的声音或设计音色时才需要 VoxFlow（仅 macOS · Apple 芯片，要装 Python 和模型，5.8 GB）：\n"+voxflowInstall+
+		"只有你要克隆自己的声音或设计音色时才需要 VoxFlow（macOS · Apple 芯片，要装 Python 和模型，5.8 GB）：\n"+voxflowInstall+
 		"\n\n启动它（装完每次开机起一次）：\n"+voxflowStart+
 		"\n\n服务默认就在 127.0.0.1:8866，起来后回这个窗口重试。")
 	ui.Row(c).Gap(design.SpaceSM).Children(func() {

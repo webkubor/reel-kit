@@ -68,6 +68,22 @@ var iconSources = map[string]string{
 	"save": `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
 		<path d="M8 2.8v7M5.2 7.4 8 10.2l2.8-2.8"/><path d="M3.4 12.2v.6a1 1 0 0 0 1 1h7.2a1 1 0 0 0 1-1v-.6"/>
 	</svg>`,
+	// 箭头：指向右边，提示「点进去有东西」
+	"chevron": `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+		<path d="M6.2 3.6 10.6 8l-4.4 4.4"/>
+	</svg>`,
+	// 检查：放大镜里的对勾
+	"check": `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+		<circle cx="7.2" cy="7.2" r="4.6"/><path d="m10.6 10.6 3 3"/><path d="m5.4 7.2 1.3 1.3 2.2-2.4"/>
+	</svg>`,
+	// 编辑：铅笔
+	"edit": `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+		<path d="m10.4 2.9 2.7 2.7-7.5 7.5-3.3.6.6-3.3Z"/><path d="m9.2 4.1 2.7 2.7"/>
+	</svg>`,
+	// 删掉：垃圾桶
+	"trash": `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+		<path d="M3.2 4.6h9.6M6.4 4.6V3.2h3.2v1.4M4.6 4.6l.6 8.2h5.6l.6-8.2"/>
+	</svg>`,
 }
 
 // icons 缓存解析结果：解析一次，界面上反复用。

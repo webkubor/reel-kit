@@ -1,6 +1,8 @@
 package app
 
 import (
+	"runtime"
+
 	"github.com/egoist/mygo/ui"
 	"github.com/webkubor/reel-kit/apps/reel-studio/studioapi"
 )
@@ -91,7 +93,7 @@ func (a *App) viewVoicePicker(c *ui.Context, backend *string, voiceID *string) {
 		}
 		choices = append(choices, choice{ch.ID, label})
 	}
-	a.pick(c, "配音通道", "本机离线：随应用自带、不联网不花钱；VoxFlow 可克隆自己的声音（仅 macOS）；云端按量计费", choices, *backend, func(id string) {
+	a.pick(c, "配音通道", voiceChannelPickerHelp(), choices, *backend, func(id string) {
 		if id != *backend {
 			*voiceID = "" // 换通道等于换音色列表，旧音色不再有意义
 		}
@@ -121,6 +123,18 @@ func (a *App) viewVoicePicker(c *ui.Context, backend *string, voiceID *string) {
 		voices = append(voices, choice{v.ID, v.Name})
 	}
 	a.pick(c, "音色", voiceChannelHelp(ch.ID), voices, *voiceID, func(id string) { *voiceID = id })
+}
+
+// voiceChannelPickerHelp 写清楚三条通道分别在哪跑、花不花钱。
+//
+// VoxFlow 现在的语音后端是 Apple 芯片上的本地 MLX 模型，Windows 装不了也用不了 ——
+// 那是 VoxFlow 当前的部署形态，不是这条路走不通。所以这句限制只在非 Apple 芯片的
+// 机器上说明白，别在 Mac 上也写着「仅 macOS」。
+func voiceChannelPickerHelp() string {
+	if runtime.GOOS == "darwin" {
+		return "本机离线：随应用自带、不联网不花钱；VoxFlow 可克隆自己的声音；云端按量计费"
+	}
+	return "本机离线：随应用自带、不联网不花钱；VoxFlow（克隆自己的声音）现在只支持 Apple 芯片的 Mac；云端按量计费"
 }
 
 // voiceChannelHelp 写清楚这条通道的钱和隐私成本。

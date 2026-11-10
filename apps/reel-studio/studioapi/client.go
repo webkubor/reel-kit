@@ -235,9 +235,48 @@ type Providers struct {
 	Image          GroupStatus `json:"image"`
 	Voice          GroupStatus `json:"voice"`
 	CustomChannels struct {
-		File     string   `json:"file"`
-		Problems []string `json:"problems"`
+		File     string          `json:"file"`
+		Problems []string        `json:"problems"`
+		Channels []CustomChannel `json:"channels"`
 	} `json:"customChannels"`
+}
+
+// CustomChannel 是一条自定义模型通道。
+//
+// 只有配置，没有密钥：密钥永远走环境变量或本机配置，界面上也只看得到变量名。
+type CustomChannel struct {
+	ID        string `json:"id"`
+	Label     string `json:"label"`
+	Kind      string `json:"kind"`
+	Protocol  string `json:"protocol"`
+	BaseURL   string `json:"baseUrl"`
+	Model     string `json:"model"`
+	Env       string `json:"env"`
+	Auth      string `json:"auth"`
+	ImagePath string `json:"imagePath"`
+	TaskPath  string `json:"taskPath"`
+	// Ready 只代表密钥到位，不代表上游模型可用 —— 那得真跑一次才知道
+	Ready     bool   `json:"ready"`
+	KeySource string `json:"keySource"`
+	Note      string `json:"note"`
+}
+
+// ChannelCheck 是探活结果里的一段：地址、鉴权、模型、协议分开报。
+//
+// OK 是三态：true 验证通过，false 验证失败，nil 上游没给得出能判断的信息
+// ——「没验证」不等于「能用」。
+type ChannelCheck struct {
+	Name   string `json:"name"`
+	OK     *bool  `json:"ok"`
+	Detail string `json:"detail"`
+}
+
+// ChannelCheckResult 是一次探活的完整结果。
+type ChannelCheckResult struct {
+	ID     string         `json:"id"`
+	Label  string         `json:"label"`
+	OK     bool           `json:"ok"`
+	Checks []ChannelCheck `json:"checks"`
 }
 
 // BGMItem 是配乐库中的一首。
@@ -313,6 +352,31 @@ func (c *Client) do(method, path string, body any, out any) error {
 		return nil
 	}
 	return json.Unmarshal(raw, out)
+}
+
+// SaveChannel 新增或更新一条自定义通道。
+func (c *Client) SaveChannel(entry map[string]any) ([]CustomChannel, error) {
+	var out struct {
+		Channels []CustomChannel `json:"channels"`
+	}
+	err := c.do(http.MethodPost, "/api/channels", entry, &out)
+	return out.Channels, err
+}
+
+// DeleteChannel 删掉一条自定义通道。
+func (c *Client) DeleteChannel(id string) ([]CustomChannel, error) {
+	var out struct {
+		Channels []CustomChannel `json:"channels"`
+	}
+	err := c.do(http.MethodDelete, "/api/channels/"+id, nil, &out)
+	return out.Channels, err
+}
+
+// CheckChannel 探活一条通道：发一次不会产生内容的请求，判断能不能用。
+func (c *Client) CheckChannel(id string) (*ChannelCheckResult, error) {
+	var out ChannelCheckResult
+	err := c.do(http.MethodPost, "/api/channels/check", map[string]any{"id": id}, &out)
+	return &out, err
 }
 
 // State 读取工作台状态。

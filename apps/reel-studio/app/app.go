@@ -195,6 +195,21 @@ type App struct {
 	// 问题与需求反馈
 	feedback feedbackState
 
+	// 自定义模型通道（用户自己填的中转站 / 厂商直连）
+	chanID       string
+	chanLabel    string
+	chanKind     string
+	chanProtocol string
+	chanBaseURL  string
+	chanModel    string
+	chanEnv      string
+	// chanKey 是密钥输入框。保存后清空：明文不留在状态里。
+	chanKey string
+	// chanEditing 记着正在改哪条通道，空串表示是新增
+	chanEditing string
+	// chanChecks 存每条通道最近一次检查的诊断，通道 id → 多行文本
+	chanChecks map[string]string
+
 	// 云端配音（MiniMax TTS）的密钥输入框。
 	// 明文不留在状态里：只留用户刚输入的那一份，保存后清空。
 	minimaxKeyInput string
@@ -622,10 +637,22 @@ func (a *App) viewSidebar(c *ui.Context) {
 				}
 			})
 		})
-		ui.Column(c).FillWidth().Gap(design.SpaceSM).
-			Background(a.kit.T.Surface).Border(1, a.kit.T.Line).
+		// 底部状态区。
+		//
+		// 之前这里是一个带描边的小方框，里面塞了九行小字：
+		// 工作台状态两行、连接状态一行、视频图片配音三行、
+		// 通道有问题再糊上两行红字。侧栏只有 248 宽，
+		// 那块地方挤成一团字墙 —— 谁也读不下去。
+		//
+		// 现在：一条分隔线，下面三样东西各一行。
+		// 工作台连接一行、能力点一行、通道待办一行（可点进去）。
+		// 详细的错误留在设置页，那儿有完整列表。
+		ui.Column(c).FillWidth().Gap(design.SpaceMD).
 			Padding(design.SpaceLG, design.SpaceXL).Children(func() {
-			a.viewConnections(c)
+			a.kit.Divider(c)
+			a.viewBackendStatus(c)
+			a.viewCapabilityLine(c)
+			a.viewChannelNotice(c)
 			a.viewSidebarFooter(c)
 		})
 	})
@@ -677,6 +704,9 @@ func (a *App) startNewVideo() {
 }
 
 // viewSidebarFooter 画左栏底部的设置与反馈入口。
+//
+// 有新版时横幅排在设置入口**上面**，两个都留着 ——
+// 之前是二选一：出了新版，「设置与反馈」就点不到了。
 func (a *App) viewSidebarFooter(c *ui.Context) {
 	info := a.updates.info
 	if info.State == UpdateReady {
@@ -687,7 +717,6 @@ func (a *App) viewSidebarFooter(c *ui.Context) {
 			a.mode = ModeSettings
 			a.redraw()
 		}
-		return
 	}
 	el := a.kit.NavItem(c, kit.Icon("settings"), "设置与反馈", "", a.mode == ModeSettings, false)
 	if el.Clicked() {
@@ -748,7 +777,10 @@ func (a *App) viewSettingsAndFeedback(c *ui.Context) {
 			// 2. 云端配音密钥
 			a.viewVoiceKeySettings(c)
 
-			// 3. 运行日志
+			// 3. 模型通道（用户自己填的中转站 / 厂商直连）
+			a.viewChannels(c)
+
+			// 4. 运行日志
 			a.kit.SectionTitle(c, "运行日志", "查看本地排障日志与文件位置", nil)
 			a.kit.Card(c, func() {
 				if path := a.LogFilePath(); path != "" {
@@ -767,7 +799,7 @@ func (a *App) viewSettingsAndFeedback(c *ui.Context) {
 				}
 			})
 
-			// 4. 问题与需求反馈
+			// 5. 问题与需求反馈
 			a.viewFeedback(c)
 		})
 	})
@@ -776,64 +808,72 @@ func (a *App) viewSettingsAndFeedback(c *ui.Context) {
 // viewBackendStatus 画本地工作台的连接状态。
 //
 // 桌面版要能双击就用：工作台没起来时，界面会自己起一个并把过程写在这里。
-// viewBackendStatus 画工作台自身的一行状态：连上了没有。
+//
+// 一行说完：左边状态点，中间名字，右边状态。
+// 出问题时才补一行说明 —— 正常状态那一行已经够了，
+// 窄侧栏里多一行都是负担。
 func (a *App) viewBackendStatus(c *ui.Context) {
 	status := a.backendState
-	ink := a.kit.T.Muted
+	label, ok := "连接中", false
 	switch status.State {
 	case "ready":
-		ink = a.kit.T.Green
+		label, ok = "已连接", true
 	case "failed":
-		ink = a.kit.T.Accent
+		label = "连不上"
 	}
-	note := status.Note
-	if note == "" {
-		note = "正在连接本地工作台…"
+	a.kit.SideStatus(c, "本地工作台", label, ok)
+	if status.State == "failed" && status.Note != "" {
+		ui.Text(c, status.Note).FontSize(design.FontTiny).TextColor(a.kit.T.Accent).TextAlign(ui.Start)
 	}
-	ui.Row(c).Gap(design.SpaceSM).AlignItems(ui.Center).Children(func() {
-		ui.Text(c, "●").FontSize(design.FontTiny).TextColor(ink)
-		ui.Text(c, "本地工作台").FontSize(design.FontSmall).TextColor(a.kit.T.Ink)
-	})
-	ui.Text(c, note).FontSize(design.FontTiny).TextColor(ink)
 }
 
-// viewConnections 画左栏底部的连接状态。
+// viewCapabilityLine 把「视频 / 图片 / 配音」的可用性排成一行。
 //
-// 只有一块，不拆成「工作台状态」+「连接状态」两段：
-// 两段说的都是同一件事（能不能干活），分开写只会让人以为有两件事。
-func (a *App) viewConnections(c *ui.Context) {
-	ui.Column(c).FillWidth().Gap(design.SpaceSM).Children(func() {
-		a.viewBackendStatus(c)
-		ui.Text(c, "连接状态").FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
-		if a.providers == nil {
-			return
+// 原来是三行，三行小字在侧栏底部堆着，比导航还抢眼 ——
+// 可用性是参考信息，不该比导航更响。一行就够。
+func (a *App) viewCapabilityLine(c *ui.Context) {
+	if a.providers == nil {
+		return
+	}
+	a.kit.CapabilityDots(c, []struct {
+		Name  string
+		Ready bool
+	}{
+		{"视频", a.providers.Video.Ready},
+		{"图片", a.providers.Image.Ready},
+		{"配音", a.providers.Voice.Ready},
+	})
+}
+
+// viewChannelNotice 提示自定义通道还没配好，并给一个入口。
+//
+// 只给一行摘要加一个箭头，不把整段错误糊在侧栏里：
+// 侧栏窄，那几行小字挤在一起读不下去；
+// 详情在设置页，那儿有完整清单，还能直接改。
+func (a *App) viewChannelNotice(c *ui.Context) {
+	if a.providers == nil {
+		return
+	}
+	problems := a.providers.CustomChannels.Problems
+	if len(problems) == 0 {
+		return
+	}
+	el := ui.ButtonBase(c).FillWidth().
+		Radius(design.RadiusSM).Padding(design.SpaceXS, design.SpaceSM).
+		Gap(design.SpaceSM).AlignItems(ui.Center).Children(func() {
+		if icon := kit.Icon("alert"); icon != nil {
+			ui.Icon(c, icon).Width(kit.IconSizeSmall).Height(kit.IconSizeSmall).TextColor(a.kit.T.Accent)
 		}
-		for _, row := range []struct {
-			name  string
-			ready bool
-			note  string
-		}{
-			{"视频", a.providers.Video.Ready, a.providers.Video.Note},
-			{"图片", a.providers.Image.Ready, a.providers.Image.Note},
-			{"配音", a.providers.Voice.Ready, a.providers.Voice.Note},
-		} {
-			ui.Row(c).Gap(design.SpaceSM).AlignItems(ui.Center).Children(func() {
-				dot := ui.Text(c, "●").FontSize(design.FontTiny)
-				if row.ready {
-					dot = dot.TextColor(a.kit.T.Green)
-				} else {
-					dot = dot.TextColor(a.kit.T.Muted)
-				}
-				ui.Text(c, row.name).FontSize(design.FontSmall).TextColor(a.kit.T.Ink)
-			})
-		}
-		if problems := a.providers.CustomChannels.Problems; len(problems) > 0 {
-			ui.Text(c, "自定义通道配置有问题").FontSize(design.FontTiny).TextColor(a.kit.T.Accent)
-			for _, p := range problems {
-				ui.Text(c, "· "+p).FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
-			}
+		ui.Text(c, fmt.Sprintf("%d 个通道待配置", len(problems))).Grow(1).
+			FontSize(design.FontSmall).TextColor(a.kit.T.Accent).TextAlign(ui.Start)
+		if icon := kit.Icon("chevron"); icon != nil {
+			ui.Icon(c, icon).Width(kit.IconSizeSmall).Height(kit.IconSizeSmall).TextColor(a.kit.T.Muted)
 		}
 	})
+	if el.Clicked() {
+		a.mode = ModeSettings
+		a.redraw()
+	}
 }
 
 // viewMain 画右边的两个区域：生成器 + 预览/素材/历史。

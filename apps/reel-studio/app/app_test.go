@@ -152,16 +152,28 @@ func Test选过的值不在选项里时不被静默换掉(t *testing.T) {
 	}
 }
 
+// Test自定义通道的配置问题要显示
+//
+// 左栏只给一行摘要加一个入口，**不把整段错误糊在窄侧栏里** ——
+// 那里挤成字墙谁也读不下去。详细原因在设置页，那儿有完整清单。
 func Test自定义通道的配置问题要显示(t *testing.T) {
 	server := stub(t, nil)
 	a := newApp(t, server.URL)
 	tt := ui.NewTester(a.View, 1280, 840)
 	tt.Frame()
-	if !tt.HasText("自定义通道配置有问题") {
-		t.Errorf("自定义通道的问题没有显示，实际文字：%q", tt.Texts())
+	if !tt.HasText("1 个通道待配置") {
+		t.Errorf("左栏没有给出通道待办的入口，实际文字：%q", tt.Texts())
 	}
+	if tt.HasText("ARK_API_KEY 未注入") {
+		t.Errorf("左栏不该塞进通道问题的具体原因，实际文字：%q", tt.Texts())
+	}
+
+	// 具体原因在设置页
+	a.mode = ModeSettings
+	tt = ui.NewTester(a.View, 1280, 840)
+	tt.Frame()
 	if !tt.HasText("ARK_API_KEY 未注入") {
-		t.Errorf("配置问题的具体原因没有显示，实际文字：%q", tt.Texts())
+		t.Errorf("设置页没有显示配置问题的具体原因，实际文字：%q", tt.Texts())
 	}
 }
 
@@ -268,4 +280,57 @@ func Test按钮交互不发生死锁(t *testing.T) {
 	if a.recTitle != "测试项目标题" {
 		t.Errorf("草稿标题未按预期填入：%s", a.recTitle)
 	}
+}
+
+// Test导航项悬停要有反馈
+//
+// 框架只给自带外观的按钮做悬停反馈，导航项这种自拼的默认
+// 「鼠标移上去跟没动一样」—— 手感发死，用户会以为界面卡了。
+// 这个测试守住那层浅底。
+func Test导航项悬停要有反馈(t *testing.T) {
+	server := stub(t, nil)
+	a := newApp(t, server.URL)
+	tt := ui.NewTester(a.View, 1280, 840)
+	tt.Frame()
+
+	rect, ok := tt.Find("项目推荐")
+	if !ok {
+		t.Fatalf("找不到「项目推荐」导航项")
+	}
+	// 取整行的众数色：那一行里绝大多数像素是按钮底色，
+	// 比在某个点上采样稳（会采到抗锯齿的字形边缘）。
+	rowY := int(rect.Y + rect.H/2)
+	before := rowBackground(tt, rowY, 20, 228)
+
+	tt.Move(float32(rect.X), float32(rect.Y+rect.H/2))
+	tt.Frame()
+	after := rowBackground(tt, rowY, 20, 228)
+
+	if before == after {
+		t.Errorf("指针移上去之后导航项没有变化（前后都是 %#v）：悬停反馈丢了", before)
+	}
+}
+
+// rowBackground 取一行里出现最多的颜色 —— 那就是这一行的底色。
+func rowBackground(tt *ui.Tester, y, x0, x1 int) uint32 {
+	img := tt.Image()
+	if img == nil {
+		return 0
+	}
+	counts := map[uint32]int{}
+	for x := x0; x < x1 && x < img.Bounds().Dx(); x++ {
+		if y < 0 || y >= img.Bounds().Dy() {
+			continue
+		}
+		r, g, b, _ := img.At(x, y).RGBA()
+		key := uint32(r>>8)<<16 | uint32(g>>8)<<8 | uint32(b>>8)
+		counts[key]++
+	}
+	best, bestN := uint32(0), -1
+	for color, n := range counts {
+		if n > bestN {
+			best, bestN = color, n
+		}
+	}
+	return best
 }

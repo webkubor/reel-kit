@@ -40,6 +40,10 @@ const (
 //	secondary —— 旁边的另一个动作
 //	quiet     —— 行内的小动作（查看、对比、取消）
 //	danger    —— 会丢东西的动作
+//
+// 外观上的分工：主操作是实心的，次操作是描边的，行内小动作只有文字，
+// 危险操作是**红字无框**—— 跟普通按钮并排时它不该抢注意力，
+// 但真要点到时颜色要立刻说清「这个会删东西」。
 func (c Comps) Action(ctx *ui.Context, variant, label string, disabled bool) ui.Element {
 	var el ui.Element
 	switch variant {
@@ -52,14 +56,52 @@ func (c Comps) Action(ctx *ui.Context, variant, label string, disabled bool) ui.
 		el = el.Radius(design.RadiusSM).Padding(0, design.SpaceXL).Height(design.ButtonHigh)
 		el = el.Background(c.T.Surface).Border(1, c.T.Line).TextColor(c.T.Ink)
 	case ButtonDanger:
+		// 不用描边框：红框加红字太吵。红字本身已经说清了。
 		el = ui.Button(ctx, label)
-		el = el.Radius(design.RadiusSM).Padding(0, design.SpaceXL).Height(design.ButtonHigh)
-		el = el.Background(c.T.Surface).Border(1, c.T.Accent).TextColor(c.T.Accent)
+		el = el.Radius(design.RadiusSM).Padding(0, design.SpaceLG).Height(design.ButtonHigh)
+		el = el.Background(c.T.Surface).TextColor(c.T.Accent)
 	default:
 		el = ui.Button(ctx, label)
 		el = el.TextColor(c.T.Muted).Radius(design.RadiusSM).Padding(design.SpaceXS, design.SpaceMD)
 	}
 	return el.FontSize(design.FontMedium).Disabled(disabled)
+}
+
+// IconAction 是一个带图标的按钮。
+//
+// 图标让一排按钮一眼能分开：只有文字的时候，
+// 「检查 / 编辑 / 删掉」三个并排，谁是谁全靠读。
+func (c Comps) IconAction(ctx *ui.Context, variant string, icon *ui.SVG, label string, disabled bool) ui.Element {
+	ink := c.T.Ink
+	switch variant {
+	case ButtonPrimary:
+		ink = c.T.AccentText
+	case ButtonDanger:
+		ink = c.T.Accent
+	case ButtonQuiet:
+		ink = c.T.Muted
+	}
+	base := c.Action(ctx, variant, "", disabled)
+	return base.Children(func() {
+		if icon != nil {
+			ui.Icon(ctx, icon).Width(IconSizeSmall).Height(IconSizeSmall).TextColor(ink)
+		}
+		if label != "" {
+			ui.Text(ctx, label).FontSize(design.FontMedium).TextColor(ink)
+		}
+	})
+}
+
+// Hover 元素在指针悬停时换一层底色。
+//
+// 框架只给自带外观的按钮（ui.Button）做悬停反馈；
+// 导航项、行内动作这些自己拼出来的控件默认是「鼠标移上去没反应」——
+// 手感发死。这个补上：悬停时给一层浅底，按下时再深一点。
+func (c Comps) Hover(el ui.Element, fill ui.Color) ui.Element {
+	if el.Hovered() {
+		return el.Background(fill)
+	}
+	return el
 }
 
 // Field 是一个带标签的表单项：标签在上、内容在下、说明在下再下。

@@ -16,12 +16,28 @@ import { recommendationSettings } from './video-settings.mjs'
 import { listBgm, resolveBgmEntry, bgmConfigured } from '../bgm-library.mjs'
 import { initializeWorkflow, snapshotSop, workflowAction, remakeProject } from './workflow.mjs'
 import { limitsFor, saveLimits } from './platform-limits.mjs'
+import { loadCustomChannels, customChannelIssues, upsertChannel, removeChannel, probeChannel } from './channels.mjs'
 
 const web = fileURLToPath(new URL('../../studio/', import.meta.url))
 const templates = fileURLToPath(new URL('../../templates/', import.meta.url))
 const templateNames = readdirSync(templates).filter(f => f.endsWith('.html') && f !== 'project-recommendation.html').map(f => f.slice(0, -5))
 const uuid = /^[a-f\d-]{36}$/
 function fail(message, status = 400) { throw Object.assign(new Error(message), { status }) }
+
+/** 自定义通道给界面看的清单：不含密钥，只说这条通道的密钥从哪来、有没有配 */
+function channelList() {
+  return loadCustomChannels().map(c => ({
+    id: c.id, label: c.label, kind: c.kind, protocol: c.protocol,
+    baseUrl: c.baseUrl, model: c.model, env: c.env,
+    auth: c.auth, imagePath: c.imagePath, taskPath: c.taskPath,
+    // ready 只代表「密钥到位」，不代表上游模型可用 —— 那是另一回事，得跑一次才知道
+    ready: Boolean(c.key),
+    keySource: c.keySource,
+    note: c.key
+      ? (c.keySource === 'env' ? `密钥来自环境变量 ${c.env}` : '密钥已存在设置页')
+      : `还没填密钥：设置环境变量 ${c.env}，或在设置页把密钥填进来`,
+  }))
+}
 async function body(req, max = 1000000) {
   const chunks = []; let length = 0
   for await (const chunk of req) {
@@ -166,7 +182,12 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
         const platform = url.searchParams.get('platform') || 'default'
         return json(res, 200, { platform, limits: limitsFor(store.state, platform) })
       }
-      if (req.method === 'GET' && path === '/api/providers') return json(res, 200, await backend.status())
+      if (req.method === 'GET' && path === '/api/providers') {
+        const status = await backend.status()
+        status.customChannels = status.customChannels || {}
+        status.customChannels.channels = channelList()
+        return json(res, 200, status)
+      }
       if (req.method === 'GET' && path === '/api/styles') {
         // 视觉风格库：口播视频用。只暴露口播模板能用的风格，别把别的版式混进来。
         const styles = KNOWLEDGE_STYLES.filter(s => TALK_TEMPLATES.includes(s.template))
@@ -212,6 +233,11 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
         if (range) headers['content-range'] = `bytes ${start}-${end}/${size}`
         res.writeHead(range ? 206 : 200, headers)
         return createReadStream(file, { start, end }).pipe(res)
+      }
+      if (req.method === 'DELETE' && path.startsWith('/api/channels/')) {
+        const channelID = decodeURIComponent(path.slice('/api/channels/'.length))
+        removeChannel(channelID)
+        return json(res, 200, { ok: true, channels: channelList() })
       }
       if (req.method === 'POST') {
         if (req.headers['x-reel-action'] !== 'studio') fail('缺少工作台操作标记', 403)
@@ -412,6 +438,30 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
           if (!name || name.length > 80) fail('项目名称须为 1–80 字')
           const project = { id: id(), name, createdAt: now() }; store.state.projects.push(project); store.save()
           return json(res, 201, project)
+        }
+        if (path === '/api/channels/check') {
+          const channel = loadCustomChannels().find(c => c.id === String(input.id || '').trim())
+          if (!channel) fail('没有这条通道，先在设置里添加')
+          const result = await probeChannel(channel)
+          return json(res, 200, { id: channel.id, label: channel.label, ok: result.ok, checks: result.checks })
+        }
+        if (path === '/api/channels') {
+          const entry = {
+            id: String(input.id || '').trim(),
+            label: String(input.label || '').trim(),
+            kind: String(input.kind || 'image').trim(),
+            protocol: String(input.protocol || 'openai').trim(),
+            baseUrl: String(input.baseUrl || '').trim(),
+            model: String(input.model || '').trim(),
+            env: String(input.env || '').trim(),
+            ...(input.imagePath ? { imagePath: String(input.imagePath).trim() } : {}),
+            ...(input.taskPath ? { taskPath: String(input.taskPath).trim() } : {}),
+            ...(input.auth ? { auth: String(input.auth).trim() } : {}),
+          }
+          if (!entry.id) fail('通道 id 不能为空')
+          if (!/^[a-z0-9][a-z0-9._-]{0,40}$/i.test(entry.id)) fail('通道 id 只能用字母、数字、点、下划线和短横线')
+          upsertChannel(entry)
+          return json(res, 200, { ok: true, channels: channelList() })
         }
         if (path === '/api/jobs') {
           const value = validate(input, store)

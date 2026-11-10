@@ -58,6 +58,18 @@ reel — 竖版短视频合成工作台
   reel templates
   reel styles           # 知识短视频 44 套视觉风格库
   reel bgm              # 配乐库（别名 + 授权 + 时长）
+  reel channels         # 自定义模型通道（自己的中转 / 厂商直连）
+
+channels 子命令:
+  reel channels list                      # 列出已配通道 + 配置问题
+  reel channels add --id <id> --base-url <地址> --env <环境变量名> \\
+      [--label <名称>] [--kind image|video] [--protocol <协议>] [--model <模型>] \\
+      [--image-path <路径>] [--task-path <路径>] [--auth bearer|api-key]
+  reel channels rm <id>                   # 删掉一条通道
+  reel channels check <id>                # 探活：不通不花钱，不生成任何内容
+
+  协议：生图 openai / minimax-image / museav，视频 ark-task / museav
+  密钥**只写环境变量名**（--env），不写进配置文件；调用前把密钥注入那个变量。
 
 make 选项:
   --template <名>     模板名（见 reel templates），默认 sticker-promo
@@ -339,6 +351,93 @@ async function cmdMake(args) {
   }
 }
 
+async function cmdChannels(args) {
+  const {
+    loadCustomChannels, customChannelIssues, upsertChannel, removeChannel, probeChannel, IMAGE_PROTOCOLS, VIDEO_PROTOCOLS,
+  } = await import('../src/studio/channels.mjs')
+  const action = args._[0] || 'list'
+
+  if (action === 'list') {
+    const { file, problems } = customChannelIssues()
+    const channels = loadCustomChannels()
+    console.log(`通道配置文件：${file}`)
+    if (!channels.length) {
+      console.log('还没有自定义通道。用 reel channels add 新增一条。')
+    }
+    for (const c of channels) {
+      const keyState = c.key
+        ? (c.keySource === 'env' ? `密钥来自环境变量 ${c.env}` : '密钥已存在设置页')
+        : `还没填密钥（环境变量 ${c.env} 或设置页）`
+      console.log(`  ${c.id.padEnd(14)} ${c.kind.padEnd(5)} ${c.protocol.padEnd(13)} ${c.label} · ${keyState}`)
+    }
+    if (problems.length) {
+      console.log('\n⚠️  配置问题：')
+      for (const p of problems) console.log(`  - ${p}`)
+    }
+    return
+  }
+
+  if (action === 'add') {
+    const id = String(args.id || '').trim()
+    const kind = String(args.kind || 'image').trim()
+    const protocol = String(args.protocol || (kind === 'video' ? 'ark-task' : 'openai')).trim()
+    if (!id) { console.error('❌ 缺 --id'); process.exit(1) }
+    if (!args['base-url']) { console.error('❌ 缺 --base-url'); process.exit(1) }
+    if (!args.env) { console.error('❌ 缺 --env（环境变量名，密钥本身不要写进文件）'); process.exit(1) }
+    if (kind === 'image' && !IMAGE_PROTOCOLS.includes(protocol)) { console.error(`❌ 生图协议只支持 ${IMAGE_PROTOCOLS.join(' / ')}`); process.exit(1) }
+    if (kind === 'video' && !VIDEO_PROTOCOLS.includes(protocol)) { console.error(`❌ 视频协议只支持 ${VIDEO_PROTOCOLS.join(' / ')}`); process.exit(1) }
+    const { file } = upsertChannel({
+      id, label: String(args.label || id), kind, protocol,
+      baseUrl: String(args['base-url']), model: String(args.model || ''), env: String(args.env),
+      ...(args['image-path'] ? { imagePath: String(args['image-path']) } : {}),
+      ...(args['task-path'] ? { taskPath: String(args['task-path']) } : {}),
+      ...(args.auth ? { auth: String(args.auth) } : {}),
+    })
+    console.log(`✅ 已写入 ${file}`)
+    if (!process.env[String(args.env)]) console.log(`⚠️  环境变量 ${args.env} 当前没注入，调用会被拒绝`)
+    console.log('   接着跑：reel channels check ' + id)
+    return
+  }
+
+  if (action === 'rm' || action === 'remove' || action === 'delete') {
+    const id = args._[1] || String(args.id || '')
+    if (!id) { console.error('❌ 缺通道 id'); process.exit(1) }
+    const { file } = removeChannel(id)
+    console.log(`✅ 已从 ${file} 删掉 ${id}`)
+    return
+  }
+
+  if (action === 'check') {
+    const id = args._[1] || String(args.id || '')
+    const channels = loadCustomChannels()
+    const target = id ? channels.find(c => c.id === id) : channels[0]
+    if (!target) { console.error(`❌ 没有可检查的通道${id ? `（${id}）` : ''}`); process.exit(1) }
+    console.log(`检查通道「${target.label}」（${target.protocol} · ${target.baseUrl}）…`)
+    const result = await probeChannel(target)
+    // 三态：通过 ✅、失败 ❌、未验证 ⚠️。
+    // 「没验证」标成通过就是骗人 —— 用户会以为能用了。
+    for (const c of result.checks) {
+      const mark = c.ok === true ? '✅' : c.ok === false ? '❌' : '⚠️'
+      console.log(`  ${mark} ${c.name}：${c.detail}`)
+    }
+    const failed = result.checks.some(c => c.ok === false)
+    const unknown = result.checks.some(c => c.ok === null)
+    if (failed) {
+      console.log('\n❌ 这条通道还用不了，先按上面几行改')
+      process.exit(1)
+    }
+    if (unknown) {
+      console.log('\n⚠️  地址与密钥都通，但还有没验过的项 —— 真跑一次任务才算数')
+      return
+    }
+    console.log('\n✅ 这条通道可以用')
+    return
+  }
+
+  console.error(`未知子命令 ${action}。可用：list / add / rm / check`)
+  process.exit(1)
+}
+
 async function main() {
   const argv = process.argv.slice(2)
   const cmd = argv[0]
@@ -377,6 +476,9 @@ async function main() {
       if (b.usedBy?.length) console.log(`  ${' '.repeat(14)} 用过：${b.usedBy.join('、')}`)
     }
     return
+  }
+  if (cmd === 'channels') {
+    return cmdChannels(args)
   }
   if (cmd === 'make') {
     if (!findChrome()) { console.error('❌ 找不到本机 Chrome，设 CHROME_PATH'); process.exit(1) }

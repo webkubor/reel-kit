@@ -40,7 +40,7 @@ func (c Comps) NavItem(ctx *ui.Context, icon *ui.SVG, label, count string, selec
 	if disabled {
 		ink = c.T.Muted
 	}
-	return ui.ButtonBase(ctx).
+	el := ui.ButtonBase(ctx).
 		FillWidth().
 		Background(fill).
 		Radius(design.RadiusSM).
@@ -65,6 +65,51 @@ func (c Comps) NavItem(ctx *ui.Context, icon *ui.SVG, label, count string, selec
 					Padding(design.SpaceXS, design.SpaceSM).MinWidth(22).TextAlign(ui.Center)
 			}
 		})
+	// 悬停反馈。框架只给自带外观的按钮做这件事，导航项这种自拼的默认
+	// 「鼠标移上去没反应」—— 手感发死，用户会以为界面卡了。
+	if !selected && !disabled {
+		el = c.Hover(el, c.T.Hover)
+	}
+	return el
+}
+
+// SideStatus 是左栏底部状态区的一行：左边一个状态点，右边一句话。
+//
+// 一行放得下就一行放：左下角那块地方窄，堆成三行四行就成了字墙。
+func (c Comps) SideStatus(ctx *ui.Context, label, value string, ok bool) ui.Element {
+	ink := c.T.Muted
+	if ok {
+		ink = c.T.Green
+	}
+	return ui.Row(ctx).FillWidth().Gap(design.SpaceSM).AlignItems(ui.Center).Children(func() {
+		ui.Text(ctx, "●").FontSize(design.FontTiny).TextColor(ink)
+		ui.Text(ctx, label).Grow(1).FontSize(design.FontSmall).TextColor(c.T.Ink).TextAlign(ui.Start)
+		if value != "" {
+			ui.Text(ctx, value).FontSize(design.FontTiny).TextColor(c.T.Muted)
+		}
+	})
+}
+
+// CapabilityDots 把「视频 / 图片 / 配音」的可用性排成一行。
+//
+// 原来是一行一个，共三行；这三个词加起来也就十来个字，
+// 挤在窄侧栏里既占地方又抢注意力 —— 排成一行就安静了。
+func (c Comps) CapabilityDots(ctx *ui.Context, caps []struct {
+	Name  string
+	Ready bool
+}) ui.Element {
+	return ui.Row(ctx).FillWidth().Gap(design.SpaceLG).AlignItems(ui.Center).Children(func() {
+		for _, cap := range caps {
+			ink := c.T.Muted
+			if cap.Ready {
+				ink = c.T.Green
+			}
+			ui.Row(ctx).Gap(design.SpaceXS).AlignItems(ui.Center).Children(func() {
+				ui.Text(ctx, cap.Name).FontSize(design.FontTiny).TextColor(c.T.Muted)
+				ui.Text(ctx, "●").FontSize(design.FontTiny).TextColor(ink)
+			})
+		}
+	})
 }
 
 // NavLabel 是导航里的分组标题（视频流水线 / 工具）。

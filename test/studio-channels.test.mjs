@@ -1,185 +1,328 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createStudio } from '../src/studio/server.mjs'
+import {
+  normalizeChannel, customChannelIssues, upsertChannel, removeChannel,
+  loadCustomChannels, probeChannel, CUSTOM_CONFIG, REEL_CONFIG,
+} from '../src/studio/channels.mjs'
+import { createProviders } from '../src/studio/providers.mjs'
 import { createStore } from '../src/studio/store.mjs'
-import { createProviders, h3Body, museavJobId } from '../src/studio/providers.mjs'
-import { resolveBgm, resolveBgmEntry } from '../src/bgm-library.mjs'
+import { createStudio } from '../src/studio/server.mjs'
 
-async function fixture(t, generate = async () => { throw new Error('provider offline') }, extraProviders = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'reel-studio-channel-'))
-  const app = createStudio({ root, providers: { status: async () => ({ image: { ready: true } }), generate, ...extraProviders } })
-  await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve))
-  t.after(async () => { app.server.closeAllConnections(); await new Promise(resolve => app.server.close(resolve)); rmSync(root, { recursive: true, force: true }) })
-  const base = `http://127.0.0.1:${app.server.address().port}`
-  const request = async (path, input, headers = {}) => fetch(base + path, { method: input === undefined ? 'GET' : 'POST', headers: { 'X-Reel-Action': 'studio', 'Content-Type': 'application/json', ...headers }, body: input === undefined ? undefined : JSON.stringify(input) })
-  const project = await (await request('/api/projects', { name: 'Test project' })).json()
-  return { ...app, root, base, request, project }
+// 自定义模型通道：配置解析、问题提示、探活。
+//
+// 这一组守住的是「用户自己填 / Agent 代填」这条底线：
+// 配错了要说得清是哪一项；探活不能花钱（不能一检查就生成一张图）；
+// 探活报告里「验证通过」和「没验证」必须分得开。
+
+/** 临时通道配置文件；返回文件路径，并保证原来的环境变量被还原 */
+function withConfig(t, channels) {
+  const dir = mkdtempSync(join(tmpdir(), 'reel-channels-'))
+  const file = join(dir, 'providers.json')
+  const previous = process.env.REEL_CHANNELS_FILE
+  process.env.REEL_CHANNELS_FILE = file
+  t.after(() => {
+    if (previous === undefined) delete process.env.REEL_CHANNELS_FILE
+    else process.env.REEL_CHANNELS_FILE = previous
+    rmSync(dir, { recursive: true, force: true })
+  })
+  if (channels) writeFileSync(file, JSON.stringify({ channels }, null, 2))
+  return file
 }
 
-test('配乐：对外 API 仍是路径字符串，元数据走 resolveBgmEntry', async t => {
-  const root = mkdtempSync(join(tmpdir(), 'reel-bgm-'))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
-  const music = join(root, '轻快.mp3')
-  writeFileSync(music, 'fixture-audio')
-  const manifest = join(root, 'manifest.json')
-  writeFileSync(manifest, JSON.stringify({ bgm: [{ alias: '轻快', key: music, license: 'CC0 / 免署名可商用', source: 'Mixkit' }] }))
-  const previous = process.env.REEL_BGM_MANIFEST
-  process.env.REEL_BGM_MANIFEST = manifest
-  t.after(() => { if (previous === undefined) delete process.env.REEL_BGM_MANIFEST; else process.env.REEL_BGM_MANIFEST = previous })
-
-  // 公开 API 的形状不能变：字符串路径，不是对象
-  assert.equal(await resolveBgm('轻快'), music)
-  const entry = await resolveBgmEntry('轻快', { exact: true })
-  assert.equal(entry.file, music)
-  assert.equal(entry.license, 'CC0 / 免署名可商用')
-  assert.equal(entry.source, 'Mixkit')
-
-  // 没给东西不能炸 —— 以前会把 undefined.file 当对象读，直接抛 TypeError
-  assert.equal(await resolveBgm(undefined), undefined)
-})
-
-test('配乐：HTTP 侧只认清单里的精确别名，不能变成任意文件读取器', async t => {
-  const root = mkdtempSync(join(tmpdir(), 'reel-bgm-'))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
-  const music = join(root, '轻快.mp3')
-  writeFileSync(music, 'fixture-audio')
-  const manifest = join(root, 'manifest.json')
-  writeFileSync(manifest, JSON.stringify({ bgm: [{ alias: '轻快', key: music, license: 'CC0' }] }))
-  const previous = process.env.REEL_BGM_MANIFEST
-  process.env.REEL_BGM_MANIFEST = manifest
-  t.after(() => { if (previous === undefined) delete process.env.REEL_BGM_MANIFEST; else process.env.REEL_BGM_MANIFEST = previous })
-
-  // 模糊命中会拿「」「x」这类碎片去撞库
-  assert.equal(await resolveBgmEntry('快', { exact: true }), undefined)
-  // 本地路径默认不放行：HTTP 接口用它等于让服务器替人读文件
-  assert.equal(await resolveBgmEntry(music, { exact: true }), undefined)
-  assert.equal((await resolveBgmEntry(music, { allowLocalPath: true })).file, music)
-})
-
-test('通道与模型可以随任务提交，非法取值在入库前被拒', async t => {
-  let received
-  const { request, project } = await fixture(t, async input => { received = input; throw new Error('provider offline') })
-  const accepted = await request('/api/jobs', { projectId: project.id, kind: 'image', prompt: '一只猫', backend: 'museav', model: 'gpt-image-2.6' })
-  assert.equal(accepted.status, 202)
-  assert.equal(received.backend, 'museav')
-  assert.equal(received.model, 'gpt-image-2.6')
-  for (const bad of [{ backend: 'museav; rm -rf /' }, { model: '../../etc/passwd' }, { voiceId: 'a/b' }]) {
-    const rejected = await request('/api/jobs', { projectId: project.id, kind: 'image', prompt: 'x', ...bad })
-    assert.equal(rejected.status, 400, JSON.stringify(bad))
-  }
-  // 模型名里本来就有空格与括号（中台的对外名与 MiniMax 音色 ID），不能一刀切拒掉
-  const spaced = await request('/api/jobs', { projectId: project.id, kind: 'video', prompt: 'x', backend: 'museav', model: 'Seedance 2.0 Mini', voiceId: 'Chinese (Mandarin)_Warm_Girl' })
-  assert.equal(spaced.status, 202)
-})
-
-test('MiniMax TTS：合成成功才落库，并记下请求模型与音色', async t => {
-  const root = mkdtempSync(join(tmpdir(), 'reel-tts-'))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
-  const previous = process.env.MINIMAX_API_KEY
-  process.env.MINIMAX_API_KEY = 'fixture-key'
-  t.after(() => { if (previous === undefined) delete process.env.MINIMAX_API_KEY; else process.env.MINIMAX_API_KEY = previous })
-  const store = createStore(root)
-  const project = { id: 'p1' }
-  store.state.projects.push({ id: 'p1', name: 'p', createdAt: new Date().toISOString() })
-  let sent
-  const providers = createProviders(store, {
-    fetcher: async (url, options) => {
-      sent = { url, body: JSON.parse(options.body) }
-      return { ok: true, status: 200, json: async () => ({ base_resp: { status_code: 0 }, data: { audio: '494433' } }) }
-    },
-  })
-  const asset = await providers.generate({ kind: 'speech', projectId: project.id, prompt: '你好', backend: 'minimax', model: 'speech-02-hd', voiceId: 'male-qn-qingse' }, () => {})
-  assert.equal(sent.url, 'https://api.minimaxi.com/v1/t2a_v2')
-  assert.equal(sent.body.voice_setting.voice_id, 'male-qn-qingse')
-  assert.equal(sent.body.model, 'speech-02-hd')
-  assert.equal(asset.requestedModel, 'speech-02-hd')
-  assert.equal(asset.persona, 'male-qn-qingse')
-  assert.equal(asset.mime, 'audio/mpeg')
-  // 上游没给回执就不许拿请求值冒充实际模型
-  assert.equal(asset.actualModel, 'unknown')
-})
-
-test('MiniMax TTS：上游报错时不落库，也不自动换账户重试', async t => {
-  const root = mkdtempSync(join(tmpdir(), 'reel-tts-'))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
-  const previous = process.env.MINIMAX_API_KEY
-  process.env.MINIMAX_API_KEY = 'fixture-key'
-  t.after(() => { if (previous === undefined) delete process.env.MINIMAX_API_KEY; else process.env.MINIMAX_API_KEY = previous })
-  const store = createStore(root)
-  let calls = 0
-  const providers = createProviders(store, {
-    fetcher: async () => { calls++; return { ok: true, status: 200, json: async () => ({ base_resp: { status_code: 2054, status_msg: 'voice id not exist' } }) } },
-  })
-  await assert.rejects(
-    () => providers.generate({ kind: 'speech', projectId: 'p1', prompt: '你好', backend: 'minimax', voiceId: 'not-a-real-voice' }, () => {}),
-    /2054/
-  )
-  assert.equal(calls, 1)
-  assert.equal(store.state.assets.length, 0)
-})
-
-test('MiniMax TTS：音色也可以从 persona 来 —— 桌面版只有「音色」一个字段', async t => {
-  const root = mkdtempSync(join(tmpdir(), 'reel-tts-'))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
-  const previous = process.env.MINIMAX_API_KEY
-  process.env.MINIMAX_API_KEY = 'fixture-key'
-  t.after(() => { if (previous === undefined) delete process.env.MINIMAX_API_KEY; else process.env.MINIMAX_API_KEY = previous })
-  const store = createStore(root)
-  store.state.projects.push({ id: 'p1', name: 'p', createdAt: new Date().toISOString() })
-  let sent
-  const providers = createProviders(store, {
-    fetcher: async (url, options) => {
-      sent = { url, body: JSON.parse(options.body) }
-      return { ok: true, status: 200, json: async () => ({ base_resp: { status_code: 0 }, data: { audio: '494433' } }) }
-    },
-  })
-  const asset = await providers.generate({ kind: 'speech', projectId: 'p1', prompt: '你好', backend: 'minimax', persona: 'female-shaonv' }, () => {})
-  assert.equal(sent.body.voice_setting.voice_id, 'female-shaonv')
-  assert.equal(asset.persona, 'female-shaonv')
-})
-
-test('H3 直连：模型可以自填，但请求体仍是 V2 契约', () => {
-  const body = h3Body({ prompt: 'walk', duration: 6, ratio: '9:16', model: 'MiniMax-H3-Turbo' }, undefined)
-  assert.equal(body.model, 'MiniMax-H3-Turbo')
-  assert.equal(body.resolution, '768P')
-  assert.equal(body.content.length, 1)
-})
-
-test('MuseAV 任务 ID 从 stderr 里取，取不到就是取不到', () => {
-  assert.equal(museavJobId('视频任务已提交: 0c1a9e15-aed3-4395-b08f-b705e8ab8aa4\n✅ 完成'), '0c1a9e15-aed3-4395-b08f-b705e8ab8aa4')
-  assert.equal(museavJobId('✅ 完成 (3.2s)'), '')
-})
-
-test('语音状态：没配密钥时说清楚去哪配，别只让人去启动 VoxFlow', async t => {
-  const root = mkdtempSync(join(tmpdir(), 'reel-voice-status-'))
-  const home = mkdtempSync(join(tmpdir(), 'reel-voice-home-'))
-  t.after(() => { rmSync(root, { recursive: true, force: true }); rmSync(home, { recursive: true, force: true }) })
-  // 隔离本机配置与本机语音服务：这条断言只讲「没配密钥」时该怎么说
-  const previousHome = process.env.HOME
-  const previousKey = process.env.MINIMAX_API_KEY
-  const previousVox = process.env.REEL_VOXFLOW_URL
-  process.env.HOME = home
-  delete process.env.MINIMAX_API_KEY
-  process.env.REEL_VOXFLOW_URL = 'http://127.0.0.1:1'
+/** 临时环境变量；用完还原，不污染同进程里别的测试 */
+function withEnv(t, name, value) {
+  const previous = process.env[name]
+  process.env[name] = value
   t.after(() => {
-    if (previousHome === undefined) delete process.env.HOME; else process.env.HOME = previousHome
-    if (previousKey === undefined) delete process.env.MINIMAX_API_KEY; else process.env.MINIMAX_API_KEY = previousKey
-    if (previousVox === undefined) delete process.env.REEL_VOXFLOW_URL; else process.env.REEL_VOXFLOW_URL = previousVox
+    if (previous === undefined) delete process.env[name]
+    else process.env[name] = previous
+  })
+}
+
+/** 把 HOME 指到临时目录，用来测「密钥存在设置页」这条路径 */
+function withHome(t) {
+  const dir = mkdtempSync(join(tmpdir(), 'reel-home-'))
+  const previous = process.env.HOME
+  process.env.HOME = dir
+  t.after(() => {
+    if (previous === undefined) delete process.env.HOME
+    else process.env.HOME = previous
+    rmSync(dir, { recursive: true, force: true })
+  })
+  return dir
+}
+
+function jsonResponse(body, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  }
+}
+
+test('配置缺项要逐条说出来，不能一声不吭', t => {
+  withConfig(t, [
+    { id: 'a', kind: 'image', protocol: 'openai', baseUrl: 'https://x.example', model: 'm', env: 'NOPE_KEY' },
+    { id: 'museav', kind: 'image', protocol: 'openai', baseUrl: 'https://x.example', model: 'm', env: 'K' },
+    { id: 'b', kind: 'image', protocol: 'openai', baseUrl: '', model: 'm', env: 'K' },
+    { id: 'c', kind: 'image', protocol: 'openai', baseUrl: 'http://x.example', model: 'm', env: 'K' },
+  ])
+  const { problems } = customChannelIssues()
+  assert.ok(problems.some(p => /a：还没填密钥/.test(p)), '要指出哪条还没填密钥')
+  assert.ok(problems.some(p => /museav：id 是内置通道保留名/.test(p)), '要挡住占用内置 id')
+  assert.ok(problems.some(p => /b：缺少 baseUrl/.test(p)), '要指出缺 baseUrl')
+  assert.ok(problems.some(p => /c：/.test(p) && /https/.test(p)), '非本机的 http 地址要被挡住')
+})
+
+test('缺关键项的通道不算可用通道，不该出现在选择列表里', t => {
+  withConfig(t, [
+    { id: 'ok', kind: 'image', protocol: 'minimax-image', baseUrl: 'https://api.minimaxi.com', model: 'image-01', env: 'K' },
+    { id: 'no-model', kind: 'image', protocol: 'minimax-image', baseUrl: 'https://api.minimaxi.com', env: 'K' },
+    { id: 'minimax', kind: 'image', protocol: 'openai', baseUrl: 'https://x.example', model: 'm', env: 'K' },
+    { id: 'insecure', kind: 'image', protocol: 'openai', baseUrl: 'http://x.example', model: 'm', env: 'K' },
+  ])
+  const ids = loadCustomChannels().map(c => c.id)
+  assert.deepEqual(ids, ['ok'])
+})
+
+test('中台通道可以不写模型名，直连厂商必须写', t => {
+  assert.equal(normalizeChannel({ id: 'm', kind: 'image', protocol: 'museav', baseUrl: 'https://x.example', env: 'K' })?.model, '')
+  assert.equal(normalizeChannel({ id: 'm', kind: 'image', protocol: 'openai', baseUrl: 'https://x.example', env: 'K' }), null)
+})
+
+test('通道配置能写进文件、也能删掉，密钥不进文件', t => {
+  const file = withConfig(t, null)
+  upsertChannel({ id: 'x1', label: '测试通道', kind: 'image', protocol: 'openai', baseUrl: 'https://x.example', model: 'm', env: 'X_KEY' })
+  const written = JSON.parse(readFileSync(file, 'utf8'))
+  assert.equal(written.channels.length, 1)
+  assert.equal(written.channels[0].key, undefined, '密钥不能写进配置文件')
+  removeChannel('x1')
+  assert.equal(JSON.parse(readFileSync(file, 'utf8')).channels.length, 0)
+})
+
+test('配置写坏了不能被下一次保存悄悄覆盖掉', t => {
+  const file = withConfig(t, null)
+  writeFileSync(file, '{ 这不是 JSON')
+  assert.throws(() => upsertChannel({ id: 'x1', kind: 'image', protocol: 'openai', baseUrl: 'https://x.example', model: 'm', env: 'K' }), /无法解析/)
+  assert.equal(readFileSync(file, 'utf8'), '{ 这不是 JSON', '坏文件得原样留着，人还能改回来')
+})
+
+test('channels 不是数组时，保存不能把用户的东西抹掉', t => {
+  const file = withConfig(t, null)
+  writeFileSync(file, JSON.stringify({ channels: { id: 'x' } }))
+  assert.throws(() => upsertChannel({ id: 'x1', kind: 'image', protocol: 'openai', baseUrl: 'https://x.example', model: 'm', env: 'K' }), /数组/)
+  assert.ok(readFileSync(file, 'utf8').includes('channels'))
+})
+
+test('探活不生成任何内容：空提示词被拒只能证明地址与密钥通', async t => {
+  withConfig(t, null)
+  withEnv(t, 'PROBE_KEY', 'x')
+  const channel = normalizeChannel({ id: 'p', kind: 'image', protocol: 'minimax-image', baseUrl: 'https://api.minimaxi.com', model: 'image-01', env: 'PROBE_KEY' })
+  const calls = []
+  const result = await probeChannel(channel, {
+    fetcher: async (url, init) => {
+      calls.push({ url, body: JSON.parse(init.body) })
+      return jsonResponse({ base_resp: { status_code: 2013, status_msg: 'invalid params, prompt are required' } })
+    },
+  })
+  assert.equal(result.ok, true)
+  assert.equal(calls.length, 1, '探活只该发一次请求')
+  assert.equal(calls[0].body.prompt, '', '探活不能带真提示词，否则就花钱了')
+  assert.ok(result.checks.some(c => c.name === '鉴权' && c.ok === true), '密钥被认了要说通过')
+  // 空提示词被拒**不能**证明模型名对不对：多数接口先查提示词再查模型。
+  const model = result.checks.find(c => c.name === '模型')
+  assert.equal(model.ok, null, '模型没被真验过，就该说未验证，不能说通过')
+})
+
+test('上游明说模型不存在时，探活要报模型失败', async t => {
+  withConfig(t, null)
+  withEnv(t, 'PROBE_KEY', 'x')
+  const channel = normalizeChannel({ id: 'p', kind: 'image', protocol: 'openai', baseUrl: 'https://x.example', model: 'nope', env: 'PROBE_KEY' })
+  const result = await probeChannel(channel, {
+    fetcher: async () => jsonResponse({ error: { message: 'The model `nope` does not exist' } }, 404),
+  })
+  assert.equal(result.ok, false)
+  assert.ok(result.checks.some(c => c.name === '模型' && c.ok === false))
+})
+
+test('密钥没注入时，探活要说清缺哪个环境变量', async t => {
+  withConfig(t, null)
+  const channel = normalizeChannel({ id: 'p', kind: 'image', protocol: 'openai', baseUrl: 'https://x.example', model: 'm', env: 'MISSING_KEY' })
+  const result = await probeChannel(channel, { fetcher: async () => { throw new Error('不该发请求') } })
+  assert.equal(result.ok, false)
+  assert.match(result.checks[0].detail, /MISSING_KEY/)
+})
+
+test('上游拒绝密钥时，探活要说清是鉴权问题，不是「通道不存在」', async t => {
+  withConfig(t, null)
+  withEnv(t, 'PROBE_KEY', 'x')
+  const channel = normalizeChannel({ id: 'p', kind: 'image', protocol: 'museav', baseUrl: 'https://manager.museav.top', env: 'PROBE_KEY' })
+  const result = await probeChannel(channel, { fetcher: async () => jsonResponse({ error: { message: 'unauthorized' } }, 401) })
+  assert.equal(result.ok, false)
+  assert.ok(result.checks.some(c => c.name === '鉴权' && c.ok === false && /拒绝/.test(c.detail)))
+})
+
+test('中台生图：回执里的任务 ID 在 results 里，轮询走 /api/jobs', async t => {
+  withConfig(t, [{
+    id: 'museav-http', kind: 'image', protocol: 'museav', baseUrl: 'https://manager.museav.top', env: 'MUS_KEY',
+  }])
+  withEnv(t, 'MUS_KEY', 'x')
+
+  const root = mkdtempSync(join(tmpdir(), 'reel-museav-store-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = createStore(root)
+  store.state.projects.push({ id: 'p1', name: '测试', createdAt: new Date().toISOString() })
+  store.save()
+
+  const seen = []
+  const fetcher = async (url, init = {}) => {
+    seen.push(`${init.method || 'GET'} ${url}`)
+    // 中台的批量回执：任务 ID 在 results 数组里，顶层没有 jobId
+    if (url.includes('generate-batch')) return jsonResponse({ results: [{ ok: true, jobId: 'job-1' }] })
+    if (url.includes('/api/jobs')) return jsonResponse({ status: 'done', cdn_url: 'https://cdn.example/a.png' })
+    return jsonResponse({})
+  }
+  const providers = createProviders(store, {
+    fetcher,
+    pause: async () => {},
+    download: async () => ({ bytes: Buffer.from('fake-png'), mime: 'image/png' }),
   })
 
-  const store = createStore(root)
-  const providers = createProviders(store, { fetcher: async () => { throw new Error('offline') } })
-  const state = await providers.status()
-  const minimax = state.voice.channels.find(c => c.id === 'minimax')
-  // 通道本身要说清楚「去哪配密钥」，而不是只说「按量计费」
-  assert.match(minimax.note, /密钥/)
-  // 总体状态也别只指向 VoxFlow：Windows 用户根本没装它
-  assert.match(state.voice.note, /云端配音/)
+  const asset = await providers.generate({ kind: 'image', projectId: 'p1', backend: 'museav-http', prompt: '一只猫', ratio: '9:16' }, () => {})
+  assert.equal(asset.mime, 'image/png')
+  assert.ok(seen.some(u => u.includes('generate-batch')), '要先提交任务')
+  assert.ok(seen.some(u => u.includes('/api/jobs?id=job-1')), '出图轮询走 /api/jobs')
+})
 
-  const voxflow = state.voice.channels.find(c => c.id === 'voxflow')
-  // 服务压根没连上时，别说「服务在线」——Windows 用户根本没装它
-  assert.match(voxflow.note, /没连上本机语音服务/)
+test('中台出视频：提交走 /api/videos，轮询也走 /api/videos（不是 /api/jobs）', async t => {
+  withConfig(t, [{
+    id: 'museav-video', kind: 'video', protocol: 'museav', baseUrl: 'https://manager.museav.top', env: 'MUS_VID_KEY',
+  }])
+  withEnv(t, 'MUS_VID_KEY', 'x')
+
+  const root = mkdtempSync(join(tmpdir(), 'reel-museav-video-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = createStore(root)
+  store.state.projects.push({ id: 'p1', name: '测试', createdAt: new Date().toISOString() })
+  store.save()
+
+  const seen = []
+  const fetcher = async (url, init = {}) => {
+    seen.push(`${init.method || 'GET'} ${url}`)
+    if (init.method === 'POST' && url.endsWith('/api/videos')) return jsonResponse({ job_id: 'vid-1' })
+    if (url.includes('/api/videos?id=')) return jsonResponse({ status: 'completed', cdn_url: 'https://cdn.example/v.mp4' })
+    return jsonResponse({})
+  }
+  const providers = createProviders(store, {
+    fetcher,
+    pause: async () => {},
+    download: async () => ({ bytes: Buffer.from('fake-mp4'), mime: 'video/mp4' }),
+  })
+
+  const asset = await providers.generate({ kind: 'video', projectId: 'p1', backend: 'museav-video', prompt: '一只猫', ratio: '9:16' }, () => {})
+  assert.equal(asset.mime, 'video/mp4')
+  assert.ok(seen.some(u => u.startsWith('POST') && u.endsWith('/api/videos')), '视频提交走 /api/videos')
+  assert.ok(seen.some(u => u.includes('/api/videos?id=vid-1')), '视频轮询走 /api/videos')
+  assert.ok(!seen.some(u => u.includes('/api/jobs')), '视频不该查图片的任务端点')
+})
+
+test('厂商直连生图：图片地址在 data.image_urls，不在 data[0].url', async t => {
+  withConfig(t, [{
+    id: 'minimax-image', kind: 'image', protocol: 'minimax-image', baseUrl: 'https://api.minimaxi.com', model: 'image-01', env: 'MM_KEY',
+  }])
+  withEnv(t, 'MM_KEY', 'x')
+
+  const root = mkdtempSync(join(tmpdir(), 'reel-minimax-store-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = createStore(root)
+  store.state.projects.push({ id: 'p1', name: '测试', createdAt: new Date().toISOString() })
+  store.save()
+
+  let sent = null
+  const providers = createProviders(store, {
+    fetcher: async (url, init) => {
+      sent = JSON.parse(init.body)
+      return jsonResponse({ data: { image_urls: ['https://cdn.example/b.png'] } })
+    },
+    download: async () => ({ bytes: Buffer.from('fake-png'), mime: 'image/png' }),
+  })
+  const asset = await providers.generate({ kind: 'image', projectId: 'p1', backend: 'minimax-image', prompt: '一只猫', ratio: '9:16' }, () => {})
+  assert.equal(asset.mime, 'image/png')
+  assert.equal(sent.aspect_ratio, '9:16', '厂商直连用 aspect_ratio，不是 size')
+  assert.equal(sent.size, undefined)
+})
+
+test('密钥存在设置页（本机配置）时也能用上，不逼用户开终端', t => {
+  const home = withHome(t)
+  withConfig(t, [{
+    id: 'saved-key', kind: 'image', protocol: 'openai', baseUrl: 'https://x.example', model: 'm', env: 'SAVED_KEY',
+  }])
+  mkdirSync(join(home, '.reel-kit'), { recursive: true })
+  writeFileSync(REEL_CONFIG(), JSON.stringify({ channelKeys: { 'saved-key': 'sk-from-settings' } }))
+  const channel = loadCustomChannels().find(c => c.id === 'saved-key')
+  assert.equal(channel.key, 'sk-from-settings')
+  assert.equal(channel.keySource, 'config')
+})
+
+test('环境变量优先于设置页里存的密钥', t => {
+  const home = withHome(t)
+  withConfig(t, [{
+    id: 'saved-key', kind: 'image', protocol: 'openai', baseUrl: 'https://x.example', model: 'm', env: 'SAVED_KEY',
+  }])
+  mkdirSync(join(home, '.reel-kit'), { recursive: true })
+  writeFileSync(REEL_CONFIG(), JSON.stringify({ channelKeys: { 'saved-key': 'sk-from-settings' } }))
+  withEnv(t, 'SAVED_KEY', 'sk-from-env')
+  const channel = loadCustomChannels().find(c => c.id === 'saved-key')
+  assert.equal(channel.key, 'sk-from-env')
+  assert.equal(channel.keySource, 'env')
+})
+
+// ── HTTP 接口：桌面端设置页靠这三个动作填通道、查通道、删通道 ──────────
+test('桌面端能新增、检查、删掉一条通道', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'reel-channels-http-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  withConfig(t, null)
+  withEnv(t, 'CH_KEY', 'x')
+
+  const app = createStudio({
+    root,
+    providers: { status: async () => ({ image: { ready: true } }), generate: async () => { throw new Error('offline') } },
+  })
+  await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve))
+  t.after(async () => { app.server.closeAllConnections(); await new Promise(resolve => app.server.close(resolve)) })
+  const base = `http://127.0.0.1:${app.server.address().port}`
+  const call = async (method, path, input) => {
+    const response = await fetch(base + path, {
+      method,
+      headers: { 'X-Reel-Action': 'studio', 'Content-Type': 'application/json' },
+      ...(input === undefined ? {} : { body: JSON.stringify(input) }),
+    })
+    return { status: response.status, body: await response.json().catch(() => ({})) }
+  }
+
+  const saved = await call('POST', '/api/channels', {
+    id: 'my-relay', label: '我的中转', kind: 'image', protocol: 'openai',
+    baseUrl: 'http://127.0.0.1:1', model: 'm', env: 'CH_KEY',
+  })
+  assert.equal(saved.status, 200)
+  assert.equal(saved.body.channels.length, 1)
+  assert.equal(saved.body.channels[0].key, undefined, '接口不能把密钥吐回界面')
+
+  const listed = await call('GET', '/api/providers')
+  assert.equal(listed.body.customChannels.channels[0].id, 'my-relay')
+  assert.equal(listed.body.customChannels.channels[0].env, 'CH_KEY')
+  assert.equal(listed.body.customChannels.channels[0].ready, true, '密钥到位就算配好了')
+
+  // 地址是本机一个没人监听的端口 —— 探活要报「连不通」，而不是说能用了
+  const checked = await call('POST', '/api/channels/check', { id: 'my-relay' })
+  assert.equal(checked.status, 200)
+  assert.equal(checked.body.ok, false)
+  assert.ok(checked.body.checks.some(c => c.name === '连通性' && c.ok === false))
+
+  const removed = await call('DELETE', '/api/channels/my-relay')
+  assert.equal(removed.status, 200)
+  assert.equal(removed.body.channels.length, 0)
 })

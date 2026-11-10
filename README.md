@@ -113,7 +113,10 @@ kyvault run --env MINIMAX_API_KEY=secret://minimax/api-key -- reel studio
 
 ### 自定义通道配置
 
-在 `~/.reel-kit/providers.json` 里声明自己的通道。**只写环境变量名，不写密钥明文**：
+用自己的中转站或厂商直连。**两条路都行**：
+
+- **桌面版设置页**（推荐）：设置 →「模型通道」里填，不用开终端、不用改文件。
+- **手写配置文件**：`~/.reel-kit/providers.json`。
 
 ```json
 {
@@ -131,10 +134,35 @@ kyvault run --env MINIMAX_API_KEY=secret://minimax/api-key -- reel studio
 }
 ```
 
-- `kind`：`image` 或 `video`。`protocol`：`openai`（一次 POST 生图）或 `ark-task`（提交任务再轮询，视频用）。
-- `env` 是环境变量名；启动工作台时注入即可：`REEL_STUDIO_HOME=... ARK_API_KEY=... reel studio`。
-- 配置有问题时，「连接状态」里会逐条列出是哪一项不对，而不是让通道悄悄消失。
-- 自定义 TTS 尚未实现，请用随应用自带的本机离线引擎、MiniMax TTS 或本地 VoxFlow。
+支持的协议：
+
+| protocol | 适用 | 怎么调 |
+|---|---|---|
+| `openai` | 生图 | 一次 POST，结果直接在响应里 |
+| `minimax-image` | 生图 | 厂商直连：请求体用 `aspect_ratio`，不是 `size` |
+| `ark-task` | 视频 | 提交任务拿 ID，再轮询出结果 |
+| `museav` | 生图 / 视频 | 中台：批量提交拿 jobId，再轮询任务状态 |
+
+关于密钥：
+
+- **配置文件里永远不写密钥明文**。通道条目只记一个环境变量名（如 `env: "ARK_API_KEY"`）。
+- 密钥有两个去处：环境变量，或桌面版设置页（存到 `~/.reel-kit/config.json`，本机 0600 权限）。
+  同一家厂商的密钥会被复用 —— 填过 MiniMax，另一条 MiniMax 通道不用再填一遍。
+- 界面和 CLI 都会显示密钥**从哪来**（`密钥来自环境变量 MINIMAX_API_KEY` / `密钥已存在设置页`），
+  不会显示密钥本身。
+
+配置有问题时，**「模型通道」页会逐条列出是哪一项不对**（比如「环境变量 ARK_API_KEY 未注入，调用会被拒绝」），
+而不是让通道悄悄消失。
+
+「检查」是三态的，不骗人：
+
+- ✅ **通过** —— 地址可达、密钥被接受；
+- ❌ **失败** —— 地址打不通、密钥被拒、模型不存在（会写清是哪一项）；
+- ⚠️ **未验证** —— 地址和密钥都通，但模型能不能真跑还没验过，得真跑一次任务才算数。
+
+检查只发只读请求，不会替你生成任何东西，也不会产生费用。
+
+自定义 TTS 尚未实现，请用随应用自带的本机离线引擎、MiniMax TTS 或本地 VoxFlow。
 
 ## 🎬 桌面应用（MyGo 原生界面）
 

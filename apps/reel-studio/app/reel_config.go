@@ -97,6 +97,49 @@ func readReelConfigForWrite() (map[string]any, error) {
 // 写文件用「临时文件 + 改名」：直接 WriteFile 的话，
 // 中途断电或进程被杀会留下半个文件，用户的配置就废了。
 func saveMinimaxKey(key string) error {
+	return saveReelConfig(func(cfg map[string]any) {
+		cfg["minimaxApiKey"] = strings.TrimSpace(key)
+	})
+}
+
+// saveChannelKey 把自定义通道的密钥写进本机配置。
+//
+// 为什么放在这里而不是让用户 export 环境变量：
+// 普通用户下载装好就该能用，不该被要求先开终端。
+// 环境变量仍然优先 —— 谁先给上算谁的。
+func saveChannelKey(id, key string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return errors.New("通道 id 不能为空")
+	}
+	return saveReelConfig(func(cfg map[string]any) {
+		keys, _ := cfg["channelKeys"].(map[string]any)
+		if keys == nil {
+			keys = map[string]any{}
+		}
+		keys[id] = strings.TrimSpace(key)
+		cfg["channelKeys"] = keys
+	})
+}
+
+// channelKeyConfigured 报告某条通道有没有存密钥。
+//
+// 只回「有没有」和末四位，不回明文：这块界面会被截图、被转发。
+func channelKeyConfigured(id string) (bool, string) {
+	keys, _ := readReelConfig()["channelKeys"].(map[string]any)
+	key, _ := keys[id].(string)
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return false, ""
+	}
+	if len(key) <= 4 {
+		return true, "****"
+	}
+	return true, "****" + key[len(key)-4:]
+}
+
+// saveReelConfig 读出本机配置、改一处、再原子写回。
+func saveReelConfig(mutate func(map[string]any)) error {
 	path := reelConfigPathFn()
 	if path == "" {
 		return errors.New("找不到用户目录")
@@ -105,7 +148,7 @@ func saveMinimaxKey(key string) error {
 	if err != nil {
 		return err
 	}
-	cfg["minimaxApiKey"] = strings.TrimSpace(key)
+	mutate(cfg)
 	raw, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
