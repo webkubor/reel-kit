@@ -44,7 +44,7 @@ func (a *App) viewTalkComposer(c *ui.Context) {
 
 	a.partTitle(c, partVisual)
 	a.viewTalkImages(c)
-	a.viewMotionKnobs(c, &a.talkAudio)
+	a.viewPictureKnobs(c, &a.talkAudio)
 
 	a.partTitle(c, partLayout)
 	if len(a.talkStyles) > 0 {
@@ -125,7 +125,7 @@ func (a *App) viewRecommendationComposer(c *ui.Context) {
 		{"contain", "完整画面"},
 		{"cover", "铺满画布"},
 	}, a.recImageFit, func(id string) { a.recImageFit = id })
-	a.viewMotionKnobs(c, &a.recAudio)
+	a.viewPictureKnobs(c, &a.recAudio)
 
 	a.partTitle(c, partLayout)
 	a.kit.Field(c, "版式", "", func() {

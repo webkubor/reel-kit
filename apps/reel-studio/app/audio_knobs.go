@@ -103,18 +103,6 @@ func (a *App) viewAudioKnobs(c *ui.Context, k *audioKnobs, bgmGain *string) {
 		k.speed = id
 	})
 
-	transitionChoices := []choice{
-		{"none", "硬切（无转场）"},
-		{"fade", "淡入淡出（柔和过渡）"},
-		{"slide-left", "向左推移（流畅连贯）"},
-		{"slide-right", "向右推移"},
-		{"zoom-in", "镜头推进（动感聚焦）"},
-		{"dissolve", "交叉溶解"},
-	}
-	a.pick(c, "切镜转场", "分镜切换时的过渡动效", transitionChoices, k.transition, func(id string) {
-		k.transition = id
-	})
-
 	a.kit.Field(c, "人声音量", "0.4–3 倍。念白被配乐盖住就调大，人声太冲就调小", func() {
 		a.kit.Input(c, &k.voiceGain, "1.35")
 	})
@@ -126,11 +114,26 @@ func (a *App) viewAudioKnobs(c *ui.Context, k *audioKnobs, bgmGain *string) {
 	})
 }
 
-// viewMotionKnobs 画「画面」那一节里的镜内动效。
+// viewPictureKnobs 画「画面」那一节里跟画面怎么动有关的两个开关。
 //
-// 为什么单独画：转场是「镜与镜之间」，镜内动效是「这一镜里画面自己在动」，
-// 两件事的适用位置不同，放在同一节里用户会以为它们是同一个开关。
-func (a *App) viewMotionKnobs(c *ui.Context, k *audioKnobs) {
+// 为什么从声音那一节挪过来：转场是「镜与镜之间」，镜内动效是「这一镜里画面自己在动」，
+// 两件都是画面的事。放在「声音与节奏」里，用户按「我要改的是画面」去找会找不到。
+func (a *App) viewPictureKnobs(c *ui.Context, k *audioKnobs) {
+	transitionChoices := []choice{
+		{"none", "硬切（无转场）"},
+		{"fade", "淡入淡出（柔和过渡）"},
+		{"slide-left", "向左推移（流畅连贯）"},
+		{"slide-right", "向右推移"},
+		{"slide-up", "向上推移"},
+		{"slide-down", "向下推移"},
+		{"wipe-left", "向左擦除"},
+		{"wipe-right", "向右擦除"},
+		{"dissolve", "交叉溶解"},
+		{"zoom-in", "镜头推进（动感聚焦）"},
+	}
+	a.pick(c, "切镜转场", "分镜切换时的过渡动效", transitionChoices, k.transition, func(id string) {
+		k.transition = id
+	})
 	motionChoices := []choice{
 		{"none", "静态画面（生成更快）"},
 		{"gentle", "轻柔运镜（图片缓慢推进、字幕入场）"},

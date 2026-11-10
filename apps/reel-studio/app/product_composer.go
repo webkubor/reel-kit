@@ -44,7 +44,7 @@ func (a *App) viewProductComposer(c *ui.Context) {
 
 	a.partTitle(c, partVisual)
 	a.viewProductImages(c)
-	a.viewMotionKnobs(c, &a.prodAudio)
+	a.viewPictureKnobs(c, &a.prodAudio)
 
 	a.partTitle(c, partLayout)
 	a.kit.Field(c, "版式", "", func() {

@@ -138,6 +138,14 @@ func Test镜内动效在画面分节里(t *testing.T) {
 	if at < visualAt || at > layoutAt {
 		t.Errorf("「镜内动效」不在画面分节里（位置 %d，画面 %d，版式 %d）", at, visualAt, layoutAt)
 	}
+	// 转场也是画面的事，不该留在声音那一节。
+	transitionAt := indexOf(texts, "切镜转场")
+	if transitionAt < 0 {
+		t.Fatalf("界面上找不到「切镜转场」：%q", texts)
+	}
+	if transitionAt < visualAt || transitionAt > layoutAt {
+		t.Errorf("「切镜转场」不在画面分节里（位置 %d，画面 %d，版式 %d）", transitionAt, visualAt, layoutAt)
+	}
 }
 
 // Test镜内动效进后端输入并能读回来
