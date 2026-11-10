@@ -26,6 +26,7 @@ func (a *App) viewTalkComposer(c *ui.Context) {
 	})
 	a.kit.Field(c, "口播脚本", "一行一句，一行一镜；最多 8 镜，每行不超过 80 字", func() {
 		a.kit.TextArea(c, &a.talkCaptions, "第一句说什么？\n第二句说什么？", 120)
+		a.viewCaptionStats(c, a.talkCaptions)
 	})
 	a.kit.Field(c, "副标题", "可选，显示在标题下方", func() {
 		a.kit.Input(c, &a.talkSubtitle, "可选")
@@ -93,6 +94,7 @@ func (a *App) viewRecommendationComposer(c *ui.Context) {
 	})
 	a.kit.Field(c, "分镜口播", "一行一句，念出来就是这条视频的正文", func() {
 		a.kit.TextArea(c, &a.recCaptions, "第一句说清这个项目解决什么问题", 120)
+		a.viewCaptionStats(c, a.recCaptions)
 	})
 
 	a.partTitle(c, partVoice)
@@ -327,6 +329,10 @@ func (a *App) viewVoiceLibrary(c *ui.Context) {
 	})
 	a.voxflowHint(c)
 	a.kit.Field(c, "我的声音", "用一段录音注册一个自己的音色，之后任何流水线都能选它", func() {
+		if !voxflowRunsHere() {
+			a.kit.Hint(c, "克隆自己的声音目前仅支持 Apple 芯片的 Mac（走本机 MLX 推理）；在 Windows 与其它平台上，请使用随包自带的离线音色或云端 MiniMax 音色。")
+			return
+		}
 		if !a.voiceImportOpen {
 			ui.Row(c).Gap(design.SpaceSM).Children(func() {
 				if button := kitButton(a.kit, c, kit.ButtonSecondary, "导入录音并注册", false); button.Clicked() {
@@ -350,6 +356,63 @@ func (a *App) viewVoiceLibrary(c *ui.Context) {
 			})
 		})
 	})
+}
+
+// captionStats 分析口播脚本的行数与字数限制。
+type captionStats struct {
+	lines     int // 有效行数（镜数）
+	maxChars  int // 最长一句字数（按 rune 算）
+	overLine  int // 哪一镜超了 80 字（从 1 开始计；0 表示没超）
+	overLen   int // 那一镜的实际字数
+	overCount bool
+	isReady   bool
+}
+
+func analyzeCaptions(text string) captionStats {
+	var s captionStats
+	lines := strings.Split(text, "\n")
+	valid := 0
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		valid++
+		chars := len([]rune(trimmed))
+		if chars > s.maxChars {
+			s.maxChars = chars
+		}
+		if chars > 80 && s.overLine == 0 {
+			s.overLine = valid
+			s.overLen = chars
+		}
+	}
+	s.lines = valid
+	s.overCount = valid > 8
+	s.isReady = valid >= 1 && valid <= 8 && s.overLine == 0
+	return s
+}
+
+// viewCaptionStats 画口播脚本的实时字数与镜数提示。
+func (a *App) viewCaptionStats(c *ui.Context, text string) {
+	st := analyzeCaptions(text)
+	if st.lines == 0 {
+		ui.Text(c, "支持 1–8 行，一行一句一镜，单句不超过 80 字").
+			FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
+		return
+	}
+	if st.overCount {
+		ui.Text(c, fmt.Sprintf("⚠️ 当前共 %d 镜，超出 8 镜上限，请删减至 8 镜以内", st.lines)).
+			FontSize(design.FontTiny).TextColor(a.kit.T.Accent)
+		return
+	}
+	if st.overLine > 0 {
+		ui.Text(c, fmt.Sprintf("⚠️ 第 %d 句有 %d 字，超出 80 字上限，请拆成两句", st.overLine, st.overLen)).
+			FontSize(design.FontTiny).TextColor(a.kit.T.Accent)
+		return
+	}
+	ui.Text(c, fmt.Sprintf("✓ 当前 %d 镜 · 最长一句 %d 字", st.lines, st.maxChars)).
+		FontSize(design.FontTiny).TextColor(a.kit.T.Green)
 }
 
 // viewGenerateComposer 画「生成素材」：用 AI 生成图片、视频或配音。

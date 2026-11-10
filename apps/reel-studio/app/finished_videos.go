@@ -52,6 +52,9 @@ func (a *App) saveFinishedVideo(asset studioapi.Asset) {
 	if name == "." || name == "" {
 		name = "成片.mp4"
 	}
+	if !strings.HasSuffix(strings.ToLower(name), ".mp4") {
+		name += ".mp4"
+	}
 	path, err := mygo.Dialog.Save(mygo.SaveDialogOptions{
 		Parent: a.win, Title: "保存成片", DefaultPath: name,
 		Filters: []mygo.FileFilter{{Name: "MP4 视频", Extensions: []string{"mp4"}}},
@@ -62,6 +65,9 @@ func (a *App) saveFinishedVideo(asset studioapi.Asset) {
 	}
 	if path == "" {
 		return
+	}
+	if !strings.HasSuffix(strings.ToLower(path), ".mp4") {
+		path += ".mp4"
 	}
 	client := &http.Client{Timeout: 10 * time.Minute}
 	res, err := client.Get(strings.TrimRight(a.opts.BaseURL, "/") + "/media/" + url.PathEscape(asset.ID) + "?download=1")
@@ -96,4 +102,5 @@ func (a *App) saveFinishedVideo(asset studioapi.Asset) {
 		return
 	}
 	a.mutate(func() { a.notice = "成片已保存到 " + path; a.noticeErr = false })
+	revealPath(path)
 }

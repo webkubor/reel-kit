@@ -23,6 +23,7 @@ func (a *App) viewProductComposer(c *ui.Context) {
 	})
 	a.kit.Field(c, "介绍词", "一行一句，一行一镜；最多 8 镜，每行不超过 80 字", func() {
 		a.kit.TextArea(c, &a.prodCaptions, "第一句说什么？\n第二句说什么？", 120)
+		a.viewCaptionStats(c, a.prodCaptions)
 	})
 	a.kit.Field(c, "一句话卖点", "可选，显示在名称旁边", func() {
 		a.kit.Input(c, &a.prodSubtitle, "例如：素材不出本机")

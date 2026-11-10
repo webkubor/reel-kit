@@ -156,6 +156,12 @@ func (a *App) viewVideoDetail(c *ui.Context, job studioapi.Job, kind string) {
 			if len(parts) > 0 {
 				ui.Text(c, strings.Join(parts, " · ")).FontSize(design.FontTiny).TextColor(a.kit.T.Muted)
 			}
+			itemAsset := *asset
+			ui.Row(c).Gap(design.SpaceSM).Children(func() {
+				if button := kitButton(a.kit, c, kit.ButtonPrimary, "保存到本地", false); button.Clicked() {
+					go a.saveFinishedVideo(itemAsset)
+				}
+			})
 		} else if job.Status == "failed" {
 			a.kit.Hint(c, "没出成片："+orDash(job.Error))
 		} else if job.Status == "succeeded" {
