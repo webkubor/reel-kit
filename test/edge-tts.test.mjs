@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { EDGE_VOICES, formatSpeedRate, edgeSynthesize } from '../src/edge-tts.mjs'
+import { EDGE_VOICES, formatSpeedRate, edgeSynthesize, withTimeout } from '../src/edge-tts.mjs'
 
 test('formatSpeedRate 格式化正确', () => {
   assert.equal(formatSpeedRate(1.0), '+0%')
@@ -29,4 +29,14 @@ test('edgeSynthesize 真实在线合成能输出有效音频字节', async () =>
   assert.equal(result.mime, 'audio/mpeg')
   assert.ok(Buffer.isBuffer(result.bytes))
   assert.ok(result.bytes.length > 1000, `输出字节数过少: ${result.bytes.length}`)
+})
+
+// 网络不通时不能永远挂着：没有时限的话，任务会一直转圈，既不出片也不报错。
+test('withTimeout 超时会报错，promise 提前结束就不报错', async () => {
+  await assert.rejects(
+    withTimeout(new Promise(() => {}), 30, 'Edge 语音服务连接超时'),
+    /连接超时/,
+  )
+  const ok = await withTimeout(Promise.resolve('done'), 1000, '不该触发')
+  assert.equal(ok, 'done')
 })

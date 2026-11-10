@@ -47,11 +47,27 @@ export function formatSpeedRate(speed = 1) {
  * @param {Function} [opts.onProgress] 进度回调
  * @returns {Promise<{ bytes: Buffer, mime: string }>}
  */
+/**
+ * 给一个 promise 加时限。
+ *
+ * 超时后用给定的话报错 —— 用户看到的是「连接超时」，不是一句「失败」。
+ * 计时器在 promise 提前结束时清掉，不给进程留悬挂的句柄。
+ */
+export function withTimeout(promise, ms, message) {
+  let timer = null
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms)
+  })
+  return Promise.race([promise, guard]).finally(() => clearTimeout(timer))
+}
+
 export async function edgeSynthesize({
   text,
   voice = 'zh-CN-XiaoxiaoNeural',
   speed = 1,
   onProgress,
+  connectTimeoutMs = 30000,
+  streamTimeoutMs = 120000,
 } = {}) {
   const trimmed = text?.trim()
   if (!trimmed) throw new Error('合成文本不能为空')
@@ -64,16 +80,25 @@ export async function edgeSynthesize({
     if (typeof onProgress === 'function') {
       onProgress('正在连接微软 Edge 语音服务…')
     }
-    await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3)
+    // 网络不通时不能永远挂着 —— 这一步没有下限时间，任务会一直转圈不出错。
+    await withTimeout(
+      tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3),
+      connectTimeoutMs,
+      `Edge 语音服务连接超时（${Math.round(connectTimeoutMs / 1000)} 秒无响应）`,
+    )
 
     const { audioStream } = tts.toStream(trimmed, { rate })
     const chunks = []
 
-    await new Promise((resolve, reject) => {
-      audioStream.on('data', chunk => chunks.push(chunk))
-      audioStream.on('end', resolve)
-      audioStream.on('error', reject)
-    })
+    await withTimeout(
+      new Promise((resolve, reject) => {
+        audioStream.on('data', chunk => chunks.push(chunk))
+        audioStream.on('end', resolve)
+        audioStream.on('error', reject)
+      }),
+      streamTimeoutMs,
+      `Edge 语音合成超时（${Math.round(streamTimeoutMs / 1000)} 秒没有出完音频）`,
+    )
 
     const bytes = Buffer.concat(chunks)
     if (!bytes.length) {
