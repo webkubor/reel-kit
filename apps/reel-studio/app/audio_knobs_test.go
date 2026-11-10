@@ -9,18 +9,42 @@ import (
 // Test声音那节有三档调节
 //
 // 人声音量、侧链、响度这三项以前只在 CLI 里，桌面端看不到 ——
-// 用户在界面���调不了，就只能改代码或跑命令行。
+// 用户在界面上调不了，就只能改代码或跑命令行。
 func Test声音那节有三档调节(t *testing.T) {
 	server := stub(t, talkJobs())
 	a := newApp(t, server.URL)
 	tt := ui.NewTester(a.View, 1280, 840)
 	tt.Frame()
 
+	texts := tt.Texts()
 	for _, label := range []string{"人声音量", "人声时压低配乐", "统一响度"} {
 		if !tt.HasText(label) {
-			t.Errorf("声音这一节少了「%s」，实际文字：%q", label, tt.Texts())
+			t.Errorf("声音这一节少了「%s」，实际文字：%q", label, texts)
 		}
 	}
+
+	// 三档必须落在「声音」这一节里、且在「画面」之前 ——
+	// 放错分节用户就找不到（这就是按七块分组的意义所在）。
+	voiceAt, visualAt := indexOf(texts, "声音"), indexOf(texts, "画面")
+	if voiceAt < 0 || visualAt < 0 {
+		t.Fatalf("界面上找不到「声音」或「画面」分节：%q", texts)
+	}
+	for _, label := range []string{"人声音量", "人声时压低配乐", "统一响度"} {
+		at := indexOf(texts, label)
+		if at < voiceAt || at > visualAt {
+			t.Errorf("「%s」不在声音分节里（位置 %d，声音 %d，画面 %d）", label, at, voiceAt, visualAt)
+		}
+	}
+}
+
+// indexOf 找一段文字第一次出现的位置，找不到返回 -1。
+func indexOf(texts []string, want string) int {
+	for i, s := range texts {
+		if s == want {
+			return i
+		}
+	}
+	return -1
 }
 
 // Test调整后再生成会把三档带回来
