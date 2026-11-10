@@ -105,6 +105,8 @@ export async function makeRecommendation(input, store, backend, progress, report
             backend: settings.voiceBackend, model: settings.voiceModel, voiceId: settings.voiceId,
             // 账户也要传：两个 MiniMax 账户是两份额度、两套声音
             profile: settings.voiceProfile,
+            // 在线语音直接按语速合成；本地引擎不支持语速参数，交给后面的 atempo 处理。
+            speed: ['edge', 'minimax'].includes(voiceBackend) ? settings.speed : 1,
           }, () => {})
           generated = true
         }
@@ -112,7 +114,8 @@ export async function makeRecommendation(input, store, backend, progress, report
         input.voiceIds[i] = asset.id
         progress(`第 ${i + 1}/${lines.length} 句旁白已就绪`)
         let file = store.path(asset)
-        if (settings.speed !== 1) {
+        // 在线语音已经在合成时按语速出片；本地引擎不支持语速参数，在这里变速。
+        if (settings.speed !== 1 && !['edge', 'minimax'].includes(voiceBackend)) {
           const adjusted = join(temp, `voice-${i}.wav`)
           await command('ffmpeg', ['-v', 'error', '-i', file, '-af', `atempo=${settings.speed}`, adjusted])
           file = adjusted
@@ -123,9 +126,9 @@ export async function makeRecommendation(input, store, backend, progress, report
       voiceClips.push({ file: meta._file, duration: meta._duration })
     }
     const durations = voiceClips.map(v => v.duration + (narration ? 0 : settings.pause))
-    progress(`正在渲染 ${settings.name} ${settings.width}×${settings.height} 画面…`)
-    const { _frames: frames } = await step({ id: 'frames', label: '渲染画面帧', origin: 'code', engine: 'playwright 本地渲染', detail: `${lines.length} 帧 · ${settings.width}×${settings.height} · ${settings.imageFit === 'cover' ? '铺满画布' : '完整画面'}` }, async () =>
-      ({ _frames: await renderFrames({ template, shots: lines.map((caption, i) => ({ image: store.path(images[i % images.length]), caption: esc(caption) })), vars: { title: esc(input.title), subtitle: esc(input.repoUrl), width: settings.width, height: settings.height, fit: settings.imageFit }, width: settings.width, height: settings.height, outDir: join(temp, 'frames') }) }))
+    progress(settings.motion === 'none' ? `正在渲染 ${settings.name} ${settings.width}×${settings.height} 画面…` : `正在逐帧渲染动效画面…`)
+    const { _frames: frames } = await step({ id: 'frames', label: '渲染画面帧', origin: 'code', engine: 'playwright 本地渲染', detail: `${lines.length} 镜 · ${settings.width}×${settings.height} · ${settings.imageFit === 'cover' ? '铺满画布' : '完整画面'}${settings.motion === 'none' ? '' : ' · 轻柔运镜'}` }, async () =>
+      ({ _frames: await renderFrames({ template, shots: lines.map((caption, i) => ({ image: store.path(images[i % images.length]), caption: esc(caption) })), vars: { title: esc(input.title), subtitle: esc(input.repoUrl), width: settings.width, height: settings.height, fit: settings.imageFit }, width: settings.width, height: settings.height, outDir: join(temp, 'frames'), motion: settings.motion, durations, onProgress: progress }) }))
     progress('正在混合旁白与 BGM，合成成片…')
     const out = join(temp, 'recommendation.mp4')
     const bgm = input.bgmId ? store.asset(input.bgmId, input.projectId) : undefined

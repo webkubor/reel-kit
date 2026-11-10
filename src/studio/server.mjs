@@ -52,7 +52,7 @@ function json(res, code, value) { res.writeHead(code, { 'content-type': 'applica
 function validate(input, store) {
   store.project(input.projectId)
   if (!['image', 'video', 'speech', 'clone', 'voice-design', 'export', 'recommendation', 'talk', 'product'].includes(input.kind)) fail('任务类型不支持')
-  const allowed = ['kind', 'projectId', 'prompt', 'ratio', 'duration', 'resolution', 'assetIds', 'audioId', 'referenceId', 'persona', 'referenceText', 'voiceName', 'template', 'captions', 'title', 'profile', 'repoUrl', 'voiceIds', 'platform', 'voiceSource', 'tone', 'emotion', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit', 'backend', 'model', 'voiceId', 'style', 'voiceBackend', 'voiceModel', 'subtitle', 'source', 'footer', 'preset', 'voiceGain', 'duck', 'normalize', 'transition', 'transitionDuration']
+  const allowed = ['kind', 'projectId', 'prompt', 'ratio', 'duration', 'resolution', 'assetIds', 'audioId', 'referenceId', 'persona', 'referenceText', 'voiceName', 'template', 'captions', 'title', 'profile', 'repoUrl', 'voiceIds', 'platform', 'voiceSource', 'tone', 'emotion', 'speed', 'pause', 'bgmId', 'bgmGain', 'narrationId', 'imageFit', 'backend', 'model', 'voiceId', 'style', 'voiceBackend', 'voiceModel', 'subtitle', 'source', 'footer', 'preset', 'voiceGain', 'duck', 'normalize', 'transition', 'transitionDuration', 'motion']
   const value = Object.fromEntries(allowed.filter(k => input[k] !== undefined).map(k => [k, input[k]]))
   if (typeof value.prompt !== 'string' || !value.prompt.trim() || value.prompt.length > 10000) {
     if (!['export', 'recommendation', 'talk', 'product'].includes(value.kind)) fail('请输入 1–10000 字的提示词或配音文字')
@@ -102,6 +102,9 @@ function validate(input, store) {
     const dur = Number(value.transitionDuration)
     if (!Number.isFinite(dur) || dur < 0.1 || dur > 1) fail('转场时长须为 0.1–1 秒')
     value.transitionDuration = dur
+  }
+  if (value.motion !== undefined) {
+    if (!['none', 'gentle'].includes(value.motion)) fail('不支持的镜内动效')
   }
   if (value.kind === 'voice-design' && (!value.voiceName?.trim() || value.voiceName.length > 80 || !value.tone?.trim() || value.tone.length > 500 || value.prompt.length > 45)) fail('新音色需要名称、声音描述和不超过 45 字的试听文字')
   if (value.kind === 'recommendation') {

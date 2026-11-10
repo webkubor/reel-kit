@@ -56,6 +56,7 @@ export async function makeTalkVideo(input, store, backend, progress, report = ()
   const assets = (input.assetIds || []).map(id => store.asset(id, input.projectId))
   if (assets.some(a => !a.mime.startsWith('image/'))) throw new Error('画面素材必须是图片')
 
+  const settings = resolveSettings('talk', input)
   const temp = mkdtempSync(join(tmpdir(), 'reel-talk-'))
   try {
     // 每个环节单独上报：失败时能看出是「配音没出来」还是「画面没渲染出来」
@@ -96,23 +97,31 @@ export async function makeTalkVideo(input, store, backend, progress, report = ()
           persona: input.persona, prompt: lines[i], tone: input.tone || '',
           backend: voiceBackend, model: input.voiceModel || undefined,
           voiceId: input.voiceId || undefined, profile: input.profile,
-          speed: input.speed || undefined,
+          speed: ['edge', 'minimax'].includes(voiceBackend) ? settings.speed : 1,
         }, () => {})
         if (!asset?.mime?.startsWith('audio/')) throw new Error(`第 ${i + 1} 句配音没有生成成功`)
-        return { _file: store.path(asset), _duration: await probeDuration(store.path(asset)), assetId: asset.id, origin: voiceOrigin, engine: asset.engine || voiceEngine, detail: lines[i].slice(0, 40) }
+        let file = store.path(asset)
+        if (!['edge', 'minimax'].includes(voiceBackend) && settings.speed !== 1) {
+          const adjusted = join(temp, `speed-${i}.wav`)
+          await command('ffmpeg', ['-v', 'error', '-i', file, '-af', `atempo=${settings.speed}`, adjusted])
+          file = adjusted
+        }
+        return { _file: file, _duration: await probeDuration(file), assetId: asset.id, origin: voiceOrigin, engine: asset.engine || voiceEngine, detail: lines[i].slice(0, 40) }
       })
       voiceClips.push({ file: meta._file, duration: meta._duration })
     }
 
-    const settings = resolveSettings('talk', input)
     const pause = settings.pause
     const durations = voiceClips.map(v => v.duration + pause)
 
-    progress('正在渲染画面帧…')
-    const { _frames: frames } = await step({ id: 'frames', label: '渲染画面帧', origin: 'code', engine: 'playwright 本地渲染', detail: `${lines.length} 帧 · ${WIDTH}×${HEIGHT} · ${templateName}` }, async () => ({
+    progress(settings.motion === 'none' ? '正在渲染画面帧…' : '正在逐帧渲染动效画面…')
+    const { _frames: frames } = await step({ id: 'frames', label: '渲染画面帧', origin: 'code', engine: 'playwright 本地渲染', detail: `${lines.length} 镜 · ${WIDTH}×${HEIGHT} · ${templateName}${settings.motion === 'none' ? '' : ' · 轻柔运镜'}` }, async () => ({
       _frames: await renderFrames({
         template,
         shots: lines.map((caption, i) => ({ image: images[i % images.length], caption: esc(caption) })),
+        motion: settings.motion,
+        durations,
+        onProgress: progress,
         vars: {
           title: esc(input.title || ''), subtitle: esc(input.subtitle || ''),
           source: esc(input.source || ''), footer: esc(input.footer || ''),

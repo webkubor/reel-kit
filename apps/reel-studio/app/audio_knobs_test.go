@@ -88,6 +88,77 @@ func TestBGM音量只换算一次(t *testing.T) {
 	}
 }
 
+// Test预设会真的改配乐音量
+//
+// 预设名字里写着「配乐 8%」，但以前选预设并不改下面那个 BGM 音量输入框 ——
+// 用户选了「口播清晰」，出来的片子配乐还是 12%。名字和实际不一致，
+// 用户只能自己猜该改哪一栏。
+func Test预设会真的改配乐音量(t *testing.T) {
+	knobs := defaultAudioKnobs()
+	bgm := "12"
+	for _, c := range []struct {
+		preset string
+		gain   string
+	}{
+		{"clear-speech", "8"},
+		{"ambient", "30"},
+		{"default", "12"},
+	} {
+		applyAudioPreset(&knobs, c.preset, &bgm)
+		if bgm != c.gain {
+			t.Errorf("预设 %s 应当把配乐音量设成 %s，实际是 %s", c.preset, c.gain, bgm)
+		}
+	}
+	// 预设同时要改人声与降乐，否则「一键」只改了一半。
+	applyAudioPreset(&knobs, "clear-speech", &bgm)
+	if knobs.voiceGain != "1.5" || !knobs.duck {
+		t.Errorf("口播清晰预设应当把人声抬到 1.5 并开启降乐，实际是 %q / %v", knobs.voiceGain, knobs.duck)
+	}
+}
+
+// Test镜内动效在画面分节里
+//
+// 转场是「镜与镜之间」，镜内动效是「这一镜里画面自己在动」，
+// 两件事适用位置不同，放在同一节里用户会以为它们是同一个开关。
+func Test镜内动效在画面分节里(t *testing.T) {
+	server := stub(t, talkJobs())
+	a := newApp(t, server.URL)
+	tt := ui.NewTester(a.View, 1280, 840)
+	tt.Frame()
+
+	texts := tt.Texts()
+	if !tt.HasText("镜内动效") {
+		t.Fatalf("画面这一节少了「镜内动效」，实际文字：%q", texts)
+	}
+	visualAt, layoutAt := indexOf(texts, "画面"), indexOf(texts, "版式")
+	at := indexOf(texts, "镜内动效")
+	if visualAt < 0 || layoutAt < 0 {
+		t.Fatalf("界面上找不到「画面」或「版式」分节：%q", texts)
+	}
+	if at < visualAt || at > layoutAt {
+		t.Errorf("「镜内动效」不在画面分节里（位置 %d，画面 %d，版式 %d）", at, visualAt, layoutAt)
+	}
+}
+
+// Test镜内动效进后端输入并能读回来
+func Test镜内动效进后端输入并能读回来(t *testing.T) {
+	a := newApp(t, stub(t, talkJobs()).URL)
+	input := map[string]any{}
+	if err := a.applyAudioKnobs(input, audioKnobs{motion: "gentle"}); err != nil {
+		t.Fatalf("写入失败：%v", err)
+	}
+	if input["motion"] != "gentle" {
+		t.Errorf("镜内动效没进输入：%v", input["motion"])
+	}
+	knobs := audioKnobsFromConfig(map[string]any{"motion": "gentle"})
+	if knobs.motion != "gentle" {
+		t.Errorf("镜内动效没有载入表单：%q", knobs.motion)
+	}
+	if got := a.configValue("talk", "motion", map[string]any{"motion": "gentle"}); got != "轻柔运镜" {
+		t.Errorf("配置面板的镜内动效显示不对：%q", got)
+	}
+}
+
 // Test三档调节的值会进后端输入
 func Test三档调节的值会进后端输入(t *testing.T) {
 	a := newApp(t, stub(t, talkJobs()).URL)

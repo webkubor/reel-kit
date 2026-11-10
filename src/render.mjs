@@ -10,6 +10,7 @@
 import { chromium } from 'playwright-core'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
+import { prepareMotion, encodeMotion } from './motion.mjs'
 
 /** 本机 Chrome，避免为这个工具再下一份 chromium */
 const CHROME_CANDIDATES = [
@@ -93,7 +94,14 @@ function toDataUri(file) {
  * @param {number} [opts.height]  画布高（默认 1920）
  * @returns {Promise<string[]>}   生成的 PNG 路径，按顺序
  */
-export async function renderFrames({ template, shots, vars, outDir, width = 1080, height = 1920 }) {
+export async function renderFrames({ template, shots, vars, outDir, width = 1080, height = 1920,
+  motion = 'none', durations, fps = 30, signal, onProgress = () => {},
+}) {
+  if (!['none', 'gentle'].includes(motion)) throw new Error('不支持的画面动效')
+  if (!Number.isInteger(fps) || fps < 1 || fps > 60) throw new Error('帧率必须是 1–60 的整数')
+  if (motion !== 'none' && (durations?.length !== shots.length || durations.some(d => !Number.isFinite(d) || d <= 0))) {
+    throw new Error('连续动效需要每镜的有效时长')
+  }
   const chrome = findChrome()
   if (!chrome) throw new Error('找不到本机 Chrome,设 CHROME_PATH 指向可执行文件')
 
@@ -121,11 +129,21 @@ export async function renderFrames({ template, shots, vars, outDir, width = 1080
       }))
       await page.setContent(html, { waitUntil: 'load' })
       // 等字体与图片解码落定，否则偶发截到文字未上屏的空帧
-      await page.evaluate(() => document.fonts.ready)
+      await page.evaluate(async () => {
+        await document.fonts.ready
+        await Promise.all([...document.images].filter(img => img.getAttribute('src')).map(img => img.decode().catch(() => {})))
+      })
       await page.waitForTimeout(120)
 
-      const out = join(outDir, `frame_${String(i).padStart(4, '0')}.png`)
-      await page.screenshot({ path: out, type: 'png' })
+      const out = join(outDir, `frame_${String(i).padStart(4, '0')}.${motion === 'none' ? 'png' : 'mp4'}`)
+      if (motion === 'none') {
+        await page.screenshot({ path: out, type: 'png' })
+      } else {
+        await prepareMotion(page, durations[i])
+        await encodeMotion(page, { out, duration: durations[i], fps, signal,
+          onProgress: p => onProgress(`正在渲染第 ${i + 1}/${shots.length} 镜动效 · ${Math.round(p * 100)}%`),
+        })
+      }
       frames.push(out)
     }
   } finally {

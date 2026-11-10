@@ -17,6 +17,7 @@ type audioKnobs struct {
 	preset     string // 预设：default / clear-speech / ambient / raw
 	speed      string // 念白语速倍数，如 "1.0"
 	transition string // 切镜转场动效，如 "none", "fade", "slide-left"
+	motion     string // 镜内动效，如 "none", "gentle"
 	voiceGain  string // 人声音量倍数，如 "1.35"
 	duck       bool   // 人声一开口是否把配乐压下去
 	normalize  bool   // 是否把成品响度归一到固定值
@@ -28,14 +29,60 @@ func defaultAudioKnobs() audioKnobs {
 		preset:     "default",
 		speed:      "1.0",
 		transition: "none",
+		motion:     "gentle",
 		voiceGain:  "1.35",
 		duck:       true,
 		normalize:  true,
 	}
 }
 
+// presetBGMLink 是「混音预设」联动到配乐音量时用的对应关系。
+//
+// 预设的名字里写着配乐音量（如「口播清晰 · 配乐 8%」），
+// 但以前选预设并不会真的改下面那个 BGM 音量输入框 —— 名字与实际不一致。
+var presetBGMLink = map[string]string{
+	"default":     "12",
+	"clear-speech": "8",
+	"ambient":     "30",
+	"raw":         "12",
+}
+
+// applyAudioPreset 把一个预设套到调节项上，并联动配乐音量。
+//
+// 预设是一整套声音关系：人声多响、配乐多响、要不要压配乐。
+// 只改其中一项，用户看到的预设名字就和实际声音对不上。
+func applyAudioPreset(k *audioKnobs, id string, bgmGain *string) {
+	k.preset = id
+	switch id {
+	case "clear-speech":
+		k.voiceGain = "1.5"
+		k.duck = true
+		k.normalize = true
+	case "ambient":
+		k.voiceGain = "1.1"
+		k.duck = true
+		k.normalize = true
+	case "raw":
+		k.voiceGain = "1"
+		k.duck = false
+		k.normalize = false
+	case "default":
+		k.voiceGain = "1.35"
+		k.duck = true
+		k.normalize = true
+	}
+	if bgmGain != nil {
+		if value, ok := presetBGMLink[id]; ok {
+			*bgmGain = value
+		}
+	}
+}
+
 // viewAudioKnobs 画「声音与节奏」那一节里的调节项。
-func (a *App) viewAudioKnobs(c *ui.Context, k *audioKnobs) {
+//
+// bgmGain 是配乐音量输入框的绑定值：选了预设要真的改它，
+// 否则「预设」只是名字，不是一键联动。
+func (a *App) viewAudioKnobs(c *ui.Context, k *audioKnobs, bgmGain *string) {
 	presetChoices := []choice{
 		{"default", "标准平衡（人声 1.35x · 配乐 12% · 智能降乐）"},
 		{"clear-speech", "口播清晰（人声 1.5x · 配乐 8% · 深度降乐）"},
@@ -43,25 +90,7 @@ func (a *App) viewAudioKnobs(c *ui.Context, k *audioKnobs) {
 		{"raw", "原样输出（不压配乐 · 不归一化）"},
 	}
 	a.pick(c, "混音预设", "一键套用常用声音组合，选后下方数值仍可微调", presetChoices, k.preset, func(id string) {
-		k.preset = id
-		switch id {
-		case "clear-speech":
-			k.voiceGain = "1.5"
-			k.duck = true
-			k.normalize = true
-		case "ambient":
-			k.voiceGain = "1.1"
-			k.duck = true
-			k.normalize = true
-		case "raw":
-			k.voiceGain = "1"
-			k.duck = false
-			k.normalize = false
-		case "default":
-			k.voiceGain = "1.35"
-			k.duck = true
-			k.normalize = true
-		}
+		applyAudioPreset(k, id, bgmGain)
 	})
 
 	speedChoices := []choice{
@@ -82,7 +111,7 @@ func (a *App) viewAudioKnobs(c *ui.Context, k *audioKnobs) {
 		{"zoom-in", "镜头推进（动感聚焦）"},
 		{"dissolve", "交叉溶解"},
 	}
-	a.pick(c, "切镜转场", "分镜切换时的过渡动效（基于 FFmpeg xfade 引擎）", transitionChoices, k.transition, func(id string) {
+	a.pick(c, "切镜转场", "分镜切换时的过渡动效", transitionChoices, k.transition, func(id string) {
 		k.transition = id
 	})
 
@@ -92,8 +121,22 @@ func (a *App) viewAudioKnobs(c *ui.Context, k *audioKnobs) {
 	a.kit.Field(c, "人声时压低配乐", "人声一开口就把配乐压下去，人声停了抬回来", func() {
 		a.kit.Checkbox(c, &k.duck, "开启侧链压低")
 	})
-	a.kit.Field(c, "统一响度", "把成品推到固定响度（-14 LUFS / -1 dBTP），不同片子放一起不会忽轻忽响", func() {
+	a.kit.Field(c, "统一响度", "把成品推到固定响度，不同片子放一起不会忽轻忽响", func() {
 		a.kit.Checkbox(c, &k.normalize, "开启响度归一化")
+	})
+}
+
+// viewMotionKnobs 画「画面」那一节里的镜内动效。
+//
+// 为什么单独画：转场是「镜与镜之间」，镜内动效是「这一镜里画面自己在动」，
+// 两件事的适用位置不同，放在同一节里用户会以为它们是同一个开关。
+func (a *App) viewMotionKnobs(c *ui.Context, k *audioKnobs) {
+	motionChoices := []choice{
+		{"none", "静态画面（生成更快）"},
+		{"gentle", "轻柔运镜（图片缓慢推进、字幕入场）"},
+	}
+	a.pick(c, "镜内动效", "同一镜里画面自己动起来；逐帧渲染，生成时间更长", motionChoices, k.motion, func(id string) {
+		k.motion = id
 	})
 }
 
@@ -111,6 +154,9 @@ func (a *App) applyAudioKnobs(input map[string]any, k audioKnobs) error {
 	}
 	if k.transition != "" {
 		input["transition"] = k.transition
+	}
+	if k.motion != "" {
+		input["motion"] = k.motion
 	}
 	if k.voiceGain != "" {
 		gain, err := parseNumberIn("人声音量", k.voiceGain, 0.4, 3)
@@ -137,6 +183,9 @@ func audioKnobsFromConfig(config map[string]any) audioKnobs {
 	}
 	if v, ok := config["transition"].(string); ok && v != "" {
 		k.transition = v
+	}
+	if v, ok := config["motion"].(string); ok && v != "" {
+		k.motion = v
 	}
 	if v, ok := config["voiceGain"]; ok {
 		if gain, err := parseNumberIn("人声音量", fmt.Sprintf("%v", v), 0.4, 3); err == nil {

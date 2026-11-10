@@ -115,6 +115,9 @@ make 选项:
                        · dissolve · zoom-in
   --transition-duration <秒>  转场时长,默认 0.4
 
+镜内动效（同一镜内画面自己动起来）:
+  --motion <名>        gentle(默认,轻柔运镜:图片缓慢推进、字幕入场,逐帧渲染,更慢) | none(静态画面,最快)
+
 配音（让念白驱动镜头时长，而非固定 --per-shot）:
   --voice <音色>       开启配音。edge 默认为 zh-CN-XiaoxiaoNeural；voxcraft 为已注册音色 key；minimax 为音色 ID
   --voice-engine <名>  edge（微软高保真 24kHz 在线免费，免 Key）| voxcraft（默认本地 Qwen3-TTS，免费）| minimax（云端 TTS，按量计费）
@@ -300,21 +303,18 @@ async function cmdMake(args) {
     : `每镜 ${perShot}s(末镜 ${lastShot}s)`
   const transition = String(args.transition || 'none')
   const xdur = Number(args['transition-duration'] || 0.4)
+  const motion = String(args.motion || 'gentle')
   const shotDescFull = transition !== 'none'
     ? `${shotDesc} · 转场 ${transition} ${xdur}s`
     : shotDesc
   console.log(`[reel] 模板 ${template} · ${n} 镜 · ${shotDescFull} · 合计 ${totalDur.toFixed(1)}s`)
-  // 开转场 + 配音:提醒末镜配音尾巴可能被切
-  if (transition !== 'none' && voiceClips) {
-    const tail = (n - 1) * xdur
-    console.log(`[reel] 转场会"吃掉"末镜配音 ${tail.toFixed(1)}s(配音尾部静音期,通常不影响念白)`)
-  }
 
   const frameDir = join(workDir, 'frames')
   try {
     process.stdout.write('[reel] 渲染帧… ')
-    const frames = await renderFrames({ template: tplFile, shots, vars, outDir: frameDir, width: w, height: h })
-    console.log(`${frames.length} 帧`)
+    const frames = await renderFrames({ template: tplFile, shots, vars, outDir: frameDir, width: w, height: h,
+      motion, durations, fps: Number(args.fps || 30) })
+    console.log(frames.length === n ? `${n} 帧` : `${frames.length} 段动画`)
 
     // --bgm 可以是本地路径,也可以是配乐库别名(清单由 REEL_BGM_MANIFEST 指定,见 bgm-library.mjs)
     const bgmFile = args.bgm ? await resolveBgm(String(args.bgm)) : undefined

@@ -40,10 +40,11 @@ func (a *App) viewProductComposer(c *ui.Context) {
 	a.kit.Field(c, "镜间停顿", "每句之后的停顿秒数（0–2）", func() {
 		a.kit.Input(c, &a.prodPause, "0.45")
 	})
-	a.viewAudioKnobs(c, &a.prodAudio)
+	a.viewAudioKnobs(c, &a.prodAudio, &a.prodBGMGain)
 
 	a.partTitle(c, partVisual)
 	a.viewProductImages(c)
+	a.viewMotionKnobs(c, &a.prodAudio)
 
 	a.partTitle(c, partLayout)
 	a.kit.Field(c, "版式", "", func() {

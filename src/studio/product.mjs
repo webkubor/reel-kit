@@ -109,6 +109,7 @@ export async function makeProductVideo(input, store, backend, progress, report =
 
     // 逐句配音：音色相同、语气相同，只是念的内容不同
     const voiceClips = []
+    const settings = resolveSettings('product', input)
     const voiceBackend = input.voiceBackend || 'edge'
     const voiceOrigin = voiceBackend === 'edge' ? 'free-online' : voiceBackend === 'sherpa' ? 'local-offline' : 'ai'
     const voiceEngine = voiceBackend === 'edge' ? 'Edge 在线高保真语音' : voiceBackend === 'sherpa' ? '本机离线语音' : voiceBackend === 'minimax' ? 'MiniMax TTS' : 'VoxFlow 本地语音'
@@ -120,20 +121,26 @@ export async function makeProductVideo(input, store, backend, progress, report =
           persona: input.persona, prompt: lines[i], tone: input.tone || '',
           backend: voiceBackend, model: input.voiceModel || undefined,
           voiceId: input.voiceId || undefined, profile: input.profile,
-          speed: input.speed || undefined,
+          // 在线语音按语速合成；本地引擎不支持语速参数，交给后面的 atempo 处理。
+          speed: ['edge', 'minimax'].includes(voiceBackend) ? settings.speed : 1,
         }, () => {})
         if (!asset?.mime?.startsWith('audio/')) throw new Error(`第 ${i + 1} 句配音没有生成成功`)
-        return { _file: store.path(asset), _duration: await probeDuration(store.path(asset)), assetId: asset.id, origin: voiceOrigin, engine: asset.engine || voiceEngine, detail: lines[i].slice(0, 40) }
+        let file = store.path(asset)
+        if (settings.speed !== 1 && !['edge', 'minimax'].includes(voiceBackend)) {
+          const adjusted = join(temp, `voice-speed-${i}.wav`)
+          await command('ffmpeg', ['-v', 'error', '-i', file, '-af', `atempo=${settings.speed}`, adjusted])
+          file = adjusted
+        }
+        return { _file: file, _duration: await probeDuration(file), assetId: asset.id, origin: voiceOrigin, engine: asset.engine || voiceEngine, detail: lines[i].slice(0, 40) }
       })
       voiceClips.push({ file: meta._file, duration: meta._duration })
     }
 
-    const settings = resolveSettings('product', input)
     const pause = settings.pause
     const durations = voiceClips.map(v => v.duration + pause)
 
-    progress('正在渲染画面帧…')
-    const { _frames: frames } = await step({ id: 'frames', label: '渲染画面帧', origin: 'code', engine: 'playwright 本地渲染', detail: `${lines.length} 帧 · ${layout.width}×${layout.height} · ${layout.template}` }, async () => ({
+    progress(settings.motion === 'none' ? '正在渲染画面帧…' : '正在逐帧渲染动效画面…')
+    const { _frames: frames } = await step({ id: 'frames', label: '渲染画面帧', origin: 'code', engine: 'playwright 本地渲染', detail: `${lines.length} 镜 · ${layout.width}×${layout.height} · ${layout.template}${settings.motion === 'none' ? '' : ' · 轻柔运镜'}` }, async () => ({
       _frames: await renderFrames({
         template,
         shots: lines.map((caption, i) => ({
@@ -150,6 +157,7 @@ export async function makeProductVideo(input, store, backend, progress, report =
           width: layout.width, height: layout.height,
         },
         width: layout.width, height: layout.height, outDir: join(temp, 'frames'),
+        motion: settings.motion, durations, onProgress: progress,
       }),
     }))
 

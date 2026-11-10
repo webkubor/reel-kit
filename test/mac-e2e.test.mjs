@@ -5,7 +5,7 @@ import { mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { promisify } from 'node:util'
-import { execFile } from 'node:child_process'
+import { execFile, spawnSync } from 'node:child_process'
 
 const run = promisify(execFile)
 
@@ -94,6 +94,7 @@ test('Mac 端端到端闭环实测：Edge 在线高保真配音 + 转场动效 +
   assert.ok(asset.duration > 3, `成片时长过短: ${asset.duration}`)
   assert.equal(asset.settings.transition, 'fade')
   assert.equal(asset.settings.voiceGain, 1.5) // clear-speech 预设人声增益为 1.5
+  assert.equal(asset.settings.motion, 'gentle', '默认应当出连续动效画面')
 
   const assetFile = join(root, 'media', `${asset.id}.mp4`)
   const { stdout } = await run('ffprobe', [
@@ -111,4 +112,14 @@ test('Mac 端端到端闭环实测：Edge 在线高保真配音 + 转场动效 +
   assert.ok(aStream, '成片必须包含音频流')
   assert.equal(aStream.sample_rate, '48000') // 48kHz 标准广播级采样率
   assert.equal(aStream.channels, 2)          // 立体声
+
+  // 6. 成片里的画面确实在动：同一镜内两个时刻的画面必须不同
+  const early = join(root, 'early.png')
+  const later = join(root, 'later.png')
+  await run('ffmpeg', ['-v', 'error', '-y', '-ss', '0.2', '-i', assetFile, '-frames:v', '1', early])
+  await run('ffmpeg', ['-v', 'error', '-y', '-ss', '1.0', '-i', assetFile, '-frames:v', '1', later])
+  const psnr = spawnSync('ffmpeg', ['-hide_banner', '-i', early, '-i', later, '-lavfi', 'psnr', '-f', 'null', '-'], { encoding: 'utf8' }).stderr
+  const match = /average:([0-9.]+)/.exec(psnr)
+  assert.ok(match, '没有拿到 PSNR')
+  assert.ok(Number(match[1]) < 40, `成片画面几乎没动（PSNR ${match[1]}），动效没有生效`)
 })

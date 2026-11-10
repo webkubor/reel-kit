@@ -40,10 +40,11 @@ func (a *App) viewTalkComposer(c *ui.Context) {
 	a.kit.Field(c, "镜间停顿", "每句之后的停顿秒数（0–2）", func() {
 		a.kit.Input(c, &a.talkPause, "0.45")
 	})
-	a.viewAudioKnobs(c, &a.talkAudio)
+	a.viewAudioKnobs(c, &a.talkAudio, &a.talkBGMGain)
 
 	a.partTitle(c, partVisual)
 	a.viewTalkImages(c)
+	a.viewMotionKnobs(c, &a.talkAudio)
 
 	a.partTitle(c, partLayout)
 	if len(a.talkStyles) > 0 {
@@ -116,7 +117,7 @@ func (a *App) viewRecommendationComposer(c *ui.Context) {
 	a.kit.Field(c, "镜间停顿", "每句之后的停顿秒数", func() {
 		a.kit.Input(c, &a.recPause, "0.35")
 	})
-	a.viewAudioKnobs(c, &a.recAudio)
+	a.viewAudioKnobs(c, &a.recAudio, &a.recBGMGain)
 
 	a.partTitle(c, partVisual)
 	a.viewStoryboardImages(c)
@@ -124,6 +125,7 @@ func (a *App) viewRecommendationComposer(c *ui.Context) {
 		{"contain", "完整画面"},
 		{"cover", "铺满画布"},
 	}, a.recImageFit, func(id string) { a.recImageFit = id })
+	a.viewMotionKnobs(c, &a.recAudio)
 
 	a.partTitle(c, partLayout)
 	a.kit.Field(c, "版式", "", func() {

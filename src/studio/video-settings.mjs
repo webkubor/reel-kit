@@ -1,4 +1,4 @@
-import { strictSetting } from '../settings.mjs'
+import { resolveSettings } from '../settings.mjs'
 
 export const platforms = {
   channels: { name: '视频号', ratio: '9:16', width: 1080, height: 1920 },
@@ -14,20 +14,17 @@ export const platforms = {
  * 少存一个，接手的人就不知道这条片子当时是「谁」的声音）。
  */
 export function recommendationSettings(input) {
-  const platform = strictSetting('recommendation', 'platform', input) || 'channels'
+  const platform = input.platform || 'channels'
   if (!platforms[platform]) throw new Error('请选择支持的发布平台')
   const voiceSource = input.voiceSource || 'scenes'
   if (!['tts', 'scenes', 'audio'].includes(voiceSource)) throw new Error('请选择旁白来源')
+  // 旋钮走统一的收敛逻辑：预设 → 默认值 → 用户填的值。
+  // 之前这里逐项 strictSetting，预设（口播清晰 / 氛围铺底）在这条流水线上是失效的。
+  const settings = resolveSettings('recommendation', input)
   return {
+    ...settings,
     platform, ...platforms[platform],
-    speed: strictSetting('recommendation', 'speed', input),
-    pause: strictSetting('recommendation', 'pause', input),
-    bgmGain: strictSetting('recommendation', 'bgmGain', input),
-    voiceGain: strictSetting('recommendation', 'voiceGain', input),
-    duck: strictSetting('recommendation', 'duck', input),
-    normalize: strictSetting('recommendation', 'normalize', input),
     voiceSource,
-    imageFit: strictSetting('recommendation', 'imageFit', input),
     // 通道 / 模型 / 音色 / 账户是四件独立的事，都要跟着这条片子走。
     // 少存一个，接手的人就不知道这条片子当时是「谁」的声音。
     voiceBackend: input.backend || 'voxflow',

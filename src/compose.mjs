@@ -70,10 +70,13 @@ export async function compose({
     throw new Error('voiceClips 与 frames 长度不一致')
   }
 
+  if (!Number.isInteger(fps) || fps < 1 || fps > 60) throw new Error('帧率必须是 1–60 的整数')
+  if (durations.some(d => !Number.isFinite(d) || d <= 0)) throw new Error('每镜时长必须是正数')
+  if (transition !== 'none' && !TRANSITIONS[transition]) throw new Error(`不支持的转场 "${transition}"`)
   const total = durations.reduce((a, b) => a + b, 0)
 
-  // 转场模式走 filter_complex 路径,不走 concat demuxer
-  if (transition !== 'none') {
+  // 连续动画片段和多镜转场共用同一条时间轴。
+  if ((transition !== 'none' && frames.length > 1) || frames.some(f => f.endsWith('.mp4'))) {
     return composeWithXfade({
       frames, durations, bgm, voiceClips, out, fps,
       fadeOut, bgmGain, bgmCrossfade, transition, transitionDuration, total,
@@ -183,12 +186,9 @@ export async function compose({
  *   xfade 需要两个有重叠的视频流,只能在 filter_complex 里把每帧 PNG 先
  *   loop+trim 成不等时长小视频,再 xfade 串联。
  *
- * 音画时长:
- *   视频流 = N 镜时长 - (N-1) * 转场时长  (xfade 重叠)
- *   配音流 = N 镜时长(不变)
- *   amix 用 video 当 first,配音尾部 (N-1) * 转场时长 秒被切。
- *   默认转场 0.4s,前几镜的配音余量(默认 0.45s)是静音,够覆盖,
- *   末镜配音的尾巴可能被切 —— 用户主动加余量即可。
+ * 每镜按原时长播放；离场镜头额外保持 X 秒，与下一镜开头重叠。
+ * 转场从下一句旁白的起点开始，不缩短总片长，也不移动任何一句旁白。
+ * 单镜和无音轨同样有效；动画输入保留逐帧画面，不重复首帧。
  */
 async function composeWithXfade({
   frames, durations, bgm, voiceClips, out, fps,
@@ -196,52 +196,46 @@ async function composeWithXfade({
   voiceGain, duck, normalize,
 }) {
   const xfadeType = TRANSITIONS[transition]
-  if (!xfadeType) {
-    throw new Error(
-      `不支持的转场 "${transition}"。可用: ${[...Object.keys(TRANSITIONS), 'none'].join(', ')}`,
-    )
-  }
-  const X = transitionDuration
-  if (!(X > 0)) throw new Error('转场时长必须 > 0')
+  if (xfadeType && (!Number.isFinite(transitionDuration) || transitionDuration <= 0)) throw new Error('转场时长必须 > 0')
+  // 短镜头也要能出片；转场最多占最短一镜的一半，且按帧对齐。
+  const X = xfadeType && frames.length > 1
+    ? Math.floor(Math.min(transitionDuration, ...durations.map(d => d / 2)) * fps) / fps : 0
 
-  // 输入:每帧 PNG(loop 1,靠 filter 控时长)+ 每镜配音 + BGM
-  const args = ['-y']
-  frames.forEach((f) => {
-    // -loop 1:让 ffmpeg 把 PNG 当视频读,而不是 image2 默认 1 帧就结束
-    // -framerate fps:loop 输出帧率(影响 xfade 的帧精度)
-    // -t:限定 input 时长(防止 ffmpeg 觉得 input 无穷)
-    args.push('-loop', '1', '-framerate', String(fps), '-t', '999999', '-i', f)
+  const args = ['-y', '-filter_complex_threads', '1']
+  frames.forEach((f, i) => {
+    if (!f.endsWith('.mp4')) args.push('-loop', '1', '-framerate', String(fps))
+    args.push('-t', String(durations[i] + X + 1 / fps), '-i', f)
   })
   const voiceStart = frames.length
   voiceClips?.forEach((v) => args.push('-i', v.file))
   const bgmIdx = voiceStart + (voiceClips?.length || 0)
   if (bgm) args.push('-i', bgm)
 
-  // 1) 每帧 PNG → 视频流(loop+trim+setpts,固定到该镜时长)
   const filters = []
   for (let i = 0; i < frames.length; i++) {
-    // loop 的 size 参数上限 32767(帧数),不指定 = 0 = 无限,这里直接不写
+    const tail = i < frames.length - 1 ? X : 0
     filters.push(
       `[${i}:v]scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=${fps},` +
-      `loop=loop=-1:start=0,trim=0:${durations[i].toFixed(3)},` +
-      `setpts=PTS-STARTPTS,format=yuv420p[v${i}]`,
+      `trim=0:${durations[i].toFixed(6)},setpts=PTS-STARTPTS,` +
+      `tpad=stop_mode=clone:stop_duration=${tail + 1 / fps},trim=0:${(durations[i] + tail).toFixed(6)},` +
+      `settb=AVTB,format=yuv420p[v${i}]`,
     )
   }
 
-  // 2) xfade 串联:每对相邻镜重叠 X 秒
-  //    第 i 对(i=1..N-1)的 offset = sum(durations[0..i-1]) - i*X
-  let accDur = durations[0]
+  let boundary = durations[0]
   let prev = '[v0]'
-  for (let i = 1; i < frames.length; i++) {
-    const last = i === frames.length - 1
-    const outLabel = last ? '[vout]' : `[vt${i}]`
-    const offset = accDur - X
-    filters.push(
-      `${prev}[v${i}]xfade=transition=${xfadeType}:duration=${X}:offset=${offset.toFixed(3)}${outLabel}`,
-    )
-    prev = outLabel
-    accDur += durations[i] - X
+  if (X > 0) {
+    for (let i = 1; i < frames.length; i++) {
+      const outLabel = `[vt${i}]`
+      filters.push(`${prev}[v${i}]xfade=transition=${xfadeType}:duration=${X}:offset=${boundary.toFixed(6)}${outLabel}`)
+      prev = outLabel
+      boundary += durations[i]
+    }
+  } else if (frames.length > 1) {
+    filters.push(`${frames.map((_, i) => `[v${i}]`).join('')}concat=n=${frames.length}:v=1:a=0[vout]`)
+    prev = '[vout]'
   }
+  const accDur = total
 
   // 3) 配音:apad 到该镜时长,concat 起来
   if (voiceClips?.length) {
@@ -272,8 +266,8 @@ async function composeWithXfade({
     filters.push(bgmFilter)
   }
 
-  // 5) 混音（与 concat 主路径共用 buildMixChain，避免两条链参数走偏）
-  filters.push(...buildMixChain({
+  // 5) 无音轨时不创建未消费的音频输出。
+  if (voiceClips?.length || bgm) filters.push(...buildMixChain({
     voiceLabel: voiceClips?.length ? '[voice]' : null,
     bgmLabel: bgm ? '[bgm]' : null,
     voiceGain: voiceGain ?? undefined,
@@ -282,16 +276,12 @@ async function composeWithXfade({
     outLabel: '[a]',
   }))
 
+  args.push('-filter_complex', filters.join(';'), '-map', prev)
+  if (voiceClips?.length || bgm) args.push('-map', '[a]', '-c:a', 'aac', '-b:a', '192k')
   args.push(
-    '-filter_complex', filters.join(';'),
-    '-map', '[vout]', '-map', '[a]',
-    '-c:a', 'aac', '-b:a', '192k',
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '20',
-    '-pix_fmt', 'yuv420p',
-    '-r', String(fps),
-    '-movflags', '+faststart',
-    '-shortest',
-    out,
+    '-pix_fmt', 'yuv420p', '-r', String(fps), '-movflags', '+faststart',
+    '-t', String(total), out,
   )
 
   try {

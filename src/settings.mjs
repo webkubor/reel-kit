@@ -125,6 +125,12 @@ export const SETTING_SCHEMA = {
     ],
   },
 
+  motion: {
+    group: '画面', label: '镜内动效', type: 'choice', default: 'gentle',
+    options: [{ value: 'none', label: '静态画面（较快）' }, { value: 'gentle', label: '轻柔运镜（逐帧渲染）' }],
+    hint: '图片缓慢推进、字幕轻柔入场；逐帧渲染，生成时间更长',
+  },
+
   transition: {
     group: '画面',
     label: '切镜转场',

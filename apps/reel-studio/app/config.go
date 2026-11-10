@@ -63,6 +63,7 @@ func configFields(kind string) []configField {
 			{partVoice, "normalize", "统一响度"},
 			{partVisual, "assetIds", "画面素材"},
 			{partVisual, "transition", "切镜转场"},
+			{partVisual, "motion", "镜内动效"},
 			{partLayout, "style", "视觉风格"},
 			{partLayout, "template", "版式模板"},
 			{partFormat, "ratio", "画幅"},
@@ -91,6 +92,7 @@ func configFields(kind string) []configField {
 			{partVisual, "assetIds", "分镜画面"},
 			{partVisual, "imageFit", "画面填充"},
 			{partVisual, "transition", "切镜转场"},
+			{partVisual, "motion", "镜内动效"},
 			{partLayout, "template", "版式"},
 			{partFormat, "platform", "发布平台"},
 			{partFormat, "ratio", "画幅"},
@@ -124,6 +126,7 @@ func configFields(kind string) []configField {
 			{partVoice, "normalize", "统一响度"},
 			{partVisual, "assetIds", "产品画面"},
 			{partVisual, "transition", "切镜转场"},
+			{partVisual, "motion", "镜内动效"},
 			{partLayout, "template", "版式"},
 			{partFormat, "ratio", "画幅"},
 			{partMusic, "bgmId", "背景音乐"},
@@ -293,6 +296,15 @@ func (a *App) configValue(kind, key string, input map[string]any) string {
 			return "原样输出"
 		case "default":
 			return "标准平衡"
+		}
+		return orDash(key)
+	case "motion":
+		key, _ := raw.(string)
+		switch key {
+		case "gentle":
+			return "轻柔运镜"
+		case "none":
+			return "静态画面"
 		}
 		return orDash(key)
 	case "transition":
