@@ -59,6 +59,23 @@ scripts/publish-desktop-release.sh app-v0.2.3 --notes /tmp/notes.md
 `SHA256SUMS` → `gh release create` 传全部产物。同名产物只发一次
 （清单点名的东西不会再被通配符重复收集）。
 
+### 只发一个平台时（macOS 先闭环）
+
+Windows 保持旧版本、这次只发 macOS 时，用两个开关：
+
+```bash
+scripts/publish-desktop-release.sh app-v1.5.0 --notes /tmp/notes.md \
+	--platform darwin/arm64 --carry windows/amd64
+```
+
+- `--platform`：**只发**列出的平台。没点名的平台整目录跳过（包括它的清单），
+  点名的平台仍然要求清单版本等于当前版本 —— 「旧构建混进来」这道防线不因为
+  只发一个平台就失效。构建步骤也跟着走：只发 macOS 就不会再构建一遍 Windows。
+- `--carry`：把另一个平台**已发布**的清单原样带上（内容一个字都不改）。
+  这一步不能省：安装版的更新检查按「最新发布页」找清单，只发 macOS 时新发布页上
+  没有 Windows 的清单，Windows 用户的「检查更新」会直接报 404。
+  清单里指向的归档仍在旧发布页上，照样能用。
+
 ### 清单的名字与安装脚本要对得上
 
 macOS 的 `install.sh` 按架构找清单：`update-darwin-<架构>.json`（Apple Silicon 上
