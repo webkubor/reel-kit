@@ -56,6 +56,9 @@ func configFields(kind string) []configField {
 			{partVoice, "voiceBackend", "配音引擎"},
 			{partVoice, "tone", "语气"},
 			{partVoice, "pause", "镜间停顿"},
+			{partVoice, "voiceGain", "人声音量"},
+			{partVoice, "duck", "人声压低配乐"},
+			{partVoice, "normalize", "统一响度"},
 			{partVisual, "assetIds", "画面素材"},
 			{partLayout, "style", "视觉风格"},
 			{partLayout, "template", "版式模板"},
@@ -78,6 +81,9 @@ func configFields(kind string) []configField {
 			{partVoice, "tone", "语气"},
 			{partVoice, "speed", "语速"},
 			{partVoice, "pause", "镜间停顿"},
+			{partVoice, "voiceGain", "人声音量"},
+			{partVoice, "duck", "人声压低配乐"},
+			{partVoice, "normalize", "统一响度"},
 			{partVisual, "assetIds", "分镜画面"},
 			{partVisual, "imageFit", "画面填充"},
 			{partLayout, "template", "版式"},
@@ -106,6 +112,9 @@ func configFields(kind string) []configField {
 			{partVoice, "voiceBackend", "配音引擎"},
 			{partVoice, "tone", "语气"},
 			{partVoice, "pause", "镜间停顿"},
+			{partVoice, "voiceGain", "人声音量"},
+			{partVoice, "duck", "人声压低配乐"},
+			{partVoice, "normalize", "统一响度"},
 			{partVisual, "assetIds", "产品画面"},
 			{partLayout, "template", "版式"},
 			{partFormat, "ratio", "画幅"},
@@ -267,6 +276,18 @@ func (a *App) configValue(kind, key string, input map[string]any) string {
 		return fmt.Sprintf("%s 秒", fmt.Sprintf("%v", raw))
 	case "speed":
 		return fmt.Sprintf("%v 倍", raw)
+	case "voiceGain":
+		return fmt.Sprintf("%v 倍", raw)
+	case "duck":
+		if on, _ := raw.(bool); on {
+			return "开"
+		}
+		return "关"
+	case "normalize":
+		if on, _ := raw.(bool); on {
+			return "开"
+		}
+		return "关"
 	case "bgmGain":
 		return fmt.Sprintf("%d%%", int(toFloat(raw)*100+0.5))
 	case "duration":
@@ -442,6 +463,7 @@ func (a *App) applyConfig(kind string, input map[string]any, jobID string) {
 			a.talkSelected[id] = true
 		}
 		a.talkBGM = a.bgmChoiceFor(str("bgmId"))
+		a.talkAudio = audioKnobsFromConfig(input)
 	case "recommendation":
 		a.repoURL = str("repoUrl")
 		a.recTitle = str("title")
@@ -471,6 +493,7 @@ func (a *App) applyConfig(kind string, input map[string]any, jobID string) {
 		a.recVoiceIDs = ids("voiceIds")
 		a.recNarrationID = str("narrationId")
 		a.recBGM = a.bgmChoiceFor(str("bgmId"))
+		a.recAudio = audioKnobsFromConfig(input)
 	case "export":
 		a.assetIDs = ids("assetIds")
 		a.ratio = str("ratio")
@@ -504,6 +527,7 @@ func (a *App) applyConfig(kind string, input map[string]any, jobID string) {
 			a.prodSelected[id] = true
 		}
 		a.prodBGM = a.bgmChoiceFor(str("bgmId"))
+		a.prodAudio = audioKnobsFromConfig(input)
 	}
 	a.adjustingJobID = jobID
 }

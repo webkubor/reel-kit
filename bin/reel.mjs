@@ -26,6 +26,7 @@ import { compose, probeDuration } from '../src/compose.mjs'
 import { synthesizeCaptions, durationsFromVoice, splitVoiceByChars } from '../src/voice.mjs'
 import { resolveBgm, listBgm, NOT_CONFIGURED } from '../src/bgm-library.mjs'
 import { getStyle, KNOWLEDGE_STYLES } from '../src/knowledge-styles.mjs'
+import { PRESETS } from '../src/settings.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const TEMPLATES = join(ROOT, 'templates')
@@ -83,12 +84,21 @@ make 选项:
   --bgm <别名|文件>    背景音乐（自动循环补满 + 片尾淡出）。给文件路径即可用；
                        想按别名取，先配一个配乐清单（REEL_BGM_MANIFEST 或
                        ~/.reel-kit/config.json），清单见 reel bgm
-  --bgm-gain <0~1>     BGM 音量增益。**有配音时默认 0.22**(垫底不抢人声),
-                       无配音时默认 1.0。觉得垫太轻调 0.3~0.4,太吵调 0.12~0.18
+  --bgm-gain <0~1>     BGM 音量增益。**有配音时默认 0.12**(垫底不抢人声),
+                       无配音时默认 1.0。觉得垫太轻调 0.3~0.4,太吵调 0.06~0.12
   --bgm-crossfade <秒>  BGM 循环接缝交叉淡化秒数,默认 1.0。短曲子 loop 时
                         会把头 K 秒和尾 K 秒做平滑过渡再去循环,听感无爆音。
                         设 0 退回旧行为(直接 loop)
   --fade-out <秒>      片尾 BGM 淡出时长,默认 1.5
+  --preset <预设>       一键套用常用组合:default(默认) / clear-speech(口播清晰,
+                       配乐压到 8%、人声提到 1.5 倍) / ambient(氛围铺底,配乐 30%) /
+                       raw(原样输出,不归一化不压配乐)。后面的具体参数会覆盖预设
+  --voice-gain <倍数>   人声增益,默认 1.35。念白被配乐盖住就调大(1.6~2.0),
+                       人声太冲就调小(1.0~1.2)
+  --no-duck           不做侧链。默认人声一响就把配乐压下去,人声停时抬回来。
+                       配乐本身要跟人声抢位置(比如卡点混剪)时才关掉
+  --no-normalize      不做响度归一化。默认输出 -14 LUFS / -1 dBTP,
+                       自己要在别处统一音量时关掉(仍会限幅,不会削顶)
   --per-shot <秒>      每镜时长，默认 2.5
   --last-shot <秒>     末镜时长（留给引导语），默认与 per-shot 相同
   --out <文件>         输出 mp4
@@ -322,15 +332,27 @@ async function cmdMake(args) {
     }
 
     process.stdout.write('[reel] 合成中… ')
+    /*
+     * 预设 → 具体参数 → 实际生效值。
+     * 后面的 flag 覆盖预设：先想「这条片子是什么调子」，再临时拧一个旋钮。
+     */
+    const presetId = args.preset ? String(args.preset) : 'default'
+    if (!PRESETS[presetId]) {
+      throw new Error(`没有这个预设：${presetId}。可选：${Object.keys(PRESETS).join(' / ')}`)
+    }
+    const preset = PRESETS[presetId].settings
     const { out, duration } = await compose({
       frames, durations,
       bgm: bgmFile,
       voiceClips: voiceClips || undefined,
-      bgmGain: args['bgm-gain'] !== undefined ? Number(args['bgm-gain']) : undefined,
+      bgmGain: args['bgm-gain'] !== undefined ? Number(args['bgm-gain']) : preset.bgmGain,
       bgmCrossfade: args['bgm-crossfade'] !== undefined ? Number(args['bgm-crossfade']) : 1.0,
       transition: String(args.transition || 'none'),
       transitionDuration: Number(args['transition-duration'] || 0.4),
       fadeOut: args['fade-out'] !== undefined ? Number(args['fade-out']) : undefined,
+      voiceGain: args['voice-gain'] !== undefined ? Number(args['voice-gain']) : preset.voiceGain,
+      duck: args['no-duck'] ? false : preset.duck,
+      normalize: args['no-normalize'] ? false : preset.normalize,
       out: resolve(String(args.out)),
       fps: Number(args.fps || 30),
     })

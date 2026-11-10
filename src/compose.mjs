@@ -10,6 +10,8 @@ import { execFile } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
+import { buildMixChain } from './audio-mix.mjs'
+import { DEFAULT_BGM_GAIN } from './settings.mjs'
 
 const run = promisify(execFile)
 
@@ -53,8 +55,14 @@ function buildConcatList(frames, durations) {
  * @param {number}   [opts.bgmCrossfade]  BGM 头尾交叉淡化秒数,>0 时启用(默认 0 = 旧行为)
  * @param {string}   [opts.transition]  镜间转场名,默认 'none'(concat demuxer 旧路径)
  * @param {number}   [opts.transitionDuration]  转场时长秒,默认 0.4
+ * @param {number}   [opts.voiceGain]   人声增益,默认 1.35(见 src/audio-mix.mjs)
+ * @param {boolean}  [opts.duck]        人声是否侧链压低配乐,默认 true
+ * @param {boolean}  [opts.normalize]   是否做响度归一化到 -14 LUFS,默认 true
  */
-export async function compose({ frames, durations, bgm, voiceClips, out, fps = 30, fadeOut, bgmGain, bgmCrossfade, transition = 'none', transitionDuration = 0.4 }) {
+export async function compose({
+  frames, durations, bgm, voiceClips, out, fps = 30, fadeOut, bgmGain, bgmCrossfade,
+  transition = 'none', transitionDuration = 0.4, voiceGain, duck, normalize,
+}) {
   if (fadeOut === undefined || Number.isNaN(fadeOut)) fadeOut = 1.5
   if (!frames.length) throw new Error('没有帧可合成')
   if (frames.length !== durations.length) throw new Error('frames 与 durations 长度不一致')
@@ -69,6 +77,7 @@ export async function compose({ frames, durations, bgm, voiceClips, out, fps = 3
     return composeWithXfade({
       frames, durations, bgm, voiceClips, out, fps,
       fadeOut, bgmGain, bgmCrossfade, transition, transitionDuration, total,
+      voiceGain, duck, normalize,
     })
   }
   const workDir = dirname(frames[0])
@@ -104,13 +113,14 @@ export async function compose({ frames, durations, bgm, voiceClips, out, fps = 3
     args.push('-i', bgm)
     const fadeStart = Math.max(0, total - fadeOut)
     /*
-     * 有配音时 BGM 必须压下去,否则念白被盖住。0.22 是实测值:
-     * 念白段 -17~-21dB、间隙纯 BGM -25~-33dB,差 6~13dB,人声清晰在前。
-     * 但「垫多重」是听感问题,不同曲子差异很大,所以留 --bgm-gain 让人调。
+     * 有念白时 BGM 必须压下去,否则念白被盖住。
+     * 默认值来自 src/settings.mjs（DEFAULT_BGM_GAIN = 0.12）——
+     * 全工程只有一个默认,不在这里另抄一份。
+     * 「垫多重」是听感问题,不同曲子差异很大,所以留 --bgm-gain 让人调。
      */
     const gain = bgmGain !== undefined && !Number.isNaN(bgmGain)
       ? bgmGain
-      : (voiceClips?.length ? 0.22 : 1)
+      : (voiceClips?.length ? DEFAULT_BGM_GAIN : 1)
     /*
      * 短曲子循环接缝:把 BGM 头 K 秒和尾 K 秒叠成一段平滑版,再拿去 loop。
      * 这样循环点落在 crossfade 的过渡区,听感自然不爆音。
@@ -127,18 +137,23 @@ export async function compose({ frames, durations, bgm, voiceClips, out, fps = 3
     filters.push(bgmFilter)
   }
 
-  if (voiceClips?.length && bgm) {
-    // duration=first：以配音轨为准，避免 BGM 把片子拖长
-    filters.push('[voice][bgm]amix=inputs=2:duration=first:dropout_transition=0[a]')
-  } else if (voiceClips?.length) {
-    filters.push('[voice]anull[a]')
-  } else if (bgm) {
-    filters.push('[bgm]anull[a]')
-  }
+  const hasAudio = Boolean(voiceClips?.length || bgm)
 
-  if (filters.length) {
+  if (hasAudio) {
+    filters.push(...buildMixChain({
+      voiceLabel: voiceClips?.length ? '[voice]' : null,
+      bgmLabel: bgm ? '[bgm]' : null,
+      voiceGain: voiceGain ?? undefined,
+      duck: duck !== false,
+      normalize: normalize !== false,
+      outLabel: '[a]',
+    }))
     args.push('-filter_complex', filters.join(';'), '-map', '0:v', '-map', '[a]',
       '-c:a', 'aac', '-b:a', '192k', '-shortest')
+  } else {
+    // 无音轨：不挂音频滤镜，输出里没有音频流（保持旧行为）
+    if (filters.length) args.push('-filter_complex', filters.join(';'))
+    args.push('-map', '0:v')
   }
 
   args.push(
@@ -178,6 +193,7 @@ export async function compose({ frames, durations, bgm, voiceClips, out, fps = 3
 async function composeWithXfade({
   frames, durations, bgm, voiceClips, out, fps,
   fadeOut, bgmGain, bgmCrossfade, transition, transitionDuration, total,
+  voiceGain, duck, normalize,
 }) {
   const xfadeType = TRANSITIONS[transition]
   if (!xfadeType) {
@@ -244,7 +260,7 @@ async function composeWithXfade({
     const fadeStart = Math.max(0, accDur - fadeOut)
     const gain = bgmGain !== undefined && !Number.isNaN(bgmGain)
       ? bgmGain
-      : (voiceClips?.length ? 0.22 : 1)
+      : (voiceClips?.length ? DEFAULT_BGM_GAIN : 1)
     const xf = bgmCrossfade && bgmCrossfade > 0 ? bgmCrossfade : 0
     const bgmFilter = xf > 0
       ? `[${bgmIdx}:a]asplit=2[b1][b2];` +
@@ -256,17 +272,15 @@ async function composeWithXfade({
     filters.push(bgmFilter)
   }
 
-  // 5) amix(用 video 当 first,配音尾部被切的那 (N-1)*X 秒是静音期)
-  if (voiceClips?.length && bgm) {
-    filters.push('[voice][bgm]amix=inputs=2:duration=first:dropout_transition=0[a]')
-  } else if (voiceClips?.length) {
-    filters.push('[voice]anull[a]')
-  } else if (bgm) {
-    filters.push('[bgm]anull[a]')
-  } else {
-    // 无音轨也要有 [a] 标签(被 -map 引用),用 anullsrc 生成静音占位
-    filters.push('anullsrc=r=44100:cl=stereo[a]')
-  }
+  // 5) 混音（与 concat 主路径共用 buildMixChain，避免两条链参数走偏）
+  filters.push(...buildMixChain({
+    voiceLabel: voiceClips?.length ? '[voice]' : null,
+    bgmLabel: bgm ? '[bgm]' : null,
+    voiceGain: voiceGain ?? undefined,
+    duck: duck !== false,
+    normalize: normalize !== false,
+    outLabel: '[a]',
+  }))
 
   args.push(
     '-filter_complex', filters.join(';'),

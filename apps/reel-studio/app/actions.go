@@ -70,12 +70,16 @@ func (a *App) submitTalk() {
 		input["pause"] = pause
 	}
 	if a.talkBGMGain != "" {
-		gain, err := parseNumberIn("BGM 音量", a.talkBGMGain, 0, 100)
+		gain, err := bgmGainValue(a.talkBGMGain)
 		if err != nil {
 			a.fail(err.Error())
 			return
 		}
-		input["bgmGain"] = gain / 100
+		input["bgmGain"] = gain
+	}
+	if err := a.applyAudioKnobs(input, a.talkAudio); err != nil {
+		a.fail(err.Error())
+		return
 	}
 	bgmChoice := a.talkBGM
 	projectID := a.projectID
@@ -177,12 +181,16 @@ func (a *App) submitProduct() {
 		input["pause"] = pause
 	}
 	if a.prodBGMGain != "" {
-		gain, err := parseNumberIn("BGM 音量", a.prodBGMGain, 0, 100)
+		gain, err := bgmGainValue(a.prodBGMGain)
 		if err != nil {
 			a.fail(err.Error())
 			return
 		}
-		input["bgmGain"] = gain / 100
+		input["bgmGain"] = gain
+	}
+	if err := a.applyAudioKnobs(input, a.prodAudio); err != nil {
+		a.fail(err.Error())
+		return
 	}
 	bgmChoice := a.prodBGM
 	projectID := a.projectID

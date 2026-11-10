@@ -40,6 +40,7 @@ func (a *App) viewProductComposer(c *ui.Context) {
 	a.kit.Field(c, "镜间停顿", "每句之后的停顿秒数（0–2）", func() {
 		a.kit.Input(c, &a.prodPause, "0.45")
 	})
+	a.viewAudioKnobs(c, &a.prodAudio)
 
 	a.partTitle(c, partVisual)
 	a.viewProductImages(c)
@@ -61,7 +62,7 @@ func (a *App) viewProductComposer(c *ui.Context) {
 
 	a.partTitle(c, partMusic)
 	a.viewBGMPickerFor(c, &a.prodBGM)
-	a.kit.Field(c, "BGM 音量（%）", "0–100，数字越大越响", func() {
+	a.kit.Field(c, "BGM 音量（%）", "0–50，数字越大越响", func() {
 		a.kit.Input(c, &a.prodBGMGain, "12")
 	})
 

@@ -23,7 +23,7 @@ const add = (repoPath, bundlePath) => pairs.push([repoPath, bundlePath])
 for (const name of readdirSync(join(root, 'src/studio'))) {
   if (name.endsWith('.mjs')) add(join('src/studio', name), join('src/studio', name))
 }
-for (const name of ['render.mjs', 'compose.mjs', 'voice.mjs', 'bgm-library.mjs', 'knowledge-styles.mjs']) {
+for (const name of ['render.mjs', 'compose.mjs', 'voice.mjs', 'bgm-library.mjs', 'knowledge-styles.mjs', 'audio-mix.mjs', 'settings.mjs']) {
   if (existsSync(join(root, 'src', name))) add(join('src', name), join('src', name))
 }
 for (const name of readdirSync(join(root, 'templates'))) {

@@ -112,6 +112,8 @@ type App struct {
 	recVoiceSource string
 	recImageFit    string
 	recBGMGain     string
+	// recAudio 是「声音」那一节的共用调节（人声音量 / 侧链 / 响度）。
+	recAudio audioKnobs
 	// recVoiceIDs 是「逐镜指定」时每一句各自的配音素材，与分镜行一一对应；
 	// 空字符串表示这一句用 AI 配音。
 	recVoiceIDs []string
@@ -132,6 +134,8 @@ type App struct {
 	talkPause    string
 	talkBGM      string
 	talkBGMGain  string
+	// talkAudio 是「声音」那一节的共用调节。
+	talkAudio audioKnobs
 
 	// 人物商品介绍
 	prodTitle    string
@@ -147,6 +151,8 @@ type App struct {
 	prodSelected map[string]bool
 	prodBGM      string
 	prodBGMGain  string
+	// prodAudio 是「声音」那一节的共用调节。
+	prodAudio audioKnobs
 
 	// 我的声音（声音克隆）
 	voiceImportOpen bool
@@ -246,11 +252,14 @@ func New(opts Options) *App {
 		recVoiceSource: "scenes",
 		recImageFit:    "contain",
 		recBGMGain:     "12",
+		recAudio:       defaultAudioKnobs(),
 		talkPause:      "0.45",
 		talkBGMGain:    "12",
+		talkAudio:      defaultAudioKnobs(),
 		prodRatio:      "9:16",
 		prodPause:      "0.45",
 		prodBGMGain:    "12",
+		prodAudio:      defaultAudioKnobs(),
 		libKind:        "video",
 		expTemplate:    "sticker-promo",
 		reviewChecks:   map[string]bool{},
@@ -1453,12 +1462,16 @@ func (a *App) submitRecommendation(channel *studioapi.Channel) {
 		input["narrationId"] = a.recNarrationID
 	}
 	if a.recBGMGain != "" {
-		gain, err := parseNumberIn("BGM 音量", a.recBGMGain, 0, 50)
+		gain, err := bgmGainValue(a.recBGMGain)
 		if err != nil {
 			a.fail(err.Error())
 			return
 		}
-		input["bgmGain"] = gain / 100
+		input["bgmGain"] = gain
+	}
+	if err := a.applyAudioKnobs(input, a.recAudio); err != nil {
+		a.fail(err.Error())
+		return
 	}
 
 	bgmChoice := a.recBGM
@@ -1483,9 +1496,6 @@ func (a *App) submitRecommendation(channel *studioapi.Channel) {
 				return
 			}
 			input["bgmId"] = bgmID
-		}
-		if a.recBGMGain != "" {
-			input["bgmGain"] = toFloat(a.recBGMGain)
 		}
 		job, err := client.SubmitJob(input)
 		a.busy.Store(false)

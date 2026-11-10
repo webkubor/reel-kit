@@ -40,6 +40,7 @@ func (a *App) viewTalkComposer(c *ui.Context) {
 	a.kit.Field(c, "镜间停顿", "每句之后的停顿秒数（0–2）", func() {
 		a.kit.Input(c, &a.talkPause, "0.45")
 	})
+	a.viewAudioKnobs(c, &a.talkAudio)
 
 	a.partTitle(c, partVisual)
 	a.viewTalkImages(c)
@@ -66,7 +67,7 @@ func (a *App) viewTalkComposer(c *ui.Context) {
 
 	a.partTitle(c, partMusic)
 	a.viewBGMPickerFor(c, &a.talkBGM)
-	a.kit.Field(c, "BGM 音量（%）", "0–100，数字越大越响", func() {
+	a.kit.Field(c, "BGM 音量（%）", "0–50，数字越大越响", func() {
 		a.kit.Input(c, &a.talkBGMGain, "12")
 	})
 
@@ -115,6 +116,7 @@ func (a *App) viewRecommendationComposer(c *ui.Context) {
 	a.kit.Field(c, "镜间停顿", "每句之后的停顿秒数", func() {
 		a.kit.Input(c, &a.recPause, "0.35")
 	})
+	a.viewAudioKnobs(c, &a.recAudio)
 
 	a.partTitle(c, partVisual)
 	a.viewStoryboardImages(c)
