@@ -91,6 +91,9 @@ curl -s http://127.0.0.1:4390/api/state | head -c 400
   `export`（素材合成）、`speech`（只要配音）、`image`、`video`、`clone`、`voice-design`。
 - `voiceBackend`：`sherpa`（随应用自带的本机离线引擎）、`voxflow`（本机克隆音色，仅 macOS）、
   `minimax`（云端，按量计费）。
+- `backend`：图片与视频的通道。`museav`（中台）、`minimax`（H3 直连）、`magpie`（Magpie 网关）、或自定义通道 id。
+- `model`：通道内的模型。`magpie` 通道用 `provider/model` 形式（如 `codex/gpt-image-2.5`），
+  清单来自 Magpie 网关自己公布的可用列表 —— reel-kit 不内置一份模型表。
 - `captions` 一行一镜，最多 8 行，每行不超过 80 字。
 
 提交后拿 `job.id`，轮询 `GET /api/state` 看 `jobs[].status`；成功后 `assetId` 就是成片。
@@ -100,6 +103,18 @@ curl -s -X POST http://127.0.0.1:4390/api/jobs \
   -H 'X-Reel-Action: studio' -H 'Content-Type: application/json' \
   -d '{"kind":"talk","projectId":"p1","title":"试一条","captions":"你好，这是本机离线引擎配的旁白。","voiceBackend":"sherpa","persona":"zh-fanchen-c"}'
 ```
+
+## Magpie 网关通道
+
+`backend: "magpie"` 把本机跑着的 Magpie 当成统一模型网关接进来。三条约定：
+
+1. **发现是只读的。** `GET /api/providers` 里 `magpie` 通道的 `models` 来自 Magpie 自己公布的可用清单
+   （靠「给一个不存在的模型，它会回出完整清单」拿到），不是 reel-kit 内置的表。
+   视频通道的可用性只看 Magpie 的工具文档与设置 —— 没配视频模型就是 `ready: false`，并写明原因。
+2. **清单 ≠ 权限。** 清单是网关公布的能力；某个 provider 有没有额度、密钥通没通，以实际调用返回为准。
+3. **提交即计费。** 上游受理后任务上先落 `upstream.taskId` / `upstream.url`，
+   再下载素材。下载失败时 `POST /api/jobs/resume` 用同一个 ID 取回，**不会重新提交**。
+   素材上的 `requestedModel` 记你填的模型，`actualModel` 只在回执真写了模型名时才填，否则是 `unknown`。
 
 ## 为什么把这层公开
 

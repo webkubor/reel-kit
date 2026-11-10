@@ -286,6 +286,7 @@ function applyChannelCopy() {
   if (!channel || mode === 'recommendation' || mode === 'export') return
   const subtitles = {
     museav: 'MuseAV 中台 · 复用本机登录态，按中台当前可用模型出图出片',
+    magpie: 'Magpie 网关 · 走 Magpie 里已配好的模型，能力清单由网关自己公布',
     minimax: 'MiniMax 直连 · 走你自己的账户与额度',
     voxflow: 'VoxFlow 本地 · 本地推理，不产生模型费用',
   }
@@ -341,9 +342,13 @@ function generationNote() {
     : '使用本机 VoxFlow 模型，本地推理不产生模型费用；首次生成可能需要加载。'
   if (mode === 'video') return channel?.id === 'museav'
     ? '将调用 MuseAV 中台出视频，模型与额度以中台实际返回为准；参考图会上传至 MuseAV。'
+    : channel?.id === 'magpie'
+    ? '将调用 Magpie 网关出视频，计费与可用性以网关实际返回为准；提交即计费，下载失败可在历史里取回，不会重复提交。'
     : `将调用 ${label} 视频模型，按所选账户额度计费；能否调用以接口返回为准。`
   if (mode === 'image') return channel?.id === 'museav'
     ? '将调用 MuseAV 生图，按账户额度计费；参考图会上传至 MuseAV。'
+    : channel?.id === 'magpie'
+    ? '将调用 Magpie 网关生图，模型清单由网关自己公布；提交即计费，下载失败可在历史里取回，不会重复提交。'
     : `将调用 ${label} 生图，按你自己的账户计费。`
   return '每次提交生成一个版本，使用所选账户的额度。'
 }

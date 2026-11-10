@@ -6,6 +6,7 @@ import { homedir } from 'node:os'
 import { command, commandFull, available, jsonFetch, download, probeBytes } from './process.mjs'
 import { sherpaEngine, sherpaSynthesize } from './sherpa.mjs'
 import { loadCustomChannels, customChannelIssues, channelHeaders } from './channels.mjs'
+import { createMagpie, discoverMagpie, magpieCommand } from './magpie.mjs'
 
 // 通道配置的解析与校验住在 channels.mjs（CLI、设置页、后端三处共用），
 // 这里转出去是为了不打断已有的引用。
@@ -188,7 +189,7 @@ function readReelConfig() {
   }
 }
 
-export function createProviders(store, { fetcher = fetch, pause = delay, download: downloadAsset = download } = {}) {
+export function createProviders(store, { fetcher = fetch, pause = delay, download: downloadAsset = download, magpieRun = magpieCommand } = {}) {
   const voiceBase = process.env.REEL_VOXFLOW_URL || 'http://127.0.0.1:8866'
   const cfg = readReelConfig()
   const primaryKey = process.env.MINIMAX_API_KEY || cfg.minimaxApiKey || ''
@@ -229,6 +230,13 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
   const safeDownload = async url => {
     try { return await downloadAsset(url) } catch (error) { throw withCause(error, '下载素材') }
   }
+  /**
+   * Magpie 网关通道。
+   *
+   * 能力发现只读：图片清单靠 Magpie 文档保证的「未知模型回出完整清单」拿，
+   * 视频只从工具文档与 Settings 判断 —— 绝不拿一次真实生成去试通道通不通。
+   */
+  const magpie = createMagpie({ run: magpieRun, download: safeDownload, probe: probeBytes, store, pause })
   /** MiniMax 文字转语音：返回音频字节 */
   const minimaxTts = async ({ key, text, model, voiceId, speed = 1 }) => {
     const response = await fetcher(MINIMAX_TTS_URL, {
@@ -433,6 +441,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
      * 把已经生成的产物取回来。
      */
     async resume({ upstream, input }, progress) {
+      if (upstream?.channel === 'magpie') return magpie.resume({ upstream, input, progress })
       if (!upstream?.taskId) throw new Error('这条记录没有上游任务 ID，无法继续取回；请重新提交')
       if (upstream.channel === 'minimax') {
         const profile = profiles.find(p => p.id === (upstream.profile || input?.profile || 'primary'))
@@ -516,6 +525,8 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
         available('museav'), available('ffmpeg'),
         Promise.all([jsonFetch(voiceBase + '/api/status', { signal: AbortSignal.timeout(3000) }), jsonFetch(voiceBase + '/api/personas', { signal: AbortSignal.timeout(3000) })]).catch(() => null),
       ])
+      // Magpie 的发现是只读的：清单来自 Magpie 自己公布的内容，不在 reel-kit 里写死一份。
+      const magpieStatus = await magpie.discover()
       const quotas = await Promise.all(profiles.filter(p => p.key).map(async ({ id, label, key }) => {
         try {
           const response = await jsonFetch('https://www.minimaxi.com/v1/token_plan/remains', { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(6000) })
@@ -543,7 +554,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
 
       return {
         video: {
-          ready: minimaxReady || museav || customVideoChannels.some(c => c.key),
+          ready: minimaxReady || museav || magpieStatus.video.ready || customVideoChannels.some(c => c.key),
           label: '视频生成',
           note: '密钥配置不代表额度已验证；提交按所选账户计费',
           profiles: quotas,
@@ -556,6 +567,10 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
               models: [{ id: 'MiniMax-H3', name: 'MiniMax H3 · 4–15 秒 768P', minSeconds: 4, maxSeconds: 15 }],
               allowCustomModel: true,
             }),
+            channel('magpie', 'Magpie 网关', magpieStatus.video.ready, magpieStatus.video.note, {
+              models: magpieStatus.video.models,
+              allowCustomModel: true,
+            }),
             ...customVideoChannels.map(c => channel(c.id, c.label, Boolean(c.key), c.key ? `直连 ${c.baseUrl} · 按你自己的账户计费` : `缺少环境变量 ${c.env}`, {
               models: [{ id: c.model, name: c.model }],
               allowCustomModel: true,
@@ -563,12 +578,16 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
           ],
         },
         image: {
-          ready: Boolean(museav) || customImageChannels.some(c => c.key),
+          ready: Boolean(museav) || magpieStatus.image.ready || customImageChannels.some(c => c.key),
           label: '图片生成',
           note: museav ? '复用本机 CLI 登录态' : '请安装并登录 museav CLI',
           channels: [
             channel('museav', 'MuseAV 中台', Boolean(museav), museav ? '复用本机 CLI 登录态，按中台当前可用模型' : '请安装并登录 museav CLI', {
               models: museavImageModels.map(m => ({ id: m.value, name: m.value })),
+              allowCustomModel: true,
+            }),
+            channel('magpie', 'Magpie 网关', magpieStatus.image.ready, magpieStatus.image.note, {
+              models: magpieStatus.image.models,
               allowCustomModel: true,
             }),
             ...customImageChannels.map(c => channel(c.id, c.label, Boolean(c.key), c.key ? `直连 ${c.baseUrl} · 按你自己的账户计费` : `缺少环境变量 ${c.env}`, {
@@ -628,6 +647,23 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
 
       if (input.kind === 'image') {
         const channelId = input.backend || 'museav'
+        if (channelId === 'magpie') {
+          // Magpie 网关：模型清单来自 Magpie 自己，用户也可自填 provider/model。
+          progress('Magpie 正在生成图片…')
+          let referencePath = ''
+          if (input.referenceId) {
+            const asset = store.asset(input.referenceId, input.projectId)
+            if (!asset.mime.startsWith('image/')) throw new Error('图片参考必须是图片')
+            referencePath = store.path(asset)
+          }
+          const result = await magpie.generateImage({ input, progress, referencePath })
+          const probe = await probeBytes('image', result.bytes)
+          return store.addAsset(input.projectId, 'Magpie 图片', result.mime || 'image/png', result.bytes, {
+            source: 'Magpie', origin: 'ai', engine: `Magpie 生图${input.model ? ' · ' + input.model : ''}`,
+            prompt: input.prompt, requestedModel: input.model || '', actualModel: result.actualModel || 'unknown',
+            upstreamTaskId: result.taskId ? String(result.taskId) : '', ...probe,
+          })
+        }
         if (channelId !== 'museav') {
           const target = customOf(channelId)
           if (!target || target.kind !== 'image' || !['openai', 'minimax-image', 'museav'].includes(target.protocol)) throw new Error(`未知或不支持的图片通道「${channelId}」`)
@@ -666,6 +702,18 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
 
       if (input.kind === 'video') {
         const channelId = input.backend || 'minimax'
+        if (channelId === 'magpie') {
+          // Magpie 网关出视频。结果地址带网关鉴权头，reel-kit 拿不到 ——
+          // 由 magpie CLI 亲自把 mp4 落到本地，下载失败也只重试「取回」。
+          progress('Magpie 正在提交视频任务…')
+          const result = await magpie.generateVideo({ input, progress })
+          const probe = await probeBytes('video.mp4', result.bytes)
+          return store.addAsset(input.projectId, 'Magpie 视频.mp4', 'video/mp4', result.bytes, {
+            source: 'Magpie', origin: 'ai', engine: `Magpie 出视频${input.model ? ' · ' + input.model : ''}`,
+            prompt: input.prompt, requestedModel: input.model || '', actualModel: result.actualModel || 'unknown',
+            upstreamTaskId: result.taskId ? String(result.taskId) : '', ...probe,
+          })
+        }
         if (channelId === 'museav') {
           // 走 MuseAV 中台出视频：一条链路同时能调 Seedance / Kling / Wan 等多个模型，
           // 不必每换一个模型就往 reel-kit 里加一条直连实现。
