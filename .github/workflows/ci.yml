@@ -100,5 +100,12 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: 安装视频测试依赖
         run: choco install ffmpeg -y --no-progress
+      # 渲染用例要真浏览器：没有 Chrome 时用例会显式跳过（不是假装通过）。
+      # 装不上也不该让整条流水线红 —— 跳过会在日志里写明原因。
+      - name: 安装 Chrome（渲染用例需要）
+        continue-on-error: true
+        run: choco install googlechrome -y --no-progress
       - name: 后端工作台用例（Windows）
         run: pnpm test:studio
+        env:
+          CHROME_PATH: C:\Program Files\Google\Chrome\Application\chrome.exe

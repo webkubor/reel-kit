@@ -30,8 +30,10 @@ func Test对比选择器能打开(t *testing.T) {
 func Test选一条对比之后能看配置差异(t *testing.T) {
 	server := stub(t, talkJobs())
 	a := newApp(t, server.URL)
-	// 对比选择器在详情下方，窗口得够高才够得着它。
-	tt := ui.NewTester(a.View, 1280, 1400)
+	// 对比选择器在详情下方，位置随各平台字体度量浮动（macOS 上 y≈1350，
+	// Linux CI 上 y≈1430）。测试窗口给到 2200 高，留出余量，
+	// 免得换个平台就点不到 —— 这类失败很费时间排查，版式却没问题。
+	tt := ui.NewTester(a.View, 1280, 2200)
 	tt.Frame()
 
 	if err := tt.Click("对比这条"); err != nil {

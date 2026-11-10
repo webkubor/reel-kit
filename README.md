@@ -50,8 +50,8 @@ macOS 当前版本 **v1.5.0**（2026-11-10 发布）。[发布页与历史版本
 
 | 平台 | 下载 | 大小 | 装完在哪 |
 |---|---|---|---|
-| **macOS**（Apple Silicon） | [reel-studio-1.5.0-arm64.dmg](https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/reel-studio-1.5.0-arm64.dmg) | — | 拖进「应用程序」 |
-| **macOS**（Apple Silicon） | [reel-studio-1.5.0-darwin-arm64.tar.gz](https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/reel-studio-1.5.0-darwin-arm64.tar.gz) | — | 解压后把 `Reel Studio.app` 拖进「应用程序」 |
+| **macOS**（Apple Silicon） | [reel-studio-1.5.0-arm64.dmg](https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/reel-studio-1.5.0-arm64.dmg) | 237 MB | 拖进「应用程序」 |
+| **macOS**（Apple Silicon） | [reel-studio-1.5.0-darwin-arm64.tar.gz](https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/reel-studio-1.5.0-darwin-arm64.tar.gz) | 289 MB | 解压后把 `Reel Studio.app` 拖进「应用程序」 |
 | **Windows**（x64） | [reel-studio-1.4.0-windows-amd64.tar.gz](https://github.com/webkubor/reel-kit/releases/download/app-v1.4.0/reel-studio-1.4.0-windows-amd64.tar.gz) | 347 MB | 解压后双击 `Reel Studio.exe`（Windows 版这轮没更新，仍是 1.4.0） |
 
 **Windows 解压后请保持目录结构**：`Reel Studio.exe` 和它旁边的 `backend/`、`bin/`、`chrome/`、`museav/`、`sherpa/` 五个目录要在同一层，少一个应用就起不来。

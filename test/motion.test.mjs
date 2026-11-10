@@ -4,7 +4,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { renderFrames } from '../src/render.mjs'
+import { renderFrames, findChrome } from '../src/render.mjs'
 import { compose } from '../src/compose.mjs'
 
 // 一张只含图片与字幕的极简模板：动效只需要这两类元素。
@@ -32,6 +32,7 @@ const probe = (file, entries = 'format=duration') =>
   Number(execFileSync('ffprobe', ['-v', 'error', `-show_entries`, entries, '-of', 'csv=p=0', file], { encoding: 'utf8' }).split('\n')[0])
 
 test('动效模式把每一镜渲染成一段视频，而不是一张静图', async t => {
+  if (!findChrome()) { t.skip('本机没有 Chrome（渲染用例需要），跳过'); return }
   const { dir, template, image } = fixture(t)
   const frames = await renderFrames({
     template,
@@ -48,6 +49,7 @@ test('动效模式把每一镜渲染成一段视频，而不是一张静图', as
 })
 
 test('动效模式下画面确实在动：同一镜不同时刻的帧不一样', async t => {
+  if (!findChrome()) { t.skip('本机没有 Chrome（渲染用例需要），跳过'); return }
   const { dir, template, image } = fixture(t)
   const frames = await renderFrames({
     template, shots: [{ image, caption: '动' }], vars: { width: 240, height: 320 },
@@ -64,6 +66,7 @@ test('动效模式下画面确实在动：同一镜不同时刻的帧不一样',
 })
 
 test('转场不吃片长：加了转场，旁白与画面仍然一样长', async t => {
+  if (!findChrome()) { t.skip('本机没有 Chrome（渲染用例需要），跳过'); return }
   const { dir, template, image } = fixture(t)
   const durations = [1.2, 1.2]
   const frames = await renderFrames({
@@ -86,6 +89,7 @@ test('没给每镜时长就不给做动效', async t => {
 })
 
 test('静态模式仍然只出静图', async t => {
+  if (!findChrome()) { t.skip('本机没有 Chrome（渲染用例需要），跳过'); return }
   const { dir, template, image } = fixture(t)
   const frames = await renderFrames({
     template, shots: [{ image, caption: '一' }], vars: { width: 240, height: 320 },

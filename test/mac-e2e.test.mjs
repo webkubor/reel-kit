@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createStudio } from '../src/studio/server.mjs'
+import { findChrome } from '../src/render.mjs'
 import { mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -10,6 +11,7 @@ import { execFile, spawnSync } from 'node:child_process'
 const run = promisify(execFile)
 
 test('Mac 端端到端闭环实测：Edge 在线高保真配音 + 转场动效 + 混音预设', async t => {
+  if (!findChrome()) { t.skip('本机没有 Chrome（渲染用例需要），跳过'); return }
   const root = mkdtempSync(join(tmpdir(), 'reel-studio-mac-e2e-'))
   const { server, store } = createStudio({ root })
 
