@@ -83,3 +83,20 @@ jobs:
         run: |
           go build ./...
           go test ./...
+
+  # 后端（Node 工作台）里全是路径、临时目录、子进程调用 ——
+  # 这些在 Windows 上和在 macOS 上不是一回事（分隔符、可执行后缀、
+  # 路径里的空格、ffmpeg 的调用方式）。桌面端只是它的前端，
+  # 后端在 Windows 上跑不通，桌面端就是空壳，所以后端也得在 Windows 上验。
+  backend-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - name: 装依赖
+        run: pnpm install --frozen-lockfile
+      - name: 后端工作台用例（Windows）
+        run: pnpm test:studio
