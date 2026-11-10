@@ -818,7 +818,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
           })
           const probe = await probeBytes('voice.mp3', bytes)
           return store.addAsset(input.projectId, `配音 · ${input.prompt.slice(0, 16)}.mp3`, mime || 'audio/mpeg', bytes, {
-            source: '微软 Edge · 在线高保真', origin: 'free-online', engine: `Edge Neural TTS · ${voiceId}`, voiceBackend: 'edge',
+            source: '微软 Edge · 在线高保真', origin: 'free-online', engine: `Edge Neural TTS · ${voiceId}`, voiceBackend: 'edge', speed: input.speed || 1,
             prompt: input.prompt, persona: voiceId, tone: '', voiceName: input.voiceName || '',
             requestedModel: 'edge-neural', actualModel: voiceId, ...probe,
           })
@@ -848,7 +848,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
           const { bytes, mime } = await minimaxTts({ key: profile.key, text: input.prompt, model, voiceId, speed: input.speed || 1 })
           const probe = await probeBytes('voice.mp3', bytes)
           return store.addAsset(input.projectId, `配音 · ${input.prompt.slice(0, 16)}.mp3`, mime || 'audio/mpeg', bytes, {
-            source: 'MiniMax TTS', origin: 'cloud-paid', engine: `MiniMax TTS · ${model}`, voiceBackend: 'minimax',
+            source: 'MiniMax TTS', origin: 'cloud-paid', engine: `MiniMax TTS · ${model}`, voiceBackend: 'minimax', speed: input.speed || 1,
             prompt: input.prompt, persona: voiceId, tone: input.tone || '', voiceName: input.voiceName || '',
             requestedModel: model, actualModel: 'unknown', profile: profile.id, ...probe,
           })

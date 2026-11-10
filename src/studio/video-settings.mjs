@@ -51,6 +51,11 @@ export function reusableVoice(asset, input, line) {
   if ((asset.requestedModel || 'voxflow-local') !== model) return false
   const voice = input.voiceId || input.persona || ''
   if ((asset.persona || '') !== voice) return false
+  // 在线语音把语速烤进了音频：语速对不上就不能复用，否则「填了语速没反应」。
+  // 本机离线引擎的语速是出片后再变速的，复用旧配音不受影响。
+  if (backend === 'edge' || backend === 'minimax') {
+    if (Number(asset.speed || 1) !== Number(input.speed || 1)) return false
+  }
   // 同一个模型在两个账户下也不是同一段声音 —— 账户也要比
   const profile = input.profile || ''
   return (asset.profile || '') === profile

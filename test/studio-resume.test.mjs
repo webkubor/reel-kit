@@ -101,6 +101,16 @@ test('不同账户的同一段声音不可复用', () => {
   assert.equal(reusableVoice(asset, { backend: 'minimax', model: 'speech-02-hd', voiceId: 'male-qn-qingse', profile: 'secondary' }, '一句'), false)
 })
 
+// 在线语音把语速烤进了音频：语速对不上还复用，用户就会看到「填了语速没反应」。
+test('语速对不上的旧配音不可复用，本机离线引擎不受影响', () => {
+  const online = { mime: 'audio/mpeg', prompt: '一句', tone: '', persona: 'v', requestedModel: 'edge-neural', source: '微软 Edge · 在线高保真', voiceBackend: 'edge', speed: 1 }
+  assert.equal(reusableVoice(online, { backend: 'edge', model: 'edge-neural', voiceId: 'v', speed: 1 }, '一句'), true)
+  assert.equal(reusableVoice(online, { backend: 'edge', model: 'edge-neural', voiceId: 'v', speed: 1.2 }, '一句'), false)
+  // 本机离线引擎的语速是出片后再变速的，复用旧配音不受语速影响
+  const local = { mime: 'audio/wav', prompt: '一句', tone: '', persona: 'v', requestedModel: 'voxflow-local', source: 'VoxFlow', voiceBackend: 'voxflow' }
+  assert.equal(reusableVoice(local, { backend: 'voxflow', model: 'voxflow-local', voiceId: 'v', speed: 1.2 }, '一句'), true)
+})
+
 test('自定义通道：配置有问题要说得出来，配错的通道不出现', async t => {
   const root = mkdtempSync(join(tmpdir(), 'reel-providers-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
