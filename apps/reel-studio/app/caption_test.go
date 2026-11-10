@@ -69,13 +69,17 @@ func Test口播表单实时显示字数反馈(t *testing.T) {
 	}
 }
 
-func Test非Apple芯片平台禁用声音克隆(t *testing.T) {
+func Test非Apple芯片平台说明远端也能克隆(t *testing.T) {
 	hint, canInstall := voxflowHintText(false)
 	if canInstall {
 		t.Errorf("非 Apple 芯片 Mac 不该给出安装命令")
 	}
-	if !strings.Contains(hint, "这台机器用不了") {
-		t.Errorf("缺少明确说明: %s", hint)
+	// 本机装不了 ≠ 用不了：远端语音服务这条路任何系统都能走。
+	if !strings.Contains(hint, "Apple 芯片的 Mac 装得起来") {
+		t.Errorf("缺少「本机装不了」的明确说明: %s", hint)
+	}
+	if !strings.Contains(hint, "REEL_VOXFLOW_URL") {
+		t.Errorf("缺少远端语音服务这条路的说明: %s", hint)
 	}
 }
 

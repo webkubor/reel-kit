@@ -69,7 +69,9 @@ func TestVoxFlow提示按机器给不同内容(t *testing.T) {
 			t.Errorf("装不了 VoxFlow 的机器上不该出现 %q，实际：%q", unwanted, 装不了)
 		}
 	}
-	for _, want := range []string{"这台机器用不了", "自带"} {
+	// 本机装不了不等于用不了：远端跑语音服务这条路任何系统都能走，
+	// 提示里必须说清楚，否则用户以为整条路断了。
+	for _, want := range []string{"自带", "Apple 芯片的 Mac 装得起来", "REEL_VOXFLOW_URL"} {
 		if !strings.Contains(装不了, want) {
 			t.Errorf("装不了 VoxFlow 的机器上提示少了 %q，实际：%q", want, 装不了)
 		}

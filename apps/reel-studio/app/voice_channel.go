@@ -91,7 +91,7 @@ func (a *App) viewVoicePicker(c *ui.Context, backend *string, voiceID *string) {
 		}
 		choices = append(choices, choice{ch.ID, label})
 	}
-	a.pick(c, "配音通道", voiceChannelPickerHelp(), choices, *backend, func(id string) {
+	a.pick(c, "配音通道", a.voiceChannelPickerHelp(), choices, *backend, func(id string) {
 		if id != *backend {
 			*voiceID = "" // 换通道等于换音色列表，旧音色不再有意义
 		}
@@ -128,11 +128,17 @@ func (a *App) viewVoicePicker(c *ui.Context, backend *string, voiceID *string) {
 // VoxFlow 现在的语音后端是 Apple 芯片上的本地 MLX 模型，Windows 与 Intel Mac
 // 都装不了也用不了 —— 那是 VoxFlow 当前的部署形态，不是这条路走不通。
 // 所以这句限制只在跑得起来的机器上省略，别在别的机器上也写着「仅 macOS」。
-func voiceChannelPickerHelp() string {
-	if voxflowRunsHere() {
+//
+// 但「本机装不了」不等于「用不了」：工作台连的是远端语音服务时，
+// Windows 一样能克隆 —— 所以这句按工作台实际连上的通道写，不按本机系统写。
+func (a *App) voiceChannelPickerHelp() string {
+	if a.voiceCloneAvailable() {
 		return "本机离线：随应用自带、不联网不花钱；VoxFlow 可克隆自己的声音；云端按量计费"
 	}
-	return "本机离线：随应用自带、不联网不花钱；VoxFlow（克隆自己的声音）现在只支持 Apple 芯片的 Mac；云端按量计费"
+	if voxflowRunsHere() {
+		return "本机离线：随应用自带、不联网不花钱；VoxFlow 可克隆自己的声音（要本机先启动语音服务）；云端按量计费"
+	}
+	return "本机离线：随应用自带、不联网不花钱；VoxFlow（克隆自己的声音）要工作台连上语音服务，本机没起服务时用不了；云端按量计费"
 }
 
 // voiceChannelHelp 写清楚这条通道的钱和隐私成本。

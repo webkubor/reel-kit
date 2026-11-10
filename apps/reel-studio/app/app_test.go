@@ -14,6 +14,15 @@ import (
 // stub 是一个假的本地工作台，只回应用原生界面要读的那几个接口。
 func stub(t *testing.T, jobs []map[string]any) *httptest.Server {
 	t.Helper()
+	return stubWithVoice(t, jobs, true)
+}
+
+// stubWithVoice 造一个假工作台，语音服务（VoxFlow）是否就绪由参数决定。
+//
+// 「能不能克隆自己的声音」判的是工作台连不连得上语音服务，不是本机什么系统 ——
+// 这两种情况都得能测，所以就绪状态做成参数。
+func stubWithVoice(t *testing.T, jobs []map[string]any, voiceReady bool) *httptest.Server {
+	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
@@ -45,7 +54,7 @@ func stub(t *testing.T, jobs []map[string]any) *httptest.Server {
 				{"id": "minimax", "label": "MiniMax TTS", "ready": true,
 					"models": []map[string]any{{"id": "speech-02-hd", "name": "speech-02-hd"}},
 					"voices": []map[string]any{{"id": "male-qn-qingse", "name": "青涩男声"}, {"id": "female-shaonv", "name": "少女音"}}},
-				{"id": "voxflow", "label": "VoxFlow · 本地", "ready": true,
+				{"id": "voxflow", "label": "VoxFlow · 本地", "ready": voiceReady,
 					"voices": []map[string]any{{"id": "demo_narrator", "name": "默认旁白"}}},
 			}},
 			"customChannels": map[string]any{"file": "/root/.reel-kit/providers.json", "problems": []string{"seedream：环境变量 ARK_API_KEY 未注入，调用会被拒绝"}},

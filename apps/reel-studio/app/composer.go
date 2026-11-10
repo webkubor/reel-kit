@@ -329,8 +329,11 @@ func (a *App) viewVoiceLibrary(c *ui.Context) {
 	})
 	a.voxflowHint(c)
 	a.kit.Field(c, "我的声音", "用一段录音注册一个自己的音色，之后任何流水线都能选它", func() {
-		if !voxflowRunsHere() {
-			a.kit.Hint(c, "克隆自己的声音目前仅支持 Apple 芯片的 Mac（走本机 MLX 推理）；在 Windows 与其它平台上，请使用随包自带的离线音色或云端 MiniMax 音色。")
+		if !a.voiceCloneAvailable() {
+			a.kit.Hint(c, "克隆自己的声音要工作台连上 VoxFlow 语音服务，现在没连上，所以还不能注册。\n"+
+				"本机跑：只有 Apple 芯片的 Mac 装得起来（走本机 MLX 推理）；\n"+
+				"远端跑：把工作台的 REEL_VOXFLOW_URL 指向一台跑着语音服务的机器，Windows 一样能用；\n"+
+				"在那之前，用随包自带的离线音色，或在「设置与反馈 → 云端配音密钥」填 MiniMax 密钥走云端。")
 			return
 		}
 		if !a.voiceImportOpen {
