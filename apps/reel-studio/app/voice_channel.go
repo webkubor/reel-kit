@@ -1,8 +1,6 @@
 package app
 
 import (
-	"runtime"
-
 	"github.com/egoist/mygo/ui"
 	"github.com/webkubor/reel-kit/apps/reel-studio/studioapi"
 )
@@ -127,11 +125,11 @@ func (a *App) viewVoicePicker(c *ui.Context, backend *string, voiceID *string) {
 
 // voiceChannelPickerHelp 写清楚三条通道分别在哪跑、花不花钱。
 //
-// VoxFlow 现在的语音后端是 Apple 芯片上的本地 MLX 模型，Windows 装不了也用不了 ——
-// 那是 VoxFlow 当前的部署形态，不是这条路走不通。所以这句限制只在非 Apple 芯片的
-// 机器上说明白，别在 Mac 上也写着「仅 macOS」。
+// VoxFlow 现在的语音后端是 Apple 芯片上的本地 MLX 模型，Windows 与 Intel Mac
+// 都装不了也用不了 —— 那是 VoxFlow 当前的部署形态，不是这条路走不通。
+// 所以这句限制只在跑得起来的机器上省略，别在别的机器上也写着「仅 macOS」。
 func voiceChannelPickerHelp() string {
-	if runtime.GOOS == "darwin" {
+	if voxflowRunsHere() {
 		return "本机离线：随应用自带、不联网不花钱；VoxFlow 可克隆自己的声音；云端按量计费"
 	}
 	return "本机离线：随应用自带、不联网不花钱；VoxFlow（克隆自己的声音）现在只支持 Apple 芯片的 Mac；云端按量计费"

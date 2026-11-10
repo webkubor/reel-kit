@@ -26,6 +26,15 @@ const (
 	voxflowStart   = "cd voxflow && source .venv/bin/activate && voice web"
 )
 
+// voxflowRunsHere 这台机器上 VoxFlow 跑不跑得起来。
+//
+// VoxFlow 现在的语音后端是 Apple 芯片上的本地 MLX 模型：只有 Apple 芯片的 Mac
+// 装得上、跑得动。别的机器（Windows、Linux、Intel Mac）给安装命令就是把人往坑里引
+// —— 那台机器上它装不出来。
+func voxflowRunsHere() bool {
+	return runtime.GOOS == "darwin" && runtime.GOARCH == "arm64"
+}
+
 // localVoiceChannel 返回本机语音通道；没有这个通道时返回 nil。
 func (a *App) localVoiceChannel() *studioapi.Channel {
 	if a.providers == nil {
@@ -38,6 +47,27 @@ func (a *App) localVoiceChannel() *studioapi.Channel {
 		}
 	}
 	return nil
+}
+
+// voxflowHintText 这台机器上 VoxFlow 跑不跑得起来，决定提示里摆什么。
+//
+// 拆成纯函数是有原因的：「跑不起来的机器」那条文案只在 Linux/Windows 上出现，
+// 要是把判断埋在渲染里，本地（Mac）永远测不到它 —— 错了也要等 CI 才报。
+//
+// 返回值：文案，以及「要不要摆安装与启动命令」。
+func voxflowHintText(supported bool) (string, bool) {
+	if !supported {
+		// VoxFlow 现在的语音后端是 Apple 芯片上的本地 MLX 模型，
+		// 这台机器跑不起来 —— 再给安装命令就是把人往坑里引。
+		return "配音用随应用自带的本机离线引擎就行，任何机器都能用。\n" +
+			"想换个更好的音色：在「设置与反馈 → 云端配音密钥」填一个 MiniMax 密钥，走云端按量计费。\n" +
+			"想克隆自己的声音：VoxFlow 现在的语音后端只跑在 Apple 芯片的 Mac 上，这台机器用不了。\n" +
+			"它后续会接别的语音后端（" + voxflowRepo + " 看进展）；在那之前，这台机器上没有本地克隆。", false
+	}
+	return "配音用随应用自带的本机离线引擎就行，装完就能用。\n" +
+		"只有你要克隆自己的声音或设计音色时才需要 VoxFlow（Apple 芯片的 Mac，要装 Python 和模型，5.8 GB）：\n" + voxflowInstall +
+		"\n\n启动它（装完每次开机起一次）：\n" + voxflowStart +
+		"\n\n服务默认就在 127.0.0.1:8866，起来后回这个窗口重试。", true
 }
 
 // voxflowHint 在本机语音服务没就绪时画一段能照着做的提示。
@@ -53,19 +83,11 @@ func (a *App) voxflowHint(c *ui.Context) {
 		return
 	}
 	a.kit.Notice(c, "VoxFlow 没连上：这只影响「克隆自己的声音」和「设计音色」，出片不受影响。", "")
-	if runtime.GOOS != "darwin" {
-		// VoxFlow 现在的语音后端是 Apple 芯片上的本地 MLX 模型，
-		// 这台机器跑不起来 —— 再给安装命令就是把人往坑里引。
-		a.kit.Hint(c, "配音用随应用自带的本机离线引擎就行，任何机器都能用。\n"+
-			"想换个更好的音色：在「设置与反馈 → 云端配音密钥」填一个 MiniMax 密钥，走云端按量计费。\n"+
-			"想克隆自己的声音：VoxFlow 现在的语音后端只跑在 Apple 芯片的 Mac 上，这台机器用不了。\n"+
-			"它后续会接别的语音后端（"+voxflowRepo+" 看进展）；在那之前，这台机器上没有本地克隆。")
+	text, showCommands := voxflowHintText(voxflowRunsHere())
+	a.kit.Hint(c, text)
+	if !showCommands {
 		return
 	}
-	a.kit.Hint(c, "配音用随应用自带的本机离线引擎就行，Windows 也能用。\n"+
-		"只有你要克隆自己的声音或设计音色时才需要 VoxFlow（macOS · Apple 芯片，要装 Python 和模型，5.8 GB）：\n"+voxflowInstall+
-		"\n\n启动它（装完每次开机起一次）：\n"+voxflowStart+
-		"\n\n服务默认就在 127.0.0.1:8866，起来后回这个窗口重试。")
 	ui.Row(c).Gap(design.SpaceSM).Children(func() {
 		if button := kitButton(a.kit, c, kit.ButtonSecondary, "复制安装命令", false); button.Clicked() {
 			_ = mygo.Clipboard.Write(transfer.TextData(voxflowInstall))
