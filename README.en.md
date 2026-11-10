@@ -171,6 +171,8 @@ npx github:webkubor/reel-kit make \
   --out out.mp4
 ```
 
+That runs straight from the Git repository — **nothing is published to the npm registry**, and the desktop app is a plain download.
+
 The repo ships full assets and captions, so a clone reproduces the demo clip:
 
 ```bash
@@ -322,7 +324,7 @@ Manifest format (`REEL_BGM_MANIFEST` can be a URL or a local json path):
 ## 📦 Repo structure
 
 ```
-reel-kit/                          # @kubor/reel-kit
+reel-kit/                          # reel-kit 仓库
 ├── bin/                           # CLI entry (the `reel` command)
 ├── src/                           # video compositing core (also exported as a lib: import { renderFrames, compose, ... })
 ├── templates/                     # 10 HTML templates

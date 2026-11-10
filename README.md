@@ -180,6 +180,8 @@ npx github:webkubor/reel-kit make \
   --out demo.mp4
 ```
 
+这条命令直接从 Git 仓库执行，**不经过 npm 仓库** —— 本项目没有发布 npm 包，桌面应用也是下载即用。
+
 ## License
 
 MIT

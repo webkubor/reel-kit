@@ -4,20 +4,26 @@
 
 ## 安装
 
+**本项目不发布到 npm 仓库**，命令行也只从 Git 仓库取 —— 没有 `npm i -g @kubor/reel-kit` 这条路。
+
+一次性执行（从 Git 仓库直接跑，不经过 npm 仓库）：
+
 ```bash
-npm i -g github:webkubor/reel-kit
-# 或不装，直接用 npx：
 npx github:webkubor/reel-kit make --template sticker-promo ...
 ```
 
-想改模板、跑 `examples/` 里的 demo，就 clone 源码：
+要改模板、跑 `examples/` 里的 demo、或者改引擎源码，就 clone 下来：
 
 ```bash
 git clone git@github.com:webkubor/reel-kit
-cd reel-kit && pnpm install && npm link
+cd reel-kit && pnpm install && npm link   # npm link 只是把本仓库挂成全局命令 reel
 ```
 
+不想装全局命令，就在仓库里直接跑：`node bin/reel.mjs make ...`。
+
 依赖：**ffmpeg**（合成）、**本机 Chrome**（渲染版式，不额外下 chromium，路径可用 `CHROME_PATH` 覆盖）。配音是可选的 —— 不加 `--voice` 就不需要任何 TTS。
+
+只想用应用出片、不碰命令行，见 [README](../README.md) 的下载一节。
 
 ## 30 秒上手
 
@@ -168,7 +174,7 @@ reel channels check <id>                 # 探活：不通不花钱，不生成�
 ## 仓库结构
 
 ```
-reel-kit/                          # @kubor/reel-kit
+reel-kit/                          # reel-kit 仓库
 ├── bin/                           # CLI 入口(`reel` 命令)
 ├── src/                           # 视频合成核心(导出为库:import { renderFrames, compose, ... })
 ├── templates/                     # 10 套 HTML 模板

@@ -1,8 +1,10 @@
 /**
  * @kubor/reel-kit 的库入口。
  *
+ * 本仓库不发布到 npm 仓库,包名只用于本地 `npm link` 之后的引用。
+ *
  * CLI 用法见 bin/reel.mjs(默认 `reel` 命令)
- * 库用法:
+ * 库用法(本地 link 后):
  *   import { renderFrames, compose, ... } from '@kubor/reel-kit'
  *
  * 设计原则:不引副作用,所有导出都是 async 函数;保持 thin wrapper,

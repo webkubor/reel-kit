@@ -45,7 +45,7 @@ bun -e "const p='/Users/webkubor/.voxflow/configs/personas.json'; const j=await 
 ### 4. 合成
 ```bash
 cd ~/dev/video/reel-kit
-npx reel make --template landscape-product \
+npx github:webkubor/reel-kit make --template landscape-product \
   --title "kyvault" --subtitle "AI 时代的密钥管家" --footer "github.com/webkubor/kyvault" \
   --assets ~/dev/video/project-demo-kit/shots \
   --caps ~/dev/video/project-demo-kit/captions.txt \

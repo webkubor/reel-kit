@@ -58,7 +58,7 @@ track('reel_make', {
 
 - 文档站启用 Plausible(只统计页面浏览)
 - CLI 不开 telemetry(避免任何隐私争议)
-- npm 包下载量靠 [npmjs.com](https://npmjs.com/package/@kubor/reel-kit) 自带统计
+- 本项目不发布 npm 包,下载量看 [GitHub Releases](https://github.com/webkubor/reel-kit/releases) 的下载计数
 
 ## 当前状态
 
