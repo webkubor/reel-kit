@@ -55,3 +55,4 @@ ffmpeg（合成）、本机 Chrome（渲染版式，不下 chromium）。
 - templates/*.html        版式模板
 - examples/               可复现的完整示例
 - docs/video-compositing-notes.md   合成工程笔记（9 条踩坑结论）
+- docs/magpie-gateway.md      Magpie 网关通道（只读能力发现、提交即计费与失败取回）

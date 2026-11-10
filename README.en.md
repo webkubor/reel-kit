@@ -102,13 +102,15 @@ You don't need assets to start: the layout and palette follow the chosen visual 
 | **Standard voice-over** (default) | The offline engine bundled with the app | Free | Nothing — same engine on macOS and Windows |
 | **Clone your own voice** / design a timbre | VoxFlow, on your machine | Free | VoxFlow on an Apple Silicon Mac, or running it on another machine |
 | **A better cloud timbre** | MiniMax TTS | Billed by usage | A MiniMax key, once, under Settings → Cloud voice key |
-| **Generate images / video** | MuseAV, MiniMax direct, or your own channel | Billed by that account | Log into MuseAV once in the app, add a vendor key, or add your own gateway |
+| **Generate images / video** | MuseAV, the Magpie gateway, MiniMax direct, or your own channel | Billed by that account | Log into MuseAV once in the app, have Magpie running locally, add a vendor key, or add your own gateway |
 
 Three rules worth knowing up front:
 
 - **The channel you pick is the channel that runs.** When one isn't ready, the interface says what's missing and disables rendering — it never quietly switches to a different, possibly more expensive, provider.
 - **A failed paid task isn't charged twice.** If the asset was generated but the download failed, the history offers "fetch the generated asset" — fetching doesn't re-bill.
 - **Model, timbre and account are three separate things**, configured separately.
+
+Images and video can also go through the **Magpie gateway**: with Magpie installed and running on this machine, pick "Magpie 网关" in the channel list — no address, no key to fill in, and the model list is whatever the gateway publishes. See [the Magpie gateway guide](docs/magpie-gateway.md).
 
 ## Where your stuff lives
 

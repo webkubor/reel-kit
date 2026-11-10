@@ -114,6 +114,7 @@ Linux 或喜欢命令行的用户，看[开发者文档](#开发者文档)。
 - **自己导入**：左栏「素材库」，图片、视频、音频都能进。
 - **AI 生成**：左栏「生成素材」，按你选的通道生成图片或视频，生成结果自动进素材库。
 - **自己的中转站**：设置 →「模型通道」里填一次就行，不用改配置文件；密钥不会出现在界面上，只存在你本机。
+- **Magpie 网关**：本机装好 [Magpie](https://github.com/yetone/magpie) 就能直接选 —— 不用填地址也不用填密钥，模型清单由网关自己公布；详见 [Magpie 网关通道](docs/magpie-gateway.md)。
 
 ## 你的东西在哪儿
 
@@ -164,6 +165,7 @@ xattr -dr com.apple.quarantine "/Applications/Reel Studio.app"
 
 - **[命令行与引擎文档](docs/cli.md)** —— 完整参数、声音后端、配乐库、通道管理、仓库结构、设计取舍
 - [本地 HTTP 接口](docs/studio-api.md) —— 桌面版和网页版共用一套接口，可以拿它做自己的批量出片工具
+- [Magpie 网关通道](docs/magpie-gateway.md) —— 把本机的 Magpie 当统一模型网关接进来：前置条件、只读能力发现、提交即计费与失败取回
 - [桌面应用发版](docs/desktop-release.md) —— 构建、打包、签名与发布流程
 - [知识短视频生产指南](docs/knowledge-video-guide.md) —— 叙事母版与文案节奏
 - [合成笔记](docs/video-compositing-notes.md) —— 音画对齐、时长余量等踩过的坑

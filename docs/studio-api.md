@@ -116,6 +116,9 @@ curl -s -X POST http://127.0.0.1:4390/api/jobs \
    再下载素材。下载失败时 `POST /api/jobs/resume` 用同一个 ID 取回，**不会重新提交**。
    素材上的 `requestedModel` 记你填的模型，`actualModel` 只在回执真写了模型名时才填，否则是 `unknown`。
 
+前置条件、界面里怎么选通道、清单与权限的区别、失败后怎么取回 —— 见
+[Magpie 网关通道](magpie-gateway.md)。
+
 ## 为什么把这层公开
 
 界面、CLI、网页版共用这一套接口，是同一个工作台的三种皮：

@@ -177,6 +177,11 @@ reel channels check <id>                 # 探活：不通不花钱，不生成�
 
 协议：生图 `openai` / `minimax-image` / `museav`，视频 `ark-task` / `museav`。密钥**只写环境变量名**（`--env`），不写进配置文件。
 
+`reel channels` 管的是**自定义**通道。**Magpie 网关**是工作台内置的通道：不用 `channels add`，
+不用填地址、不用填密钥 —— 本机装好 [Magpie](https://github.com/yetone/magpie) 并把网关跑起来，
+在「生成素材」的通道下拉里直接选「Magpie 网关」，或者调接口时把 `backend` 传 `"magpie"`。
+前置条件、只读能力发现与失败取回见 [Magpie 网关通道](magpie-gateway.md)。
+
 ## 仓库结构
 
 ```
