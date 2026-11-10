@@ -314,7 +314,7 @@ async function cmdMake(args) {
     process.stdout.write('[reel] 渲染帧… ')
     const frames = await renderFrames({ template: tplFile, shots, vars, outDir: frameDir, width: w, height: h,
       motion, durations, fps: Number(args.fps || 30) })
-    console.log(frames.length === n ? `${n} 帧` : `${frames.length} 段动画`)
+    console.log(motion === 'none' ? `${frames.length} 帧` : `${frames.length} 段动画`)
 
     // --bgm 可以是本地路径,也可以是配乐库别名(清单由 REEL_BGM_MANIFEST 指定,见 bgm-library.mjs)
     const bgmFile = args.bgm ? await resolveBgm(String(args.bgm)) : undefined
