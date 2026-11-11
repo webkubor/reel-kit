@@ -12,7 +12,7 @@
   <meta property="og:type" content="website">
   <meta property="og:title" content="Reel Studio · 把文案和素材，变成一条能直接发的短视频">
   <meta property="og:description" content="macOS Apple Silicon · AI 分镜与 JSON 编辑 · 本机离线配音和视频制作">
-  <meta property="og:image" content="docs/preview.png">
+  <meta property="og:image" content="https://webkubor.github.io/reel-kit/images/poster-16x9.jpg">
   <meta name="twitter:card" content="summary_large_image">
 
   <link rel="icon" type="image/svg+xml" href="logo.svg">
@@ -107,55 +107,45 @@
       </div>
     </section>
 
-    <!-- ───── 模板预览 ───── -->
+    <!-- ───── 成片示例 ───── -->
     <section>
-      <h2>10 套模板 <span class="small">竖版 / 方形 / 横版 / 纯文字 · 一键切换</span></h2>
+      <h2>看几条真实成片 <span class="small">由 reel-kit 在本机生成 · 点开即播</span></h2>
       <p class="section-intro">
-        模板是 HTML/CSS 文件，改颜色、改布局、加 logo 都直接编辑。
-        模板作者不需懂 ffmpeg。
+        下面是仓库随附的示例成片，都在本机由 reel-kit 合成，未使用外部视频服务。
+        左图是竖版、横版商品介绍，加上一条品牌示例，可点播放查看真实画面与配音。
       </p>
-      <div class="templates">
-        <div class="template">
-          <div class="preview">1080 × 1920</div>
-          <div class="name">sticker-promo</div>
-        </div>
-        <div class="template">
-          <div class="preview">1080 × 1920</div>
-          <div class="name">music-card</div>
-        </div>
-        <div class="template">
-          <div class="preview square">1080 × 1080</div>
-          <div class="name">sticker-square</div>
-        </div>
-        <div class="template">
-          <div class="preview">1080 × 1920</div>
-          <div class="name">quote</div>
-        </div>
-        <div class="template">
-          <div class="preview wide">1920 × 1080</div>
-          <div class="name">landscape-product</div>
-        </div>
-        <div class="template">
-          <div class="preview">1080 × 1920</div>
-          <div class="name">knowledge-dark</div>
-        </div>
-        <div class="template">
-          <div class="preview">1080 × 1920</div>
-          <div class="name">knowledge-paper</div>
-        </div>
-        <div class="template">
-          <div class="preview">1080 × 1920</div>
-          <div class="name">knowledge-gufeng</div>
-        </div>
-        <div class="template">
-          <div class="preview">竖版 / 横版</div>
-          <div class="name">project-recommendation</div>
-        </div>
-        <div class="template">
-          <div class="preview">竖版 / 横版</div>
-          <div class="name">product-presenter</div>
-        </div>
+      <div class="videos">
+        <figure class="video wide">
+          <div class="frame">
+            <video controls playsinline preload="metadata" poster="images/poster-16x9.jpg">
+              <source src="samples/product-intro-16x9.mp4" type="video/mp4">
+            </video>
+          </div>
+          <figcaption><b>商品介绍 · 横版</b> 1920 × 1080 · 约 11 秒</figcaption>
+        </figure>
+        <figure class="video">
+          <div class="frame">
+            <video controls playsinline preload="metadata" poster="images/poster-9x16.jpg">
+              <source src="samples/product-intro-9x16.mp4" type="video/mp4">
+            </video>
+          </div>
+          <figcaption><b>商品介绍 · 竖版</b> 1080 × 1920 · 约 8 秒（含字幕自动收档演示）</figcaption>
+        </figure>
+        <figure class="video">
+          <div class="frame">
+            <video controls playsinline preload="metadata" poster="images/poster-demo.jpg">
+              <source src="samples/demo-9x16.mp4" type="video/mp4">
+            </video>
+          </div>
+          <figcaption><b>品牌示例 · 竖版</b> 1080 × 1920 · 约 14 秒</figcaption>
+        </figure>
       </div>
+      <p class="template-list">
+        模板仍在维护：<code>sticker-promo</code> · <code>music-card</code> · <code>sticker-square</code> ·
+        <code>quote</code> · <code>landscape-product</code> · <code>knowledge-dark</code> ·
+        <code>knowledge-paper</code> · <code>knowledge-gufeng</code> ·
+        <code>project-recommendation</code> · <code>product-presenter</code>
+      </p>
     </section>
 
     <!-- ───── Quick Start ───── -->
