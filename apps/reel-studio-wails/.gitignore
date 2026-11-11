@@ -1,0 +1,13 @@
+# 构建产物不进 git：应用包里有几百兆的运行时。
+/build/*
+!/build/darwin/
+
+# Wails 自动生成的绑定，编译时现生成即可。
+/frontend/wailsjs/
+
+# go build 落在本目录的二进制。
+/reel-studio-wails
+/reel-studio-wails.exe
+
+# 根 .gitignore 里的 dist/ 会把引导页也排除掉，这里把它放回来。
+!/frontend/dist/

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reel Studio</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: #16161a; color: #e9e9ec;
+    font: 14px/1.6 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .boot { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+  .mark { font-size: 30px; font-weight: 600; letter-spacing: .5px; }
+  .mark span { color: #ff5c39; }
+  .bar { width: 168px; height: 3px; border-radius: 2px; background: #2c2c33; overflow: hidden; }
+  .bar i { display: block; width: 40%; height: 100%; background: #ff5c39; border-radius: 2px; animation: slide 1.1s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-100%);} 100% { transform: translateX(320%);} }
+  .note { color: #9a9aa4; min-height: 20px; }
+  .note.bad { color: #ff8a6b; max-width: 420px; text-align: center; }
+  .retry { display: none; border: 1px solid #3a3a44; background: #23232a; color: #e9e9ec;
+           padding: 7px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+  .retry.show { display: inline-block; }
+</style>
+</head>
+<body>
+<div class="boot">
+  <div class="mark">reel<span>·</span>studio</div>
+  <div class="bar"><i></i></div>
+  <div class="note" id="note">正在启动本地工作台…</div>
+  <button class="retry" id="retry">重试</button>
+</div>
+<script>
+(function () {
+  var note = document.getElementById('note');
+  var retry = document.getElementById('retry');
+
+  // Go 绑定是首选：窗口里的资源服务器用的是自定义协议，
+  // 走 fetch 有可能被当成跨站请求挡掉。
+  function status() {
+    var go = window.go;
+    if (go) {
+      for (var pkg in go) {
+        var group = go[pkg];
+        if (!group) continue;
+        for (var name in group) {
+          var obj = group[name];
+          if (obj && typeof obj.Status === 'function') {
+            try { return Promise.resolve(obj.Status()); } catch (e) { /* 换下一种 */ }
+          }
+        }
+      }
+    }
+    return fetch('/__studio/status').then(function (r) { return r.json(); });
+  }
+
+  function show(text, bad) {
+    note.textContent = text;
+    note.className = bad ? 'note bad' : 'note';
+  }
+
+  function tick() {
+    status().then(function (s) {
+      if (!s) return;
+      if (s.ready && s.url) { window.location.replace(s.url); return; }
+      if (s.error) { show(s.error, true); retry.classList.add('show'); return; }
+      show(s.note || '正在启动本地工作台…', false);
+      setTimeout(tick, 300);
+    }).catch(function () {
+      show('连不上本地工作台，正在重试…', false);
+      setTimeout(tick, 800);
+    });
+  }
+
+  retry.addEventListener('click', function () {
+    retry.classList.remove('show');
+    show('正在重启本地工作台…', false);
+    setTimeout(tick, 200);
+  });
+
+  tick();
+})();
+</script>
+</body>
+</html>

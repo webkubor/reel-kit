@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Reel Studio",
+  "outputfilename": "Reel Studio",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "webkubor",
+    "email": "jmx6kuqy@163.com"
+  },
+  "info": {
+    "companyName": "webkubor",
+    "productName": "Reel Studio",
+    "productVersion": "1.5.1",
+    "copyright": "Copyright © 2026 webkubor",
+    "comments": "本地视频工作台：素材与项目留在这台机器上。"
+  }
+}
