@@ -436,6 +436,16 @@ func (c *Client) ResumeJob(jobID string) (*Job, error) {
 	return &j, err
 }
 
+// CancelJob 取消一个正在跑的任务。
+//
+// 取消要真的把渲染、ffmpeg、语音掐断：被取消的任务如果继续跑，
+// 上游云服务照样按量计费 —— 用户白花钱换一段没人要的片子。
+func (c *Client) CancelJob(jobID string) (*Job, error) {
+	var j Job
+	err := c.do(http.MethodPost, "/api/jobs/"+jobID+"/cancel", map[string]any{}, &j)
+	return &j, err
+}
+
 // SaveSettings 保存项目偏好（含通道、模型、音色、账户）。
 func (c *Client) SaveSettings(projectID string, settings map[string]any) error {
 	return c.do(http.MethodPost, "/api/project-settings", map[string]any{"projectId": projectID, "settings": settings}, nil)

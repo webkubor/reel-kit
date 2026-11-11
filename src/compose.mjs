@@ -14,6 +14,13 @@ import { buildMixChain } from './audio-mix.mjs'
 import { DEFAULT_BGM_GAIN } from './settings.mjs'
 
 const run = promisify(execFile)
+// ffmpeg 也要能被取消：合成是整条流水线里最慢的一步，用户点取消却只能等它跑完，
+// 那这个取消就是假的。signal 交给 Node 自己处理，进程会被 SIGTERM。
+const runFfmpeg = (args, signal, extra = {}) => {
+  const options = { maxBuffer: 32 * 1024 * 1024, ...extra }
+  if (signal) options.signal = signal
+  return run('ffmpeg', args, options)
+}
 
 /**
  * ffmpeg xfade transition 名字 → 内部滤镜名。
@@ -61,7 +68,7 @@ function buildConcatList(frames, durations) {
  */
 export async function compose({
   frames, durations, bgm, voiceClips, out, fps = 30, fadeOut, bgmGain, bgmCrossfade,
-  transition = 'none', transitionDuration = 0.4, voiceGain, duck, normalize,
+  transition = 'none', transitionDuration = 0.4, voiceGain, duck, normalize, signal,
 }) {
   if (fadeOut === undefined || Number.isNaN(fadeOut)) fadeOut = 1.5
   if (!frames.length) throw new Error('没有帧可合成')
@@ -80,7 +87,7 @@ export async function compose({
     return composeWithXfade({
       frames, durations, bgm, voiceClips, out, fps,
       fadeOut, bgmGain, bgmCrossfade, transition, transitionDuration, total,
-      voiceGain, duck, normalize,
+      voiceGain, duck, normalize, signal,
     })
   }
   const workDir = dirname(frames[0])
@@ -170,7 +177,7 @@ export async function compose({
   )
 
   try {
-    await run('ffmpeg', args, { maxBuffer: 32 * 1024 * 1024 })
+    await runFfmpeg(args, signal)
   } catch (e) {
     const tail = String(e.stderr || e.message).split('\n').slice(-14).join('\n')
     throw new Error(`ffmpeg 合成失败:\n${tail}`)
@@ -193,7 +200,7 @@ export async function compose({
 async function composeWithXfade({
   frames, durations, bgm, voiceClips, out, fps,
   fadeOut, bgmGain, bgmCrossfade, transition, transitionDuration, total,
-  voiceGain, duck, normalize,
+  voiceGain, duck, normalize, signal,
 }) {
   const xfadeType = TRANSITIONS[transition]
   if (xfadeType && (!Number.isFinite(transitionDuration) || transitionDuration <= 0)) throw new Error('转场时长必须 > 0')
@@ -285,7 +292,7 @@ async function composeWithXfade({
   )
 
   try {
-    await run('ffmpeg', args, { maxBuffer: 32 * 1024 * 1024 })
+    await runFfmpeg(args, signal)
   } catch (e) {
     const tail = String(e.stderr || e.message).split('\n').slice(-14).join('\n')
     throw new Error(`ffmpeg 合成失败:\n${tail}`)

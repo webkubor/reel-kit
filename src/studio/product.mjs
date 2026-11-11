@@ -39,12 +39,12 @@ const templateFile = name => fileURLToPath(new URL(`../../templates/${name}.html
  * 与口播的浅色渐变不同，商品介绍默认是深色版式 ——
  * 占位图跟着版式走，缺素材时看着仍像一条正经片子，而不是半成品。
  */
-async function placeholderImage(file, layout) {
+async function placeholderImage(file, layout, signal) {
   const c0 = (layout.template === 'landscape-product' ? '0x14161a' : '0x0d0f11').replace('#', '0x')
   const c1 = '0x2b2f36'
   await command('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi',
     '-i', `gradients=size=${layout.width}x${layout.height}:c0=${c0}:c1=${c1}:nb_colors=2`,
-    '-frames:v', '1', file])
+    '-frames:v', '1', file], { signal })
   return file
 }
 
@@ -69,7 +69,7 @@ function captionSize(text, layout) {
   return 32
 }
 
-export async function makeProductVideo(input, store, backend, progress, report = () => {}) {
+export async function makeProductVideo(input, store, backend, progress, report = () => {}, signal = undefined) {
   const lines = (input.captions || '').split('\n').map(s => s.trim()).filter(Boolean)
   if (!lines.length || lines.length > 8 || lines.some(s => s.length > 80)) {
     throw new Error('请填写 1–8 行介绍词，每行不超过 80 字；过长的句子请拆成多镜')
@@ -94,7 +94,8 @@ export async function makeProductVideo(input, store, backend, progress, report =
         return meta
       }
       return Promise.resolve().then(run).then(settle, error => {
-        report({ ...def, status: 'failed', error: redact(error.message), ms: Date.now() - started })
+        // 被取消不是失败：界面上的工序面板要能区分「用户主动停了」和「做坏了」。
+        report({ ...def, status: error?.cancelled ? 'canceled' : 'failed', error: redact(error.message), ms: Date.now() - started })
         throw error
       })
     }
@@ -123,12 +124,12 @@ export async function makeProductVideo(input, store, backend, progress, report =
           voiceId: input.voiceId || undefined, profile: input.profile,
           // 在线语音按语速合成；本地引擎不支持语速参数，交给后面的 atempo 处理。
           speed: ['edge', 'minimax'].includes(voiceBackend) ? settings.speed : 1,
-        }, () => {})
+        }, () => {}, { signal })
         if (!asset?.mime?.startsWith('audio/')) throw new Error(`第 ${i + 1} 句配音没有生成成功`)
         let file = store.path(asset)
         if (settings.speed !== 1 && !['edge', 'minimax'].includes(voiceBackend)) {
           const adjusted = join(temp, `voice-speed-${i}.wav`)
-          await command('ffmpeg', ['-v', 'error', '-i', file, '-af', `atempo=${settings.speed}`, adjusted])
+          await command('ffmpeg', ['-v', 'error', '-i', file, '-af', `atempo=${settings.speed}`, adjusted], { signal })
           file = adjusted
         }
         return { _file: file, _duration: await probeDuration(file), assetId: asset.id, origin: voiceOrigin, engine: asset.engine || voiceEngine, detail: lines[i].slice(0, 40) }
@@ -157,7 +158,7 @@ export async function makeProductVideo(input, store, backend, progress, report =
           width: layout.width, height: layout.height,
         },
         width: layout.width, height: layout.height, outDir: join(temp, 'frames'),
-        motion: settings.motion, durations, onProgress: progress,
+        motion: settings.motion, durations, onProgress: progress, signal,
       }),
     }))
 
@@ -172,7 +173,7 @@ export async function makeProductVideo(input, store, backend, progress, report =
         bgmGain, bgmCrossfade: 0,
         voiceGain: settings.voiceGain, duck: settings.duck, normalize: settings.normalize,
         transition: settings.transition, transitionDuration: settings.transitionDuration,
-        out,
+        out, signal,
       })
       return { _duration: await probeDuration(out) }
     })

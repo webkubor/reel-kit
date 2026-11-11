@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { command, commandFull, available, jsonFetch, download, probeBytes } from './process.mjs'
+import { command, commandFull, available, jsonFetch, download, probeBytes, cancelledError } from './process.mjs'
 import { sherpaEngine, sherpaSynthesize } from './sherpa.mjs'
 import { EDGE_VOICES, edgeSynthesize } from '../edge-tts.mjs'
 import { loadCustomChannels, customChannelIssues, channelHeaders } from './channels.mjs'
@@ -228,8 +228,17 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
     return { persona: result.key, name: result.name }
   }
 
-  const safeDownload = async url => {
-    try { return await downloadAsset(url) } catch (error) { throw withCause(error, '下载素材') }
+  const safeDownload = async (url, ...rest) => {
+    try { return await downloadAsset(url, ...rest) } catch (error) { throw withCause(error, '下载素材') }
+  }
+  // 能被取消的等待：取消后不用等满这一轮轮询间隔。
+  const sleepWithSignal = async (ms, signal) => {
+    if (!signal) return pause(ms)
+    if (signal.aborted) throw cancelledError()
+    await Promise.race([
+      pause(ms),
+      new Promise((_, reject) => signal.addEventListener('abort', () => reject(cancelledError()), { once: true })),
+    ])
   }
   /**
    * Magpie 网关通道。
@@ -239,7 +248,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
    */
   const magpie = createMagpie({ run: magpieRun, download: safeDownload, probe: probeBytes, store, pause })
   /** MiniMax 文字转语音：返回音频字节 */
-  const minimaxTts = async ({ key, text, model, voiceId, speed = 1 }) => {
+  const minimaxTts = async ({ key, text, model, voiceId, speed = 1, signal }) => {
     const response = await fetcher(MINIMAX_TTS_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -250,7 +259,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
         voice_setting: { voice_id: voiceId, speed, vol: 1, pitch: 0 },
         audio_setting: { sample_rate: 32000, bitrate: 128000, format: 'mp3', channel: 1 },
       }),
-      signal: AbortSignal.timeout(120000),
+      signal: signal ? AbortSignal.any([AbortSignal.timeout(120000), signal]) : AbortSignal.timeout(120000),
     })
     const result = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(`MiniMax TTS HTTP ${response.status}${result.base_resp?.status_msg ? `：${result.base_resp.status_msg}` : ''}`)
@@ -640,7 +649,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
         customChannels: customChannelIssues(),
       }
     },
-    async generate(input, progress) {
+    async generate(input, progress, { signal } = {}) {
       const custom = loadCustomChannels()
       const customOf = id => custom.find(c => c.id === id)
 
@@ -815,6 +824,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
             voice: voiceId,
             speed: input.speed || 1,
             onProgress: progress,
+            signal,
           })
           const probe = await probeBytes('voice.mp3', bytes)
           return store.addAsset(input.projectId, `配音 · ${input.prompt.slice(0, 16)}.mp3`, mime || 'audio/mpeg', bytes, {
@@ -827,7 +837,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
           if (input.kind !== 'speech') throw new Error('本机离线通道只做文字配音；录音克隆与音色设计要用 VoxFlow')
           const engine = sherpaEngine()
           if (!engine) throw new Error('本机语音引擎没找到，请重新安装应用')
-          const bytes = await sherpaSynthesize({ text: input.prompt, engine, onProgress: progress })
+          const bytes = await sherpaSynthesize({ text: input.prompt, engine, onProgress: progress, signal })
           const probe = await probeBytes('voice.wav', bytes)
           return store.addAsset(input.projectId, `配音 · ${input.prompt.slice(0, 16)}.wav`, 'audio/wav', bytes, {
             source: '本机离线语音', origin: 'local-offline', engine: 'sherpa-onnx · 中文离线模型', voiceBackend: 'sherpa',
@@ -845,7 +855,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
           if (!voiceId) throw new Error('请选择音色（voice_id），或手动填写')
           const model = input.model || MINIMAX_TTS_MODELS[0].id
           progress('MiniMax 正在合成配音…')
-          const { bytes, mime } = await minimaxTts({ key: profile.key, text: input.prompt, model, voiceId, speed: input.speed || 1 })
+          const { bytes, mime } = await minimaxTts({ key: profile.key, text: input.prompt, model, voiceId, speed: input.speed || 1, signal })
           const probe = await probeBytes('voice.mp3', bytes)
           return store.addAsset(input.projectId, `配音 · ${input.prompt.slice(0, 16)}.mp3`, mime || 'audio/mpeg', bytes, {
             source: 'MiniMax TTS', origin: 'cloud-paid', engine: `MiniMax TTS · ${model}`, voiceBackend: 'minimax', speed: input.speed || 1,
@@ -868,17 +878,17 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
         if (!designing && !persona) throw new Error('请选择已有音色，或创建新音色')
         progress(designing ? '正在设计音色，首次生成需要加载模型…' : 'VoxFlow 正在合成配音…')
         const payload = designing ? { voice_name: input.voiceName, text: input.prompt, tone: input.tone, emotion: input.emotion || '', commit: true } : { persona, text: input.prompt, tone: input.tone || '' }
-        const submitted = await jsonFetch(voiceBase + (designing ? '/api/design' : '/api/clone'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        const submitted = await jsonFetch(voiceBase + (designing ? '/api/design' : '/api/clone'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal })
         for (let attempt = 0; attempt < 300; attempt++) {
-          await pause(2000)
-          const { tasks } = await jsonFetch(voiceBase + '/api/tasks')
+          await sleepWithSignal(2000, signal)
+          const { tasks } = await jsonFetch(voiceBase + '/api/tasks', { signal })
           const task = tasks.find(t => t.id === submitted.task_id)
           if (!task) continue
           if (['error', 'failed', 'cancelled'].includes(task.status)) throw new Error(task.error || '本地语音生成失败')
           if (task.status === 'done') {
             const result = task.result
             if (!result?.url?.startsWith('/api/audio/')) throw new Error('VoxFlow 未返回音频文件')
-            const { bytes } = await safeDownload(new URL(result.url, voiceBase))
+            const { bytes } = await safeDownload(new URL(result.url, voiceBase), 200 * 1024 * 1024, 0, signal)
             const probe = await probeBytes('voice.wav', bytes)
             return store.addAsset(input.projectId, designing ? `${input.voiceName} · 样音.wav` : `配音 · ${input.prompt.slice(0, 16)}.wav`, 'audio/wav', bytes, { source: 'VoxFlow', origin: 'local-offline', engine: 'VoxFlow 本地语音', voiceBackend: 'voxflow', prompt: input.prompt, persona: result.persona_key || persona, tone: input.tone || '', voiceName: input.voiceName || '', requestedModel: 'voxflow-local', actualModel: 'unknown', ...probe })
           }

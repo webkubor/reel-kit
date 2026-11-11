@@ -66,7 +66,7 @@ export function sherpaEngine() {
  *
  * 引擎自己会按句切分（--tts-max-num-sentences），所以整段文字一次传进去就行。
  */
-export async function sherpaSynthesize({ text, engine, onProgress }) {
+export async function sherpaSynthesize({ text, engine, onProgress, signal }) {
   if (!engine) throw new Error('本机语音引擎没找到，请重新安装应用')
   const content = String(text || '').trim()
   if (!content) throw new Error('没有要合成的文字')
@@ -83,6 +83,7 @@ export async function sherpaSynthesize({ text, engine, onProgress }) {
     ], {
       timeout: 600000,
       env: sherpaEnv(engine),
+      signal,
     })
     if (!existsSync(out)) throw new Error('本机语音引擎没有产出音频')
     return readFileSync(out)
