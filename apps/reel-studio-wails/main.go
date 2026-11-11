@@ -1,14 +1,13 @@
 // Reel Studio 桌面壳（Wails v2）。
 //
-// 桌面版只做三件事：把本机工作台（Node 服务）起起来、用原生窗口打开它、
-// 退出时把它收掉。功能全在网页那一侧 —— 浏览器里跑的和桌面里跑的是同一份代码，
-// 不会出现「桌面端少一个功能」这种两份维护出来的问题。
+// 零 HTTP：不再起 Node 工作台、不占端口、不常驻进程。所有逻辑通过
+// Go 绑定（window.go.App）直接调用本地引擎。界面由 frontend/dist
+// 里的引导页提供，Phase 6 会把它换成本地控制台 UI。
 package main
 
 import (
 	"embed"
 	"fmt"
-	"net/http"
 	"os"
 
 	"github.com/wailsapp/wails/v2"
@@ -31,8 +30,7 @@ func main() {
 		// 界面就是工作台本身。这里只打包一个引导页：
 		// 等工作台起来、拿到它的地址后再跳过去。
 		AssetServer: &assetserver.Options{
-			Assets:  assets,
-			Handler: http.HandlerFunc(app.serve),
+			Assets: assets,
 		},
 		OnStartup:          app.startup,
 		OnShutdown:         app.shutdown,

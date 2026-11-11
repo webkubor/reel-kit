@@ -65,6 +65,7 @@
     status().then(function (s) {
       if (!s) return;
       if (s.ready && s.url) { window.location.replace(s.url); return; }
+      if (s.ready) { show('本地工作台已就绪（零 HTTP，无工作台地址可跳转）', false); return; }
       if (s.error) { show(s.error, true); retry.classList.add('show'); return; }
       show(s.note || '正在启动本地工作台…', false);
       setTimeout(tick, 300);
