@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"sync"
 )
 
@@ -264,6 +265,46 @@ func (e *Engine) StopVoxcraft() {
 // SynthesizeVoiceBatch 用 voxcraft 批量合成念白，返回本地 wav 路径列表。
 func (e *Engine) SynthesizeVoiceBatch(base, persona string, texts []string, outDir string) ([]string, error) {
 	return SynthesizeViaServer(base, persona, texts, outDir)
+}
+
+// ──────────────────────────────────────────────────────────────
+// 渲染（从 render.mjs / motion.mjs 搬）
+// ──────────────────────────────────────────────────────────────
+
+// RenderRequest 前端发来的渲染请求。
+//
+// 与内部的 RenderOpts 分开：RenderOpts 带 OnProgress 回调，
+// 不是可 JSON 序列化的东西，不能直接当绑定参数用。
+type RenderRequest struct {
+	Template  string         `json:"template"`
+	Shots     []Shot         `json:"shots"`
+	Vars      map[string]any `json:"vars"`
+	Width     int            `json:"width"`
+	Height    int            `json:"height"`
+	Motion    string         `json:"motion"`
+	Durations []float64      `json:"durations"`
+	FPS       int            `json:"fps"`
+}
+
+// RenderFrames 渲染逐镜画面（静帧出 PNG，动效出 mp4）。
+func (e *Engine) RenderFrames(req RenderRequest) ([]string, error) {
+	if e.store == nil {
+		return nil, errNoStore
+	}
+	// 输出目录固定在工作台目录下，不接受前端指定 ——
+	// 否则界面能往任意路径写文件。
+	outDir := filepath.Join(e.store.Root(), "renders", newID())
+	return RenderFrames(context.Background(), RenderOpts{
+		Template:  req.Template,
+		Shots:     req.Shots,
+		Vars:      req.Vars,
+		OutDir:    outDir,
+		Width:     req.Width,
+		Height:    req.Height,
+		Motion:    req.Motion,
+		Durations: req.Durations,
+		FPS:       req.FPS,
+	})
 }
 
 var errNoStore = errors.New("工作台状态还没初始化")
