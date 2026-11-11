@@ -12,7 +12,6 @@ import (
 // 窗口打开时先显示一个引导页，等工作台起来、拿到它的地址后跳过去。
 type App struct {
 	backend *Backend
-	ctx     context.Context
 }
 
 // NewApp 造一个桌面壳。
@@ -21,13 +20,12 @@ func NewApp() *App {
 }
 
 // startup 是窗口起来时做的事：把本机工作台拉起来。
-func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
+func (a *App) startup(_ context.Context) {
 	a.backend.Ensure()
 }
 
 // shutdown 是退出时做的事：把本机工作台收掉。
-func (a *App) shutdown(ctx context.Context) {
+func (a *App) shutdown(_ context.Context) {
 	a.backend.Stop()
 }
 

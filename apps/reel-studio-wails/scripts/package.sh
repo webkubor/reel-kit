@@ -44,7 +44,7 @@ fi
 RESOURCES="${REEL_STUDIO_RUNTIME_SRC:-$PWD/../reel-studio/resources/$RES_DIR}"
 [ -d "$RESOURCES" ] || { echo "找不到运行时资源目录：${RESOURCES}" >&2; echo "先跑 scripts/prepare-resources.sh 生成，或设 REEL_STUDIO_RUNTIME_SRC 指向已有资源。" >&2; exit 4; }
 
-VERSION="$(node -e 'process.stdout.write(require("../reel-studio/mygo.json").version)' 2>/dev/null || echo "dev")"
+VERSION="${REEL_STUDIO_VERSION:-$(node -e 'process.stdout.write(require("../reel-studio/mygo.json").version)' 2>/dev/null || echo "dev")}"
 APP_NAME="Reel Studio"
 
 echo "== 1/3 构建 ${APP_NAME}（${PLATFORM}）"
