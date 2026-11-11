@@ -1,0 +1,22 @@
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="reel-kit 应用图标">
+  <title>reel-kit</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7e3df"/>
+      <stop offset="0.55" stop-color="#fbe9e7"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" rx="232" fill="url(#bg)"/>
+  <rect x="2" y="2" width="1020" height="1020" rx="230" fill="none" stroke="rgba(204,88,77,0.10)" stroke-width="3"/>
+  <rect x="8" y="8" width="1008" height="1008" rx="224" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="5"/>
+  <g transform="translate(252,252) scale(13.684)">
+    <circle cx="19" cy="19" r="19" fill="none" stroke="#cc584d" stroke-width="2.5"/>
+    <circle cx="19" cy="19" r="10" fill="none" stroke="#cc584d" stroke-width="2"/>
+    <circle cx="19" cy="19" r="3.5" fill="#cc584d"/>
+    <circle cx="19" cy="4" r="1.8" fill="#cc584d"/>
+    <circle cx="19" cy="34" r="1.8" fill="#cc584d"/>
+    <circle cx="4" cy="19" r="1.8" fill="#cc584d"/>
+    <circle cx="34" cy="19" r="1.8" fill="#cc584d"/>
+  </g>
+</svg>
