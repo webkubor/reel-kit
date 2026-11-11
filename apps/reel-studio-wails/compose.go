@@ -321,7 +321,7 @@ func composeWithXfade(ctx context.Context, frames []string, durations []float64,
 
 // ProbeDuration 读一个媒体文件的秒数，用于校验/展示。
 func ProbeDuration(ctx context.Context, file string) (float64, error) {
-	cmd := exec.CommandContext(ctx, "ffprobe",
+	cmd := exec.CommandContext(ctx, mediaCommand("ffprobe"),
 		"-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", file,
 	)
 	out, err := cmd.Output()
@@ -402,7 +402,7 @@ func writeFile(path, content string) error {
 
 // runFfmpeg 调用 ffmpeg，支持上下文取消，出错时带上 stderr 尾部。
 func runFfmpeg(ctx context.Context, args []string) error {
-	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, mediaCommand("ffmpeg"), args...)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {

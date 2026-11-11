@@ -27,10 +27,12 @@ func main() {
 		Height:    840,
 		MinWidth:  1024,
 		MinHeight: 680,
-		// 界面就是工作台本身。这里只打包一个引导页：
-		// 等工作台起来、拿到它的地址后再跳过去。
+		// 界面就是工作台本身：本地控制台 UI 直接打包在 frontend/dist 里。
+		// Handler 是 Wails 内置资源服务器的一个分支，用来把本机素材递��界面
+		//（<img src="/media/素材id">）—— 不是自己起的服务，不占端口。
 		AssetServer: &assetserver.Options{
-			Assets: assets,
+			Assets:  assets,
+			Handler: app.mediaHandler(),
 		},
 		OnStartup:          app.startup,
 		OnShutdown:         app.shutdown,

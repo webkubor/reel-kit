@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><style>
+*{box-sizing:border-box}
+body{width:{{width}}px;height:{{height}}px;margin:0;background:#101519;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;position:relative;overflow:hidden}
+.scene{position:absolute;left:5%;top:17%;width:90%;height:51%;object-fit:{{fit}}}
+header{position:absolute;top:3%;left:5%;right:5%;height:13%;overflow:hidden}
+small{font-size:clamp(16px,2.2vmin,24px);letter-spacing:3px}
+h1{font-size:clamp(30px,5vmin,54px);line-height:1.2;margin:12px 0 0;overflow-wrap:anywhere}
+.caption{position:absolute;left:5%;right:5%;top:71%;bottom:8%;display:flex;flex-direction:column;justify-content:center}
+p{font-size:clamp(24px,4vmin,44px);font-weight:650;line-height:1.35;margin:0;overflow-wrap:anywhere}
+footer{margin-top:12px;font-size:clamp(14px,1.8vmin,20px);opacity:.8;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+</style></head><body><img class="scene" src="{{image}}" alt="项目画面"><header><small>开源项目推荐</small><h1>{{title}}</h1></header><div class="caption"><p>{{caption}}</p><footer>{{subtitle}}</footer></div></body></html>

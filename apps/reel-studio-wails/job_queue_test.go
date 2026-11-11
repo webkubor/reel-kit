@@ -73,13 +73,13 @@ func TestStoreInterruptedOnRestart(t *testing.T) {
 	}
 	p, _ := s1.AddProject("项目")
 	for _, status := range []string{"queued", "running"} {
-		s1.State().Jobs = append(s1.State().Jobs, &Job{
+		s1.state.Jobs = append(s1.state.Jobs, &Job{
 			ID: newID(), ProjectID: p.ID, Status: status,
 			Input: map[string]any{}, CreatedAt: nowISO(), UpdatedAt: nowISO(),
 		})
 	}
 	// 加一条已完成的，重启后不该被动。
-	s1.State().Jobs = append(s1.State().Jobs, &Job{
+	s1.state.Jobs = append(s1.state.Jobs, &Job{
 		ID: newID(), ProjectID: p.ID, Status: "succeeded",
 		Input: map[string]any{}, CreatedAt: nowISO(), UpdatedAt: nowISO(),
 	})
@@ -262,12 +262,12 @@ func TestQueueRejectsWhenFull(t *testing.T) {
 func TestQueueCancelFinishedJob(t *testing.T) {
 	s := newTestStore(t)
 	p, _ := s.AddProject("项目")
-	s.State().Jobs = append(s.State().Jobs, &Job{
+	s.state.Jobs = append(s.state.Jobs, &Job{
 		ID: newID(), ProjectID: p.ID, Status: "succeeded",
 		Input: map[string]any{}, CreatedAt: nowISO(), UpdatedAt: nowISO(),
 	})
 	q := NewJobQueue(s, nil)
-	if _, err := q.Cancel(s.State().Jobs[0].ID); err == nil {
+	if _, err := q.Cancel(s.state.Jobs[0].ID); err == nil {
 		t.Fatal("已结束的任务不该能被取消")
 	}
 }

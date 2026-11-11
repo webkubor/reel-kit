@@ -1,88 +1,180 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Reel Studio</title>
-<style>
-  :root { color-scheme: dark; }
-  html, body { height: 100%; }
-  body {
-    margin: 0; background: #16161a; color: #e9e9ec;
-    font: 14px/1.6 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .boot { display: flex; flex-direction: column; align-items: center; gap: 18px; }
-  .mark { font-size: 30px; font-weight: 600; letter-spacing: .5px; }
-  .mark span { color: #ff5c39; }
-  .bar { width: 168px; height: 3px; border-radius: 2px; background: #2c2c33; overflow: hidden; }
-  .bar i { display: block; width: 40%; height: 100%; background: #ff5c39; border-radius: 2px; animation: slide 1.1s ease-in-out infinite; }
-  @keyframes slide { 0% { transform: translateX(-100%);} 100% { transform: translateX(320%);} }
-  .note { color: #9a9aa4; min-height: 20px; }
-  .note.bad { color: #ff8a6b; max-width: 420px; text-align: center; }
-  .retry { display: none; border: 1px solid #3a3a44; background: #23232a; color: #e9e9ec;
-           padding: 7px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; }
-  .retry.show { display: inline-block; }
-</style>
-</head>
-<body>
-<div class="boot">
-  <div class="mark">reel<span>·</span>studio</div>
-  <div class="bar"><i></i></div>
-  <div class="note" id="note">正在启动本地工作台…</div>
-  <button class="retry" id="retry">重试</button>
-</div>
-<script>
-(function () {
-  var note = document.getElementById('note');
-  var retry = document.getElementById('retry');
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Reel Studio</title>
+    <link rel="stylesheet" href="./app.css" />
+  </head>
+  <body>
+    <div id="app" class="flex h-full">
+      <!-- 侧栏：品牌、项目、状态 -->
+      <aside class="flex w-[210px] shrink-0 flex-col border-r border-line bg-paper">
+        <div class="flex items-center gap-2.5 px-5 pb-3 pt-5">
+          <span class="flex h-8 w-8 items-center justify-center rounded-md bg-ink font-serif text-lg text-white">r<i class="not-italic text-accent-soft">·</i></span>
+          <span class="leading-tight">
+            <span class="block text-base font-semibold tracking-tight text-ink">reel<span class="font-normal text-ink-mid">studio</span></span>
+            <span class="mt-0.5 block text-[9px] font-medium uppercase tracking-[0.18em] text-ink-dim">本地视频工作台</span>
+          </span>
+        </div>
 
-  // Go 绑定是首选：窗口里的资源服务器用的是自定义协议，
-  // 走 fetch 有可能被当成跨站请求挡掉。
-  function status() {
-    var go = window.go;
-    if (go) {
-      for (var pkg in go) {
-        var group = go[pkg];
-        if (!group) continue;
-        for (var name in group) {
-          var obj = group[name];
-          if (obj && typeof obj.Status === 'function') {
-            try { return Promise.resolve(obj.Status()); } catch (e) { /* 换下一种 */ }
-          }
-        }
-      }
-    }
-    return fetch('/__studio/status').then(function (r) { return r.json(); });
-  }
+        <div class="flex items-center justify-between px-5 pb-1.5 pt-5">
+          <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-lo">我的视频</span>
+          <button id="btn-new-project-icon" class="btn btn-ghost btn-icon text-base leading-none" aria-label="新建项目">＋</button>
+        </div>
+        <nav id="project-list" class="min-h-0 flex-1 overflow-y-auto px-2 pb-2" aria-label="项目列表"></nav>
 
-  function show(text, bad) {
-    note.textContent = text;
-    note.className = bad ? 'note bad' : 'note';
-  }
+        <div class="border-t border-line px-5 py-4">
+          <div class="flex items-center gap-2 text-2xs text-ink-mid">
+            <span id="engine-dot" class="h-1.5 w-1.5 rounded-full bg-warn"></span>
+            <span id="engine-status">正在启动…</span>
+          </div>
+          <p class="mt-2 text-2xs leading-relaxed text-ink-lo">
+            素材与成片留在这台机器上<br />
+            语音与出图用在线服务时才会联网
+          </p>
+        </div>
+      </aside>
 
-  function tick() {
-    status().then(function (s) {
-      if (!s) return;
-      if (s.ready && s.url) { window.location.replace(s.url); return; }
-      if (s.ready) { show('本地工作台已就绪（零 HTTP，无工作台地址可跳转）', false); return; }
-      if (s.error) { show(s.error, true); retry.classList.add('show'); return; }
-      show(s.note || '正在启动本地工作台…', false);
-      setTimeout(tick, 300);
-    }).catch(function () {
-      show('连不上本地工作台，正在重试…', false);
-      setTimeout(tick, 800);
-    });
-  }
+      <!-- 主区 -->
+      <div class="flex min-w-0 flex-1 flex-col">
+        <header class="flex h-14 shrink-0 items-center gap-2.5 border-b border-line bg-surface px-5">
+          <span id="label-project" class="text-xs text-ink-lo">当前项目</span>
+          <div id="project-select" class="w-56" aria-labelledby="label-project"></div>
+          <button id="btn-new-project" class="btn btn-secondary btn-sm">＋ 新建项目</button>
+          <div class="ml-auto flex items-center gap-2">
+            <button id="btn-pick-images" class="btn btn-secondary btn-sm">＋ 导入素材</button>
+          </div>
+        </header>
 
-  retry.addEventListener('click', function () {
-    retry.classList.remove('show');
-    show('正在重启本地工作台…', false);
-    setTimeout(tick, 200);
-  });
+        <div class="flex min-h-0 flex-1">
+          <!-- 左：写什么 -->
+          <section class="flex min-w-0 flex-1 flex-col overflow-y-auto border-r border-line p-5">
+            <div class="mb-4 shrink-0">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">REEL STUDIO</p>
+              <h1 class="mt-1.5 text-2xl font-semibold tracking-tight text-ink">做一支产品介绍短片</h1>
+              <p class="mt-1 text-xs leading-relaxed text-ink-lo">
+                写几句介绍词，逐句配音，按画幅渲染成片。在线语音会联网并可能产生费用。
+              </p>
+            </div>
 
-  tick();
-})();
-</script>
-</body>
+            <div class="panel mb-4 shrink-0">
+              <div class="panel-head">
+                <h2 class="panel-title">镜头内容</h2>
+                <span id="layout-badge" class="badge">—</span>
+              </div>
+              <div class="panel-body">
+                <div class="field">
+                  <label class="label" for="f-title">标题</label>
+                  <input id="f-title" class="input input-md" maxlength="40" placeholder="这支视频的一句话主题" />
+                </div>
+
+                <div class="field">
+                  <label class="label" for="f-subtitle">副标题 <span class="label-hint">可选</span></label>
+                  <input id="f-subtitle" class="input input-md" maxlength="40" placeholder="出现在标题旁边的短句" />
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="field">
+                    <label class="label" id="label-ratio">画幅</label>
+                    <div id="select-ratio" aria-labelledby="label-ratio"></div>
+                  </div>
+                  <div class="field">
+                    <label class="label" id="label-voice">语音通道</label>
+                    <div id="select-voice" aria-labelledby="label-voice"></div>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <label class="label" for="f-lines">
+                    介绍词 <span class="label-hint">一行一句，一句一镜</span>
+                  </label>
+                  <textarea id="f-lines" class="input" rows="7" placeholder="这是我们花了两年做出来的一支笔&#10;笔尖是 0.2 毫米，转起来很稳"></textarea>
+                  <div class="mt-1.5 flex items-start justify-between gap-3">
+                    <p class="help">最多 8 句，每句不超过 80 字。句子越长，镜头越长。</p>
+                    <span id="lines-count" class="shrink-0 text-2xs text-ink-dim">0 / 8 行</span>
+                  </div>
+                </div>
+
+                <div class="mt-1 border-t border-line pt-4">
+                  <p id="run-hint" class="mb-3 text-2xs leading-relaxed text-ink-lo" role="status" aria-live="polite"></p>
+                  <div class="flex gap-2">
+                    <button id="btn-run" class="btn btn-primary btn-md flex-1">开始制作</button>
+                    <button id="btn-cancel" class="btn btn-danger btn-md hidden">取消</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel shrink-0">
+              <div class="panel-head">
+                <h2 class="panel-title">画面素材</h2>
+                <span id="asset-selected" class="badge">未选择</span>
+              </div>
+              <div class="panel-body">
+                <div id="asset-grid" class="grid grid-cols-4 gap-2"></div>
+                <p id="asset-empty" class="text-2xs leading-relaxed text-ink-lo">
+                  还没有导入图片。没有素材也能出片 —— 会先用深色占位图，之后可以换真图重做。
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <!-- 右：出来什么样 -->
+          <section class="flex min-w-0 flex-[1.05] flex-col overflow-y-auto p-5">
+            <div class="panel mb-4 shrink-0">
+              <div class="panel-head">
+                <h2 class="panel-title">画面</h2>
+                <span id="preview-meta" class="text-2xs text-ink-lo">—</span>
+              </div>
+              <div class="panel-body">
+                <div class="flex justify-center">
+                  <div id="stage-wrap" class="relative overflow-hidden rounded-lg bg-raised shadow-stage" style="width: 236px; height: 420px">
+                    <div id="stage-canvas" class="stage-canvas mp"></div>
+                    <video id="stage-video" class="stage-video hidden" controls></video>
+                  </div>
+                </div>
+                <p id="stage-note" class="mt-3 text-center text-2xs text-ink-dim">画面示意 · 最终以成片为准</p>
+                <div class="mt-3 flex justify-center"><button id="btn-export" class="btn btn-secondary btn-sm hidden" type="button">导出成片</button></div>
+              </div>
+            </div>
+
+            <div class="panel mb-4 shrink-0">
+              <div class="panel-head"><h2 class="panel-title">项目成片</h2></div>
+              <div id="video-list" class="panel-body flex flex-col gap-1"></div>
+            </div>
+            <div class="panel shrink-0">
+              <div class="panel-head">
+                <h2 class="panel-title">制作过程</h2>
+                <span id="job-state" class="badge"></span>
+              </div>
+              <div class="panel-body">
+                <div id="steps" class="flex flex-col gap-1.5"></div>
+                <p id="steps-empty" class="text-2xs leading-relaxed text-ink-lo">
+                  提交后这里显示每一步的进度。语音在哪个通道跑、哪一步开始联网，都写在这里。
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <dialog id="project-dialog" aria-labelledby="project-dialog-title" class="w-[380px] rounded-lg border border-line bg-surface p-5 shadow-pop backdrop:bg-ink/20">
+      <form id="project-form" method="dialog">
+        <h2 id="project-dialog-title" class="text-base font-semibold tracking-tight text-ink">新建项目</h2>
+        <p class="mt-1 text-2xs leading-relaxed text-ink-lo">素材、生成记录与成片都按项目保存。</p>
+        <label class="label mt-4" for="new-name">项目名称</label>
+        <input id="new-name" class="input input-md" maxlength="80" required placeholder="例如：秋日短片" />
+        <div class="mt-4 flex justify-end gap-2">
+          <button type="button" id="btn-cancel-project" class="btn btn-ghost btn-sm">取消</button>
+          <button type="submit" class="btn btn-primary btn-sm">创建</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="./select.js"></script>
+    <script src="./app.js"></script>
+  </body>
 </html>

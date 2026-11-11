@@ -38,6 +38,11 @@ var chromeCandidates = []string{
 
 // FindChrome 找本机 Chrome 的可执行文件。
 func FindChrome() string {
+	if path := bundledResource("chrome", "chrome-headless-shell"); path != "" {
+		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
+			return path
+		}
+	}
 	for _, p := range chromeCandidates {
 		if p == "" {
 			continue
@@ -420,7 +425,7 @@ func encodeMotion(ctx context.Context, parent context.Context, out string, durat
 		"-pix_fmt", "yuv420p", "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
 		"-movflags", "+faststart", out,
 	}
-	cmd := exec.CommandContext(parent, "ffmpeg", args...)
+	cmd := exec.CommandContext(parent, mediaCommand("ffmpeg"), args...)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	stdin, err := cmd.StdinPipe()

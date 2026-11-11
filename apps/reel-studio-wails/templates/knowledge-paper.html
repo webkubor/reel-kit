@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  /* 知识大赏 · 纸本文献与档案调查模板（1080×1920 竖版）
+     吸收自 vibe-knowledge：水墨纸本/档案灯台/视觉调查家族
+     特点：典雅米黄纸底、深墨色文字、文献报章排版、醒目出处索引 */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1080px; height: 1920px;
+    background: {{bg}};
+    color: #24201c;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Noto Serif SC", serif;
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    padding: 120px 80px 100px;
+  }
+
+  /* 默认米黄纸本回退 */
+  :root {
+    --paper-bg: #ece4d4;
+    --accent: {{accent1}};      /* 茜红 #b23a2e 或 墨青 #3c6e71 */
+    --accent-sub: {{accent2}};  /* 墨青 #3c6e71 */
+    --ink-dark: #201c18;
+    --ink-dim: #7d7266;
+  }
+
+  /* 纸张微噪与自然边缘 */
+  .paper-texture {
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.4) 0%, rgba(0,0,0,0.06) 100%);
+    pointer-events: none; z-index: 1;
+  }
+
+  /* 顶部：档案编号与出处 */
+  .header {
+    width: 100%; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 2px solid rgba(42, 36, 32, 0.2);
+    padding-bottom: 20px; z-index: 2; margin-bottom: 20px;
+  }
+  .doc-id {
+    font-size: 26px; font-weight: 800; letter-spacing: 2px;
+    color: var(--accent);
+    font-family: monospace;
+  }
+  .source {
+    font-size: 24px; color: var(--ink-dim); letter-spacing: 1px;
+    background: rgba(0, 0, 0, 0.05); padding: 6px 16px; border-radius: 4px;
+    border-left: 3px solid var(--accent);
+    max-width: 550px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* 标题区：典雅排版 */
+  .head {
+    width: 100%; text-align: center; z-index: 2; margin-top: 15px;
+  }
+  .title {
+    font-size: 78px; font-weight: 900; line-height: 1.25;
+    color: var(--ink-dark); letter-spacing: 2px;
+  }
+  .subtitle {
+    margin-top: 16px; font-size: 34px; color: var(--ink-dim); letter-spacing: 4px;
+  }
+
+  /* 核心视觉图表/插画卡片 */
+  .stage {
+    width: 100%; flex: 1; max-height: 50%;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2; padding: 25px 0;
+  }
+  .card-box {
+    width: 100%; height: 100%; position: relative;
+    border-radius: 16px; overflow: hidden;
+    background: #ffffff;
+    border: 1px solid rgba(42, 36, 32, 0.15);
+    box-shadow: 0 16px 40px rgba(42, 36, 32, 0.08);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .card-box img {
+    width: 100%; height: 100%; object-fit: contain;
+    border-radius: 10px;
+  }
+
+  /* 底部重点与解读 */
+  .caption-box {
+    width: 100%; z-index: 2; text-align: center;
+    padding: 34px 40px; border-radius: 14px;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(42, 36, 32, 0.12);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+    margin-bottom: 24px;
+    min-height: 160px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .caption {
+    font-size: 56px; font-weight: 700; line-height: 1.45;
+    color: var(--ink-dark); letter-spacing: 1.5px;
+  }
+  .caption mark {
+    background: rgba(178, 58, 46, 0.15);
+    color: var(--accent); padding: 0 8px; border-radius: 4px;
+  }
+
+  /* 底部 */
+  .footer {
+    width: 100%; text-align: center; z-index: 2;
+    font-size: 28px; color: var(--ink-dim); letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+  <div class="paper-texture"></div>
+
+  <div class="header">
+    <div class="doc-id">DOSSIER // KNOWLEDGE</div>
+    <div class="source">{{source}}</div>
+  </div>
+
+  <div class="head">
+    <div class="title">{{title}}</div>
+    <div class="subtitle">{{subtitle}}</div>
+  </div>
+
+  <div class="stage">
+    <div class="card-box">
+      <img src="{{image}}" alt="">
+    </div>
+  </div>
+
+  <div class="caption-box">
+    <div class="caption">{{caption}}</div>
+  </div>
+
+  <div class="footer">{{footer}}</div>
+
+  <script>
+    const srcEl = document.querySelector('.source');
+    if (srcEl && (!srcEl.textContent.trim() || srcEl.textContent.includes('{{source}}'))) {
+      srcEl.style.display = 'none';
+    }
+  </script>
+</body>
+</html>

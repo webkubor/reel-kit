@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"sync"
 )
@@ -22,6 +23,10 @@ type Engine struct {
 
 	// voxcraft：本机离线语音引擎的服务句柄（可能复用已有的）。
 	voxcraft *VoxcraftServer
+
+	// speechOverride 是测试替身：非 nil 时 GenerateSpeech 走它。
+	// 生产路径永远是 nil —— 真实通道（VoxFlow / MiniMax）不受影响。
+	speechOverride func(ctx context.Context, projectID, text, tone, backend, model, voiceID, profile string, speed float64) (*Asset, error)
 }
 
 // Status 是引擎当前状态，给界面看。
@@ -41,7 +46,7 @@ func NewEngine() *Engine {
 		return e
 	}
 	e.store = store
-	e.queue = NewJobQueue(store, nil)
+	e.queue = NewJobQueue(store, e.runPipeline)
 	return e
 }
 
@@ -49,7 +54,7 @@ func NewEngine() *Engine {
 func (e *Engine) Status() Status {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return Status{Ready: true, URL: "", Note: e.note, Error: ""}
+	return Status{Ready: e.store != nil && e.queue != nil, URL: "", Note: e.note, Error: ""}
 }
 
 // Start 启动后台 worker（任务队列）。界面加载后调用一次。
@@ -131,7 +136,12 @@ func (e *Engine) ListProjects() []*Project {
 	if e.store == nil {
 		return []*Project{}
 	}
-	return e.store.State().Projects
+	out := []*Project{}
+	for _, p := range e.store.State().Projects {
+		cp := *p
+		out = append(out, &cp)
+	}
+	return out
 }
 
 // CreateProject 新建项目。
@@ -175,8 +185,11 @@ func (e *Engine) State() *StudioState {
 
 // SubmitJob 提交一条出片任务，立刻返回（实际执行在后台 worker）。
 func (e *Engine) SubmitJob(projectID string, input map[string]any) (*Job, error) {
-	if e.queue == nil {
+	if e.queue == nil || e.store == nil {
 		return nil, errNoStore
+	}
+	if _, err := e.store.Project(projectID); err != nil {
+		return nil, err
 	}
 	return e.queue.Submit(projectID, input)
 }
@@ -218,16 +231,59 @@ func (e *Engine) CancelJob(jobID string) (string, error) {
 
 // ──────────────────────────────────────────────────────────────
 // 语音合成（从 voice.mjs / edge-tts.mjs / voxcraft-*.mjs 搬）
+//
+// 只暴露「查状态」，不暴露「写文件」——
+// 绑定参数里的路径与地址如果由前端给，界面就能往任意位置写文件、
+// 向任意地址发请求。合成这件事由出片流水线自己调。
 // ──────────────────────────────────────────────────────────────
 
-// SpeakViaMinimax 用 MiniMax 云端 TTS 合成一段文字，落到本地 wav。
-func (e *Engine) SpeakViaMinimax(text, out, voice string) error {
-	return SpeakViaMinimax(context.Background(), text, out, voice)
+// VoiceChannel 语音通道的信息。
+type VoiceChannel struct {
+	ID     string `json:"id"`
+	Label  string `json:"label"`
+	Origin string `json:"origin"`
+	Engine string `json:"engine"`
+	Ready  bool   `json:"ready"`
+	Note   string `json:"note"`
 }
 
-// DurationsFromVoice 由念白时长推导镜头时长。
-func (e *Engine) DurationsFromVoice(voiceDurations []float64, margin, min float64) []float64 {
-	return DurationsFromVoice(voiceDurations, margin, min)
+// VoiceChannels 列出可用的语音通道。
+func (e *Engine) VoiceChannels() []VoiceChannel {
+	vox := LocateVoxcraft()
+	_, _, _, _, _, sherpaErr := sherpaFiles()
+	channels := []VoiceChannel{
+		{
+			ID: "sherpa", Label: "本机离线语音", Origin: "local-offline",
+			Engine: "sherpa-onnx", Ready: sherpaErr == nil,
+			Note: "本机语音模型资源未就绪",
+		},
+		{
+			ID: "voxflow", Label: "VoxFlow 本机语音",
+			Origin: "local-offline", Engine: "VoxFlow 本地语音",
+			Ready: vox.OK, Note: vox.Reason,
+		},
+		{
+			ID: "minimax", Label: "MiniMax TTS",
+			Origin: "cloud-paid", Engine: "MiniMax TTS",
+			Ready: MinimaxAPIKey() != "",
+			Note:  minimaxNote(),
+		},
+		{
+			ID: "edge", Label: "Edge 在线语音",
+			Origin: "free-online", Engine: "Edge 在线高保真语音",
+			Ready: false,
+			Note:  "这个版本还没有 Go 版实现，暂时不可用",
+		},
+	}
+	return channels
+}
+
+// minimaxNote 说明 MiniMax 现在能不能用。
+func minimaxNote() string {
+	if MinimaxAPIKey() != "" {
+		return "已配置密钥，按量计费"
+	}
+	return "未配置 MINIMAX_API_KEY"
 }
 
 // LocateVoxcraft 定位本机 voxcraft 安装。
@@ -235,36 +291,32 @@ func (e *Engine) LocateVoxcraft() VoxcraftInfo {
 	return LocateVoxcraft()
 }
 
-// StartVoxcraft 确保 voxcraft 服务可用，返回服务基址。
-//
-// 别人开着就复用，不重复起进程 —— 这是本机唯一的免费离线语音引擎。
-func (e *Engine) StartVoxcraft(home, bin string) (string, error) {
-	server, err := EnsureServer(home, bin)
-	if err != nil {
-		return "", err
-	}
-	e.mu.Lock()
-	if e.voxcraft != nil {
-		StopServer(e.voxcraft)
-	}
-	e.voxcraft = server
-	e.mu.Unlock()
-	return server.Base, nil
+// DurationsFromVoice 由念白时长推导镜头时长。
+func (e *Engine) DurationsFromVoice(voiceDurations []float64, margin, min float64) []float64 {
+	return DurationsFromVoice(voiceDurations, margin, min)
 }
 
-// StopVoxcraft 停掉自己起的 voxcraft 服务（复用的不动）。
-func (e *Engine) StopVoxcraft() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if e.voxcraft != nil {
-		StopServer(e.voxcraft)
-		e.voxcraft = nil
-	}
+// ProductLayoutInfo 一种画幅的版式信息，给界面下拉用。
+type ProductLayoutInfo struct {
+	Ratio    string `json:"ratio"`
+	Template string `json:"template"`
+	Width    int    `json:"width"`
+	Height   int    `json:"height"`
+	Label    string `json:"label"`
 }
 
-// SynthesizeVoiceBatch 用 voxcraft 批量合成念白，返回本地 wav 路径列表。
-func (e *Engine) SynthesizeVoiceBatch(base, persona string, texts []string, outDir string) ([]string, error) {
-	return SynthesizeViaServer(base, persona, texts, outDir)
+// ProductLayoutsInfo 列出支持的画幅。
+func (e *Engine) ProductLayoutsInfo() []ProductLayoutInfo {
+	labels := map[string]string{"9:16": "竖版 · 1080×1920", "16:9": "横版 · 1920×1080"}
+	out := []ProductLayoutInfo{}
+	for _, ratio := range []string{"9:16", "16:9"} {
+		l := ProductLayouts[ratio]
+		out = append(out, ProductLayoutInfo{
+			Ratio: ratio, Template: l.Template, Width: l.Width, Height: l.Height,
+			Label: labels[ratio],
+		})
+	}
+	return out
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -276,6 +328,8 @@ func (e *Engine) SynthesizeVoiceBatch(base, persona string, texts []string, outD
 // 与内部的 RenderOpts 分开：RenderOpts 带 OnProgress 回调，
 // 不是可 JSON 序列化的东西，不能直接当绑定参数用。
 type RenderRequest struct {
+	// Template 是版式名（不是路径）—— 界面只能从已知清单里选，
+	// 不能让它去读任意文件。
 	Template  string         `json:"template"`
 	Shots     []Shot         `json:"shots"`
 	Vars      map[string]any `json:"vars"`
@@ -291,11 +345,24 @@ func (e *Engine) RenderFrames(req RenderRequest) ([]string, error) {
 	if e.store == nil {
 		return nil, errNoStore
 	}
+	content, err := ReadTemplate(req.Template)
+	if err != nil {
+		return nil, err
+	}
+	temp, err := os.MkdirTemp("", "reel-render-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(temp)
+	templateFile := filepath.Join(temp, req.Template+".html")
+	if err := os.WriteFile(templateFile, []byte(content), 0o600); err != nil {
+		return nil, err
+	}
 	// 输出目录固定在工作台目录下，不接受前端指定 ——
 	// 否则界面能往任意路径写文件。
 	outDir := filepath.Join(e.store.Root(), "renders", newID())
 	return RenderFrames(context.Background(), RenderOpts{
-		Template:  req.Template,
+		Template:  templateFile,
 		Shots:     req.Shots,
 		Vars:      req.Vars,
 		OutDir:    outDir,

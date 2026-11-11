@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -19,7 +20,7 @@ import (
 // context.CancelFunc，取消时调用它，让下游的 exec.CommandContext 与
 // HTTP 请求一起中止。
 type JobQueue struct {
-	mu      sync.Mutex
+	mu      *sync.Mutex
 	store   *StudioStore
 	running bool
 
@@ -43,6 +44,7 @@ var ErrCanceled = errors.New("已取消")
 // NewJobQueue 造一个任务队列。
 func NewJobQueue(store *StudioStore, handler JobHandler) *JobQueue {
 	return &JobQueue{
+		mu:          &store.mu,
 		store:       store,
 		controllers: map[string]context.CancelFunc{},
 		wake:        make(chan struct{}, 1),
@@ -59,9 +61,17 @@ func (q *JobQueue) SetHandler(handler JobHandler) {
 
 // Submit 入队一条任务，立刻返回；实际执行在后台 worker 里。
 func (q *JobQueue) Submit(projectID string, input map[string]any) (*Job, error) {
+	data, err := json.Marshal(input)
+	if err != nil {
+		return nil, err
+	}
+	var ownedInput map[string]any
+	if err := json.Unmarshal(data, &ownedInput); err != nil {
+		return nil, err
+	}
 	q.mu.Lock()
 	active := 0
-	for _, j := range q.store.State().Jobs {
+	for _, j := range q.store.state.Jobs {
 		if j.Status == "queued" || j.Status == "running" {
 			active++
 		}
@@ -73,19 +83,24 @@ func (q *JobQueue) Submit(projectID string, input map[string]any) (*Job, error) 
 	job := &Job{
 		ID:        newID(),
 		ProjectID: projectID,
-		Input:     input,
+		Input:     ownedInput,
 		Status:    "queued",
 		CreatedAt: nowISO(),
 		UpdatedAt: nowISO(),
 		Message:   "等待执行",
 		Steps:     []Step{},
 	}
-	q.store.State().Jobs = append(q.store.State().Jobs, job)
-	q.store.Save()
+	q.store.state.Jobs = append(q.store.state.Jobs, job)
+	if err := q.store.saveLocked(); err != nil {
+		q.store.state.Jobs = q.store.state.Jobs[:len(q.store.state.Jobs)-1]
+		q.mu.Unlock()
+		return nil, err
+	}
+	snapshot := cloneJob(job)
 	q.mu.Unlock()
 
 	q.poke()
-	return job, nil
+	return snapshot, nil
 }
 
 // Cancel 取消一条任务。
@@ -95,7 +110,7 @@ func (q *JobQueue) Submit(projectID string, input map[string]any) (*Job, error) 
 func (q *JobQueue) Cancel(jobID string) (string, error) {
 	q.mu.Lock()
 	var job *Job
-	for _, j := range q.store.State().Jobs {
+	for _, j := range q.store.state.Jobs {
 		if j.ID == jobID {
 			job = j
 			break
@@ -106,13 +121,13 @@ func (q *JobQueue) Cancel(jobID string) (string, error) {
 		return "", errors.New("找不到这个任务")
 	}
 	switch job.Status {
-	case "succeeded", "failed", "canceled":
+	case "succeeded", "failed", "canceled", "interrupted":
 		q.mu.Unlock()
 		return "", errors.New("任务已经结束了，取消不了")
 	case "queued":
 		job.Status = "canceled"
 		job.UpdatedAt = nowISO()
-		q.store.Save()
+		q.store.saveLocked()
 		q.mu.Unlock()
 		return "canceled", nil
 	}
@@ -130,10 +145,10 @@ func (q *JobQueue) Cancel(jobID string) (string, error) {
 func (q *JobQueue) Jobs() []*Job {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	all := q.store.State().Jobs
+	all := q.store.state.Jobs
 	out := make([]*Job, 0, len(all))
 	for i := len(all) - 1; i >= 0; i-- {
-		out = append(out, all[i])
+		out = append(out, cloneJob(all[i]))
 	}
 	return out
 }
@@ -142,9 +157,9 @@ func (q *JobQueue) Jobs() []*Job {
 func (q *JobQueue) Job(jobID string) *Job {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	for _, j := range q.store.State().Jobs {
+	for _, j := range q.store.state.Jobs {
 		if j.ID == jobID {
-			return j
+			return cloneJob(j)
 		}
 	}
 	return nil
@@ -199,13 +214,13 @@ func (q *JobQueue) pump(parent context.Context) {
 func (q *JobQueue) nextQueued() *Job {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	for _, j := range q.store.State().Jobs {
+	for _, j := range q.store.state.Jobs {
 		if j.Status == "queued" {
 			j.Status = "running"
 			j.Steps = []Step{}
 			j.Message = "正在准备任务…"
 			j.UpdatedAt = nowISO()
-			q.store.Save()
+			q.store.saveLocked()
 			return j
 		}
 	}
@@ -218,6 +233,8 @@ func (q *JobQueue) run(parent context.Context, job *Job) {
 
 	q.mu.Lock()
 	q.controllers[job.ID] = cancel
+	handler := q.handler
+	input := cloneJob(job)
 	q.mu.Unlock()
 
 	progress := func(text string, upstream map[string]any) {
@@ -235,7 +252,7 @@ func (q *JobQueue) run(parent context.Context, job *Job) {
 			}
 		}
 		job.UpdatedAt = nowISO()
-		q.store.Save()
+		q.store.saveLocked()
 	}
 	report := func(step Step) {
 		q.mu.Lock()
@@ -249,7 +266,7 @@ func (q *JobQueue) run(parent context.Context, job *Job) {
 		steps = append(steps, step)
 		job.Steps = steps
 		job.UpdatedAt = nowISO()
-		q.store.Save()
+		q.store.saveLocked()
 	}
 
 	defer func() {
@@ -259,12 +276,12 @@ func (q *JobQueue) run(parent context.Context, job *Job) {
 		cancel()
 	}()
 
-	if q.handler == nil {
+	if handler == nil {
 		q.finish(job, "", errors.New("本地引擎还没有接上出片管线"))
 		return
 	}
 
-	assetID, err := q.handler(ctx, job, progress, report)
+	assetID, err := handler(ctx, input, progress, report)
 	if err != nil {
 		// 用户主动停的，标「已取消」而不是「失败」：这两件事该分开，用户才知道要不要重来。
 		if errors.Is(err, context.Canceled) || errors.Is(err, ErrCanceled) {
@@ -296,7 +313,7 @@ func (q *JobQueue) finish(job *Job, assetID string, err error) {
 		job.Message = "执行失败；输入已保留，可查看步骤定位问题"
 	}
 	job.UpdatedAt = nowISO()
-	q.store.Save()
+	q.store.saveLocked()
 }
 
 // Redact 抹掉错误信息里的密钥、服务地址与本机绝对路径（对齐 Node 版 redact）。

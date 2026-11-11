@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  /*
+   * music-card — 1080×1920 竖版音乐宣推/歌词卡片模板 (抖音/小红书/视频号推歌专属)。
+   *
+   * 模板作者须知:
+   *   画布尺寸必须写在 body 的 width/height, render.mjs 会从这里读 viewport。
+   *   占位符: {{title}} {{subtitle}} {{caption}} {{image}} {{footer}} {{bg}} {{accent1}} {{accent2}}。
+   *   图片由 render.mjs 转成 data URI 注入。
+   */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1080px; height: 1920px;
+    background: #0d0f17;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    padding: 110px 80px 90px;
+  }
+
+  /* 氛围光晕层 */
+  .ambient-glow {
+    position: absolute; border-radius: 50%;
+    filter: blur(140px); opacity: 0.4; pointer-events: none; z-index: 0;
+  }
+  .glow-tl {
+    width: 650px; height: 650px; top: -100px; left: -150px;
+    background: {{accent1}};
+  }
+  .glow-br {
+    width: 600px; height: 600px; bottom: 50px; right: -120px;
+    background: {{accent2}};
+  }
+  .glow-mid {
+    width: 500px; height: 500px; top: 45%; left: 25%;
+    background: #ec4899; opacity: 0.25;
+  }
+
+  /* 顶部状态与歌曲头部 */
+  .header {
+    z-index: 2; width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  .badge-row {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 24px;
+  }
+  .pill-tag {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    padding: 6px 20px;
+    font-size: 22px; font-weight: 600; letter-spacing: 2px;
+    color: #e2e8f0; text-transform: uppercase;
+    backdrop-filter: blur(10px);
+  }
+  .hires-tag {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    border-radius: 6px; padding: 4px 12px;
+    font-size: 20px; font-weight: 800; letter-spacing: 1px; color: #000;
+  }
+  .song-title {
+    font-size: 64px; font-weight: 800; line-height: 1.25;
+    letter-spacing: 2px;
+    background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    max-width: 900px;
+  }
+  .song-subtitle {
+    margin-top: 14px; font-size: 30px; font-weight: 500;
+    color: #94a3b8; letter-spacing: 4px;
+  }
+
+  /* 唱片/封面主体舞台 */
+  .player-stage {
+    z-index: 2; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative; margin: 30px 0;
+  }
+  .cover-card-wrap {
+    position: relative; width: 620px; height: 620px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  /* 黑胶拟物盘 */
+  .vinyl-disc {
+    position: absolute; right: -60px; width: 560px; height: 560px;
+    border-radius: 50%;
+    background: repeating-radial-gradient(circle, #18181b, #18181b 2px, #09090b 4px, #09090b 6px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(255, 255, 255, 0.05);
+    z-index: 1;
+    display: flex; align-items: center; justify-content: center;
+    border: 3px solid #27272a;
+  }
+  .vinyl-center {
+    width: 190px; height: 190px; border-radius: 50%;
+    background: radial-gradient(circle, #ec4899 0%, #be185d 70%, #000 100%);
+    border: 6px solid #18181b;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .vinyl-hole {
+    width: 28px; height: 28px; border-radius: 50%; background: #0d0f17;
+  }
+  /* 封面图片 */
+  .cover-box {
+    position: relative; width: 580px; height: 580px;
+    border-radius: 28px; overflow: hidden;
+    z-index: 2;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.15);
+    background: #1e293b;
+  }
+  .cover-img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+
+  /* 音频律动频谱条 */
+  .audio-visualizer {
+    display: flex; align-items: flex-end; justify-content: center; gap: 8px;
+    height: 44px; margin-top: 32px; z-index: 2;
+  }
+  .v-bar {
+    width: 6px; border-radius: 3px;
+    background: linear-gradient(180deg, {{accent1}} 0%, {{accent2}} 100%);
+  }
+  .v-bar:nth-child(1) { height: 18px; }
+  .v-bar:nth-child(2) { height: 32px; }
+  .v-bar:nth-child(3) { height: 44px; }
+  .v-bar:nth-child(4) { height: 26px; }
+  .v-bar:nth-child(5) { height: 44px; }
+  .v-bar:nth-child(6) { height: 36px; }
+  .v-bar:nth-child(7) { height: 22px; }
+  .v-bar:nth-child(8) { height: 42px; }
+  .v-bar:nth-child(9) { height: 28px; }
+  .v-bar:nth-child(10) { height: 16px; }
+
+  /* 歌词区 */
+  .lyrics-stage {
+    z-index: 2; width: 100%; min-height: 200px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 0 30px;
+  }
+  .lyric-caption {
+    font-size: 54px; font-weight: 700; line-height: 1.5;
+    letter-spacing: 3px;
+    color: #ffffff;
+    text-shadow: 0 4px 24px rgba(0, 0, 0, 0.7);
+    max-width: 960px;
+  }
+
+  /* 底部播放进度条与引导 */
+  .bottom-section {
+    z-index: 2; width: 100%; display: flex; flex-direction: column; align-items: center;
+  }
+  .progress-bar-wrap {
+    width: 860px; margin-bottom: 26px;
+  }
+  .progress-line {
+    width: 100%; height: 6px; background: rgba(255, 255, 255, 0.15); border-radius: 3px;
+    position: relative; overflow: hidden;
+  }
+  .progress-fill {
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, {{accent1}} 0%, {{accent2}} 100%);
+    border-radius: 3px;
+  }
+  .progress-time {
+    display: flex; justify-content: space-between; margin-top: 10px;
+    font-size: 22px; color: #64748b; font-weight: 500; font-family: monospace;
+  }
+  .controls-mock {
+    display: flex; align-items: center; gap: 60px; margin-bottom: 28px;
+  }
+  .btn-icon {
+    font-size: 32px; color: #94a3b8; line-height: 1;
+  }
+  .btn-play {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: #ffffff; color: #000;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; box-shadow: 0 10px 25px rgba(255, 255, 255, 0.3);
+  }
+  .footer-text {
+    font-size: 28px; color: #94a3b8; letter-spacing: 3px; font-weight: 500;
+  }
+</style>
+</head>
+<body>
+  <div class="ambient-glow glow-tl"></div>
+  <div class="ambient-glow glow-br"></div>
+  <div class="ambient-glow glow-mid"></div>
+
+  <!-- 顶部信息 -->
+  <div class="header">
+    <div class="badge-row">
+      <span class="pill-tag">新歌上线</span>
+      <span class="hires-tag">Hi-Res</span>
+    </div>
+    <div class="song-title">{{title}}</div>
+    <div class="song-subtitle">{{subtitle}}</div>
+  </div>
+
+  <!-- 中间唱片封面 -->
+  <div class="player-stage">
+    <div class="cover-card-wrap">
+      <div class="vinyl-disc">
+        <div class="vinyl-center"><div class="vinyl-hole"></div></div>
+      </div>
+      <div class="cover-box">
+        <img class="cover-img" src="{{image}}" alt="Album Cover">
+      </div>
+    </div>
+    <!-- 律动频谱 -->
+    <div class="audio-visualizer">
+      <div class="v-bar"></div><div class="v-bar"></div><div class="v-bar"></div>
+      <div class="v-bar"></div><div class="v-bar"></div><div class="v-bar"></div>
+      <div class="v-bar"></div><div class="v-bar"></div><div class="v-bar"></div>
+      <div class="v-bar"></div>
+    </div>
+  </div>
+
+  <!-- 逐句歌词 -->
+  <div class="lyrics-stage">
+    <div class="lyric-caption">{{caption}}</div>
+  </div>
+
+  <!-- 底部播放条与平台收听指引 -->
+  <div class="bottom-section">
+    <div class="progress-bar-wrap">
+      <div class="progress-line">
+        <div class="progress-fill"></div>
+      </div>
+      <div class="progress-time">
+        <span>01:15</span>
+        <span>03:20</span>
+      </div>
+    </div>
+    <div class="controls-mock">
+      <span class="btn-icon">⏮</span>
+      <div class="btn-play">▶</div>
+      <span class="btn-icon">⏭</span>
+    </div>
+    <div class="footer-text">{{footer}}</div>
+  </div>
+</body>
+</html>

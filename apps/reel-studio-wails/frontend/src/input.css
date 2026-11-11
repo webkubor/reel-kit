@@ -1,0 +1,439 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * 基础层：只做浏览器默认行为的归零，不在这里另立一套色板。
+ * 所有颜色、字号、圆角、间距都来自 tailwind.config.js 的令牌。
+ */
+@layer base {
+  html,
+  body,
+  #app {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans text-sm antialiased;
+    /* 桌面应用不该整页被拖拽选中 —— 拖控件时选中文字很难看 */
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* 输入框里的文字要能选中复制 */
+  input,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-line-strong;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent/50 ring-offset-2 ring-offset-paper;
+  }
+}
+
+@layer components {
+  /* ── 按钮 ───────────────────────────────────────────────
+     一个界面里只允许有一个实心主按钮（开始制作）。
+     其余都是描边或无框 —— 层级靠底色和描边拉开，不靠堆颜色。
+     所有按钮共享同一套尺寸刻度与状态机，不给单个按钮开特例。 */
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap
+           rounded-md text-sm font-medium transition-colors duration-150
+           disabled:cursor-not-allowed disabled:opacity-45;
+  }
+  .btn-md {
+    @apply h-9 px-3.5;
+  }
+  .btn-sm {
+    @apply h-7 px-2.5 text-xs;
+  }
+  .btn-icon {
+    @apply h-8 w-8 p-0;
+  }
+
+  .btn-primary {
+    @apply bg-accent text-white hover:bg-accent-deep active:bg-accent-deep;
+  }
+  .btn-secondary {
+    @apply border border-line bg-surface text-ink hover:border-line-strong hover:bg-raised;
+  }
+  .btn-ghost {
+    @apply text-ink-mid hover:bg-raised hover:text-ink;
+  }
+  .btn-danger {
+    @apply border border-err/40 bg-surface text-err hover:border-err/20 hover:border-err/60;
+  }
+
+  /* ── 输入 ───────────────────────────────────────────────
+     标签 12/500，控件 36 高，内容 13。
+     聚焦时描边变主色 + 一圈 25% 透明度的同色晕，
+     键盘用户能看见，光标用户也能看见。 */
+  .field {
+    @apply mb-4 last:mb-0;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-medium text-ink-mid;
+  }
+  .label-hint {
+    @apply ml-1 font-normal text-ink-dim;
+  }
+  .help {
+    @apply mt-1.5 text-2xs leading-relaxed text-ink-lo;
+  }
+  .help-error {
+    @apply text-err;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-line bg-surface px-3 text-sm text-ink
+           placeholder:text-ink-dim
+           hover:border-line-strong
+           focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/25
+           disabled:cursor-not-allowed disabled:bg-raised disabled:text-ink-dim;
+  }
+  .input-md {
+    @apply h-9;
+  }
+  .input-sm {
+    @apply h-7 px-2.5 text-xs;
+  }
+  textarea.input {
+    @apply resize-y py-2 leading-7;
+  }
+
+  /* ── 下拉 ───────────────────────────────────────────────
+     不用原生 <select>：原生下拉由操作系统渲染，
+     半透明、圆角、字号全不听我们的，跟整屏纸面调性直接打架。
+
+     这里自绘一个 listbox：
+       触发器与输入框同规格（同高、同描边、同聚焦环），
+       菜单用面板白 + 圆角 10 + 一层浮起阴影，
+       选中项用主色 + 左侧一个方块标记，键盘 ↑↓ Enter Esc 全支持。 */
+  .select {
+    @apply relative inline-flex h-9 w-full cursor-pointer items-center justify-between gap-2
+           rounded-md border border-line bg-surface px-3 text-sm text-ink
+           hover:border-line-strong
+           focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/25;
+  }
+  .select-value {
+    @apply truncate;
+  }
+  .select-value.is-placeholder {
+    @apply text-ink-dim;
+  }
+  .select-arrow {
+    @apply shrink-0 text-ink-lo transition-transform duration-150;
+  }
+  .select[aria-expanded='true'] .select-arrow {
+    @apply rotate-180;
+  }
+
+  .select-menu {
+    @apply absolute left-0 top-[calc(100%+4px)] z-50 max-h-60 min-w-full
+           overflow-auto rounded-lg border border-line bg-surface py-1 shadow-pop;
+  }
+  .select-option {
+    @apply flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-sm text-ink-mid;
+  }
+  .select-option:hover,
+  .select-option.is-active {
+    @apply bg-raised text-ink;
+  }
+  .select-option[aria-selected='true'] {
+    @apply font-medium text-accent;
+  }
+  .select-tick {
+    @apply h-1.5 w-1.5 shrink-0 rounded-full bg-accent opacity-0;
+  }
+  .select-option[aria-selected='true'] .select-tick {
+    @apply opacity-100;
+  }
+
+  /* ── 面板 ─────────────────────────────────────────────── */
+  .panel {
+    @apply rounded-lg border border-line bg-surface shadow-card;
+  }
+  .panel-head {
+    @apply flex h-11 items-center justify-between border-b border-line px-4;
+  }
+  .panel-title {
+    @apply text-sm font-semibold tracking-tight text-ink;
+  }
+  .panel-body {
+    @apply p-4;
+  }
+
+  /* ── 徽章 ─────────────────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center rounded-sm bg-raised px-1.5 py-0.5 text-2xs font-medium text-ink-lo;
+  }
+  .badge-accent {
+    @apply bg-accent-soft text-accent;
+  }
+
+  /* ── 侧栏项目项 ───────────────────────────────────────── */
+  .project-item {
+    @apply flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-ink-mid
+           transition-colors hover:bg-raised hover:text-ink;
+  }
+  .project-item.is-active {
+    @apply bg-surface text-ink shadow-card;
+  }
+  .project-item.is-active .project-dot {
+    @apply bg-accent opacity-100;
+  }
+  .project-dot {
+    @apply h-1.5 w-1.5 shrink-0 rounded-full bg-line-strong opacity-0;
+  }
+
+  /* ── 素材格 ───────────────────────────────────────────── */
+  .asset-cell {
+    @apply relative aspect-square cursor-pointer overflow-hidden rounded-md border border-line
+           bg-raised transition-colors hover:border-line-strong;
+  }
+  .asset-cell img {
+    @apply h-full w-full object-cover;
+  }
+  .asset-cell.is-selected {
+    @apply border-accent ring-1 ring-accent/40;
+  }
+  .asset-cell-badge {
+    @apply absolute right-1 top-1 rounded-sm bg-black/55 px-1 text-[10px] text-white;
+  }
+
+  /* ── 工序行 ───────────────────────────────────────────── */
+  .step-row {
+    @apply flex items-center gap-2.5 rounded-md border border-line bg-raised px-3 py-2;
+  }
+  .step-row.is-running {
+    @apply border-accent/40 bg-accent-soft;
+  }
+  .step-row.is-failed {
+    @apply border-err/40 bg-err/10;
+  }
+  .step-mark {
+    @apply flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold;
+  }
+  .step-mark.is-done {
+    @apply bg-ok/10 text-ok;
+  }
+  .step-mark.is-running {
+    @apply bg-accent/20 text-accent;
+  }
+  .step-mark.is-failed {
+    @apply bg-err/20 text-err;
+  }
+  .step-mark.is-idle {
+    @apply bg-line text-ink-dim;
+  }
+  .step-label {
+    @apply min-w-0 flex-1 truncate text-xs font-medium text-ink;
+  }
+  .step-meta {
+    @apply shrink-0 truncate text-2xs text-ink-lo;
+  }
+
+  /* ── 画面台 ─────────────────────────────────────────────
+     画面台内部按成片尺寸 1080×1920 / 1920×1080 排版，
+     再用 transform 缩放到面板宽度 —— 比例和成片完全一致，
+     用户在面板里看到的位置关系就是成片里的位置关系。
+
+     这里的 CSS 规则与 templates/product-presenter.html、
+     templates/landscape-product.html 一一对应。
+     改了模板记得同步这里，否则面板和成片会对不上。 */
+  .stage {
+    @apply relative overflow-hidden rounded-lg bg-stage shadow-stage;
+  }
+  .stage-canvas {
+    @apply absolute left-0 top-0;
+    transform-origin: top left;
+  }
+
+  /* 竖版：满屏画面 + 顶部标题条 + 底部字幕 */
+  .mp {
+    width: 1080px;
+    height: 1920px;
+    position: relative;
+    overflow: hidden;
+    background: #0d0f11;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  }
+  .mp-scene {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .mp-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.5) 0%,
+      rgba(0, 0, 0, 0.05) 24%,
+      rgba(0, 0, 0, 0) 40%,
+      rgba(0, 0, 0, 0.55) 62%,
+      rgba(0, 0, 0, 0.93) 100%
+    );
+  }
+  .mp-bar {
+    position: absolute;
+    top: 5%;
+    left: 6%;
+    right: 6%;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .mp-tag {
+    font-size: 26px;
+    letter-spacing: 2px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 999px;
+    padding: 8px 22px;
+    color: #fff;
+    white-space: nowrap;
+  }
+  .mp-title {
+    font-size: 44px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: 0.5px;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mp-caption {
+    position: absolute;
+    left: 7%;
+    right: 7%;
+    bottom: 15%;
+  }
+  .mp-caption p {
+    margin: 0;
+    font-size: 40px;
+    line-height: 1.28;
+    font-weight: 700;
+    text-shadow: 0 3px 18px rgba(0, 0, 0, 0.75), 0 1px 3px rgba(0, 0, 0, 0.9);
+    word-break: break-word;
+  }
+  .mp-foot {
+    position: absolute;
+    left: 7%;
+    right: 7%;
+    bottom: 5%;
+    font-size: 30px;
+    color: rgba(255, 255, 255, 0.86);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .mp-foot::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #a7442d;
+  }
+
+  /* 横版：浅底 + 左图右文 */
+  .ml {
+    width: 1920px;
+    height: 1080px;
+    position: relative;
+    overflow: hidden;
+    background: #f6f5f2;
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+  }
+  .ml-arc {
+    position: absolute;
+    border-radius: 50%;
+  }
+  .ml-arc-tl {
+    width: 600px;
+    height: 540px;
+    top: -260px;
+    left: -120px;
+    background: #e2b8a6;
+  }
+  .ml-arc-br {
+    width: 540px;
+    height: 480px;
+    bottom: -220px;
+    right: -140px;
+    background: #cfd8c4;
+  }
+  .ml-pic {
+    z-index: 2;
+    width: 50%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 60px;
+  }
+  .ml-pic img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 32px;
+    filter: drop-shadow(0 12px 34px rgba(0, 0, 0, 0.16));
+  }
+  .ml-panel {
+    z-index: 2;
+    width: 50%;
+    padding: 80px 96px 80px 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .ml-title {
+    font-size: 88px;
+    font-weight: 800;
+    color: #1f1f1f;
+    letter-spacing: 2px;
+  }
+  .ml-subtitle {
+    margin-top: 24px;
+    font-size: 36px;
+    color: #9a9a9a;
+    letter-spacing: 4px;
+  }
+  .ml-caption {
+    margin-top: 64px;
+    font-size: 40px;
+    font-weight: 600;
+    color: #2a2a2a;
+    line-height: 1.5;
+  }
+  .ml-foot {
+    margin-top: 80px;
+    font-size: 28px;
+    color: #a5a5a5;
+    letter-spacing: 1px;
+  }
+
+  /* 成片视频 */
+  .stage-video {
+    @apply absolute inset-0 h-full w-full bg-stage object-contain;
+  }
+}

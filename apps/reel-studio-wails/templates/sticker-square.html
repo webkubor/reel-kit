@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  /*
+   * sticker-square — 1080×1080 方形(小红书图文 / 朋友圈九宫格)。
+   *
+   * 模板作者须知:
+   *   画布尺寸必须写在 body 的 width/height,render.mjs 会从这里读 viewport。
+   *   占位符 {{title}} {{subtitle}} {{caption}} {{image}} {{bg}} {{accent1}} {{accent2}}。
+   *   图片由 render.mjs 转成 data URI 注入,不要引外部资源。
+   */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1080px; height: 1080px;
+    background: {{bg}};
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center;
+  }
+
+  .arc { position: absolute; border-radius: 50%; }
+  .arc-tl { width: 520px; height: 460px; top: -200px; left: -80px; background: {{accent1}}; }
+  .arc-br { width: 480px; height: 420px; bottom: -180px; right: -100px; background: {{accent2}}; }
+
+  .title {
+    z-index: 2; margin-top: 96px;
+    font-size: 40px; font-weight: 700; color: #1f1f1f; letter-spacing: 2px;
+  }
+  .subtitle {
+    z-index: 2; margin-top: 10px;
+    font-size: 24px; color: #9a9a9a; letter-spacing: 6px;
+  }
+
+  /* 方形里图片占主导,给到 60% 高 */
+  .stage {
+    z-index: 2; width: 100%; flex: 0 1 auto;
+    display: flex; align-items: center; justify-content: center;
+    padding: 28px 100px 28px;
+  }
+  .stage img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    border-radius: 24px;
+    filter: drop-shadow(0 10px 28px rgba(0,0,0,0.14));
+  }
+
+  .caption {
+    z-index: 2; text-align: center;
+    font-size: 52px; font-weight: 700; color: #1f1f1f;
+    line-height: 1.4; padding: 0 80px;
+    min-height: 72px;
+    margin-bottom: 96px;
+  }
+</style>
+</head>
+<body>
+  <div class="arc arc-tl"></div>
+  <div class="arc arc-br"></div>
+  <div class="title">{{title}}</div>
+  <div class="subtitle">{{subtitle}}</div>
+  <div class="stage"><img src="{{image}}" alt=""></div>
+  <div class="caption">{{caption}}</div>
+</body>
+</html>
