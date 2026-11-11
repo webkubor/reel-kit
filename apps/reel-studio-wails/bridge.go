@@ -18,12 +18,15 @@ func NewApp() *App {
 	return &App{engine: NewEngine()}
 }
 
-// startup 是窗口起来时做的事：零 HTTP 下没有子进程要拉起，直接就绪。
-func (a *App) startup(_ context.Context) {}
+// startup 是窗口起来时做的事：拉起任务队列 worker，其余零 HTTP 无子进程要拉起。
+func (a *App) startup(_ context.Context) {
+	a.engine.Start()
+}
 
-// shutdown 是退出时做的事：零 HTTP 下没有子进程要回收。
+// shutdown 是退出时做的事：停掉 worker 与本机语音服务。
 func (a *App) shutdown(_ context.Context) {
 	a.engine.Stop()
+	a.engine.StopVoxcraft()
 }
 
 // Status 给界面问引擎状态用（Go 绑定，前端调 window.go…Status()）。
