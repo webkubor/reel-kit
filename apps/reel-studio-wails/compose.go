@@ -228,14 +228,14 @@ func composeWithXfade(ctx context.Context, frames []string, durations []float64,
 		))
 	}
 
-	var prev string
+	prev := "[v0]"
 	if x > 0 {
 		prev = "[v0]"
 		boundary := durations[0]
 		for i := 1; i < len(frames); i++ {
 			outLabel := fmt.Sprintf("[vt%d]", i)
 			filters = append(filters, fmt.Sprintf(
-				"%s[%d:v]xfade=transition=%s:duration=%.6f:offset=%.6f%s",
+				"%s[v%d]xfade=transition=%s:duration=%.6f:offset=%.6f%s",
 				prev, i, xfadeType, x, boundary, outLabel,
 			))
 			prev = outLabel

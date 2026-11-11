@@ -48,38 +48,43 @@ jobs:
           node --test test/readme-cli.test.mjs
           node scripts/check-readme-cli.mjs
 
-  # 桌面端是 Go 原生界面：它的交互测试（版式几何、配置回填、对比选择器、
-  # 截图走查）不开窗口就能跑，值得在 CI 里当门禁。
+  # The shipping desktop product is Wails + the Go engine.
   desktop:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.27.3'
-          cache-dependency-path: apps/reel-studio/go.sum
-      - name: 桌面端构建与测试
-        working-directory: apps/reel-studio
+          go-version-file: apps/reel-studio-wails/go.mod
+          cache-dependency-path: apps/reel-studio-wails/go.sum
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Compile frontend (build time only)
+        working-directory: apps/reel-studio-wails/frontend
         run: |
+          node --check src/app.js
+          node --check src/select.js
+          bash build.sh
+          git diff --exit-code -- dist
+      - name: Install media test dependencies
+        run: brew install ffmpeg
+      - name: Go engine and media regression tests
+        working-directory: apps/reel-studio-wails
+        run: |
+          go vet ./...
+          go test -race -count=1 ./...
           go build ./...
-          go test ./...
 
-  # Windows 是唯一一个我们没法在本地真机验证的平台：
-  # 桌面端是原生窗口，路径分隔符、日志目录、崩溃日志落点、临时目录位置
-  # 全都和 macOS 不同（%TEMP% vs /tmp，%APPDATA% vs ~/Library）。
-  # 排障链路（脱敏、导出、崩溃日志）恰恰是最吃平台差异的地方，
-  # 所以在 Windows runner 上跑同一套交互测试 —— 把「Windows 上会不会崩、
-  # 报错能不能带出来」提前到 CI，而不是等用户报错再修。
   desktop-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.27.3'
-          cache-dependency-path: apps/reel-studio/go.sum
-      - name: 桌面端构建与测试（Windows）
-        working-directory: apps/reel-studio
+          go-version-file: apps/reel-studio-wails/go.mod
+          cache-dependency-path: apps/reel-studio-wails/go.sum
+      - name: Go engine build and tests (Windows)
+        working-directory: apps/reel-studio-wails
         run: |
           go build ./...
           go test ./...

@@ -24,8 +24,8 @@ module.exports = {
         ink: {
           DEFAULT: '#22252a',
           mid: '#5b6169',
-          lo: '#868d95',
-          dim: '#aab0b6',
+          lo: '#616873',
+          dim: '#6c7178',
         },
 
         // 描边两档

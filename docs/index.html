@@ -45,25 +45,25 @@
   <!-- ───── Reel Studio 桌面版 ───── -->
   <section class="studio" id="studio">
     <div class="studio-head">
-      <h2>四条流水线，填表就能出片</h2>
+      <h2>本机离线制作，文案变成短片</h2>
       <p class="section-intro">
-        应用左侧是四条视频流水线，点进去中间是这条流水线的配置，右边是它跑出来的视频。
-        自包含安装包内含 Node、Chrome、FFmpeg 与 MuseAV CLI；配音引擎也一起打包，不用再单独装；
+        Reel Studio 1.6.0 使用 Wails + Go，左侧填写文案，右侧播放成片。
+        包内提供离线中文语音、Chrome 与 FFmpeg，无 Node 运行时、无本地 HTTP 业务服务。
         素材与成片留在你自己电脑上。
       </p>
     </div>
     <div class="studio-grid">
       <div class="studio-card">
-        <h3>GitHub 项目推荐</h3>
-        <p>输入仓库地址 → 分镜 → 逐句配音 → 带解说的项目介绍视频。</p>
+        <h3>项目与素材</h3>
+        <p>新建项目、导入图片，按项目保存素材、任务记录与历史成片。</p>
       </div>
       <div class="studio-card">
-        <h3>知识口播 / 观点解读</h3>
-        <p>写一段脚本，一行一镜，逐句配音自动对时长；44 套视觉风格，没有素材也能先出片。</p>
+        <h3>逐句离线配音</h3>
+        <p>一行一句、一句一镜，按真实语音时长安排画面；最多 8 句，每句 80 字。</p>
       </div>
       <div class="studio-card">
         <h3>合成与导出</h3>
-        <p>按顺序把素材、配音、BGM 合成成片，导出到本地项目。</p>
+        <p>在应用里播放真实成片，通过系统保存对话框导出 MP4；制作中可以取消。</p>
       </div>
       <div class="studio-card">
         <h3>人物商品介绍</h3>
@@ -71,43 +71,19 @@
       </div>
     </div>
     <div class="studio-download">
-      <a class="install" href="https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/reel-studio-1.5.0-darwin-arm64.tar.gz">下载 macOS（Apple Silicon · 289 MB）</a>
-      <a class="install secondary" href="https://github.com/webkubor/reel-kit/releases/download/app-v1.4.0/reel-studio-1.4.0-windows-amd64.tar.gz">下载 Windows（x64，347 MB）</a>
+      <a class="install" href="https://github.com/webkubor/reel-kit/releases/download/app-v1.6.0/reel-studio-1.6.0-darwin-arm64.zip">下载 macOS（Apple Silicon）</a>
       <p class="studio-meta">
-        macOS v1.5.0（另有 <a href="https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/reel-studio-1.5.0-arm64.dmg">dmg</a>）/ Windows 1.4.0 ·
-        <a href="https://github.com/webkubor/reel-kit/releases/tag/app-v1.5.0">发布页与校验值</a> ·
-        <a href="https://github.com/webkubor/reel-kit/releases/latest">历史版本</a>
+        v1.6.0 · macOS 13+ · 本版暂不提供 Windows 安装包 ·
+        <a href="https://github.com/webkubor/reel-kit/releases/tag/app-v1.6.0">发布页与校验值</a> ·
+        <a href="https://github.com/webkubor/reel-kit/releases">历史版本</a>
       </p>
     </div>
     <div class="studio-firstrun">
-      <h3>第一次用，不用再装任何东西</h3>
-      <p>
-        配音引擎随应用一起打包，下载解压就能出声：<strong>不联网、不产生费用、
-        声音不出本机</strong>。macOS 与 Windows 是同一套模型、同一个调用方式。
-      </p>
-      <p class="studio-meta">
-        只有「克隆自己的声音」和「设计音色」这两件事需要
-        <a href="https://github.com/webkubor/voxflow" target="_blank" rel="noopener">VoxFlow</a>
-        （Apple 芯片的 Mac，本机推理）。它是可选的 —— 装不装都不影响出片，
-        也不影响自带引擎配音。
-      </p>
-      <p class="studio-meta">
-        <strong>macOS 第一次打开会被 Gatekeeper 拦一下</strong>（这个包没做苹果公证）：
-        右键点应用选「打开」再点「打开」就行，或在终端里执行
-        <code>xattr -dr com.apple.quarantine "/Applications/Reel Studio.app"</code>。
-        Windows 同样没做代码签名，被 SmartScreen 拦时选「仍要运行」。
-      </p>
-      <p class="studio-meta">
-        <strong>遇到问题怎么反馈：</strong>在「设置与反馈 → 运行日志」选择「导出排障报告」，
-        检查其中是否包含私人信息后，把报告附到 <a href="https://github.com/webkubor/reel-kit/issues/new/choose">问题反馈</a>。
-        Windows 启动闪退时，可在资源管理器输入 <code>%TEMP%</code> 查找 <code>reel-studio-crash.log</code>；
-        部分启动错误可能不会生成日志。Windows 版的图形界面仍在真实用户实测中，欢迎把遇到的问题直接发给我们。
-      </p>
-      <p class="studio-meta">
-        图片与视频默认走 MuseAV 中台与 MiniMax；也可以在「设置与反馈 → 模型通道」里
-        填上你自己的中转站或厂商直连 —— 在设置页填一次就行，不用改配置文件，
-        密钥也不会出现在界面里。
-      </p>
+      <h3>离线资源随包提供</h3>
+      <p>中文配音使用 sherpa-onnx：不联网、不按调用计费。缺少资源时显示错误，不偷偷切换到云服务。</p>
+      <p class="studio-meta"><strong>签名状态：</strong>ad-hoc 签名、未 Apple 公证，macOS 可能拦截首次启动。当前需要手动下载更新。</p>
+      <p class="studio-meta"><strong>MVP 边界：</strong>编辑画面为示意；草稿只在当前进程内暂存。尚未提供云 TTS、声音克隆、AI 素材生成或旧项目自动迁移。</p>
+      <p class="studio-meta">失败时查看「制作过程」，复制错误并移除私人路径后提交 <a href="https://github.com/webkubor/reel-kit/issues/new/choose">问题反馈</a>。</p>
     </div>
   </section>
 
@@ -117,7 +93,7 @@
     <section>
       <h2>桌面应用底下，是一套能自己搭的引擎</h2>
       <p class="section-intro">
-        应用和命令行跑的是同一条流水线。想批量出片、接进自己的流程，或者改模板，都可以直接用命令行。
+        仓库另外提供独立的 CLI/库，适合批量出片和模板开发；以下能力属于 CLI，不代表桌面 MVP 已开放全部入口。
       </p>
       <div class="features">
         <div class="feature">

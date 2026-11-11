@@ -31,4 +31,4 @@ cp "$resources/bin/ffmpeg" "$resources/bin/ffprobe" "$app/Contents/Resources/bin
 codesign --force --deep --sign - "$app"
 codesign --verify --deep --strict "$app"
 printf '本地测试应用：%s\n' "$app"
-printf '注意：这是临时自签名构建，未公证，不能作为正式分发包。\n'
+printf '签名：ad-hoc；未 Apple 公证。分发说明必须保留此状态。\n'

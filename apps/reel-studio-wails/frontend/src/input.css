@@ -15,9 +15,9 @@
 
   body {
     @apply bg-paper text-ink font-sans text-sm antialiased;
-    /* 桌面应用不该整页被拖拽选中 —— 拖控件时选中文字很难看 */
-    -webkit-user-select: none;
-    user-select: none;
+    /* Status and errors remain selectable for copying into a report. */
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   /* 输入框里的文字要能选中复制 */

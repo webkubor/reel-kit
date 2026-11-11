@@ -4,7 +4,9 @@
 
 **短视频合成引擎 · AI 无人值守的批量装配器**(用户 2026-08-24 拍板定位)。
 
-素材 + 逐句文案 + 配音/BGM → mp4。**CLI + 库单形态。**
+素材 + 逐句文案 + 配音/BGM → mp4。独立 CLI/库保留；现行桌面产品为 `apps/reel-studio-wails`（Wails + Go）。
+
+桌面 UI 改动前读 `apps/reel-studio-wails/DESIGN.md` 并加载 `cs skill show ui-design`。发版遵循 `docs/desktop-release.md`；不再将 MyGo/Node 实现作为桌面发布目标。
 
 定位边界(明确不做什么):
 - **不生成视频**(AI 出视频是上游 Hailuo 这类工具的事,reel-kit 不做)

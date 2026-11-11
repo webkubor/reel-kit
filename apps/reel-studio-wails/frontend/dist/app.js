@@ -283,6 +283,8 @@
         title: $('f-title').value,
         subtitle: $('f-subtitle').value,
         lines: $('f-lines').value,
+        ratio: state.ratio,
+        selectedAsset: state.selectedAsset,
       }
     }
     stopPolling()
@@ -292,7 +294,11 @@
     $('f-subtitle').value = draft.subtitle || ''
     $('f-lines').value = draft.lines || ''
     paintLineCount()
-    state.selectedAsset = ''
+    state.ratio = draft.ratio || '9:16'
+    if (selects.ratio) selects.ratio.setItems(layoutItems(), state.ratio)
+    paintLayout()
+    paintVoiceHint()
+    state.selectedAsset = draft.selectedAsset || ''
     state.assets = []
     state.videos = []
     state.videoId = ''
@@ -635,13 +641,14 @@
     var empty = $('steps-empty')
     clear(box)
     var job = state.job
+    var labels = { queued: '排队中', running: '制作中', succeeded: '已完成', failed: '制作失败', canceled: '已取消', interrupted: '已中断' }
+    $('job-state').textContent = job ? (labels[job.status] || job.status || '') : ''
+    if (job && job.message && (job.status === 'queued' || job.status === 'running')) $('run-hint').textContent = job.message
     if (!job || !job.steps || !job.steps.length) {
       empty.classList.remove('hidden')
-      $('job-state').textContent = ''
       return
     }
     empty.classList.add('hidden')
-    $('job-state').textContent = job.status || ''
 
     job.steps.forEach(function (step) {
       var row = el('div', 'step-row')
