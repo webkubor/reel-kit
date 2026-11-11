@@ -1,6 +1,9 @@
 # 构建产物不进 git：应用包里有几百兆的运行时。
 /build/*
 !/build/darwin/
+# 应用图标源与母版（wails build 从这里生成 .icns），跟随品牌版本化。
+!/build/appicon.png
+!/build/appicon.svg
 
 # Wails 自动生成的绑定，编译时现生成即可。
 /frontend/wailsjs/
