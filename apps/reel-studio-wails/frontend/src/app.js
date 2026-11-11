@@ -1,8 +1,8 @@
 /**
  * Reel Studio 本地控制台。
  *
- * 所有数据都来自 Go 绑定（window.go.main.Engine / .App），不发一个 HTTP 请求 ——
- * 界面调的就是本机内存里的 Go 方法。
+ * 业务操作通过 Go 绑定（window.go.main.Engine / .App），无本地 HTTP 业务服务。
+ * 本地媒体由 Wails AssetServer 提供；显式 AI 请求由 Go 连接用户配置的服务。
  *
  * 布局：左边「写什么」，右边「出来什么样」。
  * 右边那块深色画面台按成片尺寸排版再缩放，比例和成片完全一致。
@@ -24,6 +24,12 @@
     ratio: '9:16',
     voiceBackend: 'sherpa',
     job: null,
+    jobs: [],
+    inspectedJob: null,
+    mode: 'form',
+    motion: 'gentle',
+    transition: 'none',
+    planId: '',
     pollTimer: null,
     stageScale: 1,
   }
@@ -65,6 +71,16 @@
   // ── 启动 ──────────────────────────────────────────────
   function boot() {
     wire()
+    selects.motion = window.ReelSelect.create($('select-motion'), {
+      items: [{ value: 'none', label: '静态画面' }, { value: 'gentle', label: '轻柔运镜' }],
+      value: state.motion,
+      onChange: function (value) { state.motion = value },
+    })
+    selects.transition = window.ReelSelect.create($('select-transition'), {
+      items: [{ value: 'none', label: '硬切' }, { value: 'fade', label: '淡入淡出' }],
+      value: state.transition,
+      onChange: function (value) { state.transition = value },
+    })
     engine()
       .Status()
       .then(function (status) {
@@ -145,6 +161,16 @@
         .catch(fail)
     })
 
+    $('btn-ai-settings').addEventListener('click', openAISettings)
+    $('ai-cancel').addEventListener('click', function () { $('ai-key').value = ''; $('ai-dialog').close() })
+    $('ai-dialog').addEventListener('close', function () { $('ai-key').value = '' })
+    $('ai-settings-form').addEventListener('submit', saveAISettings)
+    $('ai-test').addEventListener('click', testAISettings)
+    $('ai-clear-key').addEventListener('click', clearAIKey)
+    $('btn-generate-plan').addEventListener('click', generatePlan)
+    $('mode-form').addEventListener('click', function () { setMode('form') })
+    $('mode-code').addEventListener('click', function () { setMode('code') })
+    $('btn-view-image').addEventListener('click', showImage)
     $('btn-pick-images').addEventListener('click', pickImages)
     $('btn-export').addEventListener('click', function () {
       if (!state.projectId || !state.videoId) return
@@ -163,6 +189,106 @@
     })
 
     window.addEventListener('resize', layoutStage)
+  }
+
+  function openAISettings() {
+    $('ai-settings-status').textContent = '读取设置中…'
+    $('ai-dialog').showModal()
+    engine().GetAISettings().then(function (settings) {
+      $('ai-url').value = settings.baseUrl || ''
+      $('ai-model').value = settings.model || ''
+      $('ai-key').value = ''
+      $('ai-key-status').textContent = settings.hasKey ? '此地址已有钥匙串密钥；留空保持不变。' : '密钥保存在系统钥匙串，不写入项目或日志。'
+      $('ai-settings-status').textContent = ''
+    }).catch(function (err) { $('ai-settings-status').textContent = '读取失败：' + err })
+  }
+
+  function saveAISettings(event) {
+    event.preventDefault()
+    var settings = { baseUrl: $('ai-url').value.trim(), model: $('ai-model').value.trim(), hasKey: false }
+    var key = $('ai-key').value
+    $('ai-settings-status').textContent = '保存中…'
+    engine().SaveAISettings(settings, key).then(function (saved) {
+      $('ai-key').value = ''
+      $('ai-key-status').textContent = saved.hasKey ? '此地址已有钥匙串密钥；留空保持不变。' : '此地址没有已保存的密钥。'
+      $('ai-settings-status').textContent = '已保存。可检查连接；检查不会提交生成请求。'
+    }).catch(function (err) { $('ai-settings-status').textContent = '保存失败：' + err })
+  }
+
+  function testAISettings() {
+    $('ai-settings-status').textContent = '检查中…'
+    engine().GetAISettings().then(function (saved) {
+      if (saved.baseUrl !== $('ai-url').value.trim().replace(/\/+$/, '') || saved.model !== $('ai-model').value.trim() || $('ai-key').value) {
+        throw new Error('请先保存当前填写的设置，再检查连接。')
+      }
+      return engine().CheckAIConnection()
+    }).then(function (message) { $('ai-settings-status').textContent = message })
+      .catch(function (err) { $('ai-settings-status').textContent = '检查失败：' + err })
+  }
+
+  function clearAIKey() {
+    engine().GetAISettings().then(function (saved) {
+      if (saved.baseUrl !== $('ai-url').value.trim().replace(/\/+$/, '')) {
+        throw new Error('地址尚未保存，请先保存或重新打开设置，再移除该地址的密钥。')
+      }
+      return engine().ClearAIKey()
+    }).then(function () {
+      $('ai-key').value = ''
+      $('ai-key-status').textContent = '已移除已保存地址的钥匙串密钥。'
+    }).catch(function (err) { $('ai-settings-status').textContent = '移除失败：' + err })
+  }
+
+  function planFromForm() {
+    return { title: $('f-title').value.trim(), subtitle: $('f-subtitle').value.trim(), ratio: state.ratio, lines: splitLines($('f-lines').value) }
+  }
+
+  function validatePlan(plan) {
+    if (!plan || typeof plan.title !== 'string' || typeof plan.subtitle !== 'string' || !Array.isArray(plan.lines) || ['9:16', '16:9'].indexOf(plan.ratio) < 0 ||
+        Array.from(plan.title).length > 40 || Array.from(plan.subtitle).length > 40 || plan.lines.length < 1 || plan.lines.length > 8 ||
+        plan.lines.some(function (line) { return typeof line !== 'string' || !line.trim() || Array.from(line).length > 80 })) {
+      throw new Error('分镜需包含 title、subtitle、ratio（9:16 或 16:9）和 1–8 条不超过 80 字的 lines。')
+    }
+    return plan
+  }
+
+  function applyPlan(plan) {
+    validatePlan(plan)
+    $('f-title').value = plan.title
+    $('f-subtitle').value = plan.subtitle
+    $('f-lines').value = plan.lines.join('\n')
+    state.ratio = plan.ratio
+    if (selects.ratio) selects.ratio.setItems(layoutItems(), state.ratio)
+    paintLineCount()
+    paintLayout()
+    paintStage()
+  }
+
+  function setMode(mode) {
+    if (mode === state.mode) return true
+    try {
+      if (mode === 'code') $('f-code').value = JSON.stringify(planFromForm(), null, 2)
+      else applyPlan(validatePlan(JSON.parse($('f-code').value)))
+    } catch (err) { fail(err); return false }
+    state.mode = mode
+    $('form-editor').classList.toggle('hidden', mode !== 'form')
+    $('code-editor').classList.toggle('hidden', mode !== 'code')
+    $('mode-form').setAttribute('aria-pressed', mode === 'form' ? 'true' : 'false')
+    $('mode-code').setAttribute('aria-pressed', mode === 'code' ? 'true' : 'false')
+    return true
+  }
+
+  function generatePlan() {
+    var prompt = $('ai-prompt').value.trim()
+    if (!state.projectId || !prompt) { fail('请先选择项目并填写生成要求。'); return }
+    var projectID = state.projectId
+    setRunning(true)
+    state.inspectedJob = null
+    engine().SubmitJob(projectID, { kind: 'storyboard', prompt: prompt }).then(function (job) {
+      if (projectID !== state.projectId) return
+      state.job = job
+      renderSteps()
+      startPolling()
+    }).catch(function (err) { if (projectID === state.projectId) { setRunning(false); fail(err) } })
   }
 
   function openProjectDialog() {
@@ -208,7 +334,7 @@
   function paintLayout() {
     var layout = currentLayout()
     $('layout-badge').textContent = layout
-      ? layout.label + ' · ' + layout.width + '×' + layout.height
+      ? layout.label
       : '—'
     $('preview-meta').textContent = layout ? layout.width + ' × ' + layout.height : '—'
   }
@@ -285,6 +411,13 @@
         lines: $('f-lines').value,
         ratio: state.ratio,
         selectedAsset: state.selectedAsset,
+        prompt: $('ai-prompt').value,
+        code: $('f-code').value,
+        mode: state.mode,
+        motion: state.motion,
+        transition: state.transition,
+        pause: $('f-pause').value,
+        planId: state.planId,
       }
     }
     stopPolling()
@@ -293,6 +426,19 @@
     $('f-title').value = draft.title || ''
     $('f-subtitle').value = draft.subtitle || ''
     $('f-lines').value = draft.lines || ''
+    $('ai-prompt').value = draft.prompt || ''
+    $('f-code').value = draft.code || ''
+    $('f-pause').value = draft.pause || '0.4'
+    state.motion = draft.motion || 'gentle'
+    state.transition = draft.transition || 'none'
+    if (selects.transition) selects.transition.setItems([{value: 'none', label: '硬切'}, {value: 'fade', label: '淡入淡出'}], state.transition)
+    state.planId = draft.planId || ''
+    if (selects.motion) selects.motion.setItems([{value: 'none', label: '静态画面'}, {value: 'gentle', label: '轻柔运镜'}], state.motion)
+    state.mode = draft.mode || 'form'
+    $('form-editor').classList.toggle('hidden', state.mode !== 'form')
+    $('code-editor').classList.toggle('hidden', state.mode !== 'code')
+    $('mode-form').setAttribute('aria-pressed', state.mode === 'form' ? 'true' : 'false')
+    $('mode-code').setAttribute('aria-pressed', state.mode === 'code' ? 'true' : 'false')
     paintLineCount()
     state.ratio = draft.ratio || '9:16'
     if (selects.ratio) selects.ratio.setItems(layoutItems(), state.ratio)
@@ -304,6 +450,9 @@
     state.videoId = ''
     renderVideos()
     state.job = null
+    state.jobs = []
+    state.inspectedJob = null
+    renderJobs()
     setRunning(false)
     renderProjects()
     renderSteps()
@@ -316,7 +465,9 @@
     if (!projectID) return
     engine().ListJobs().then(function (jobs) {
       if (state.projectId !== projectID || state.job) return
-      var job = (jobs || []).filter(function (item) { return item.projectId === projectID })[0]
+      state.jobs = (jobs || []).filter(function (item) { return item.projectId === projectID })
+      renderJobs()
+      var job = state.jobs[0]
       if (!job) return
       state.job = job
       renderSteps()
@@ -379,6 +530,7 @@
     if (!state.assets.length) {
       empty.classList.remove('hidden')
       $('asset-selected').textContent = '未选择'
+      $('btn-view-image').classList.add('hidden')
       return
     }
     empty.classList.add('hidden')
@@ -391,7 +543,9 @@
       img.src = '/media/' + asset.id
       img.alt = asset.name
       cell.appendChild(img)
-      cell.appendChild(el('span', 'asset-cell-badge', asset.width + '×' + asset.height))
+      if (asset.width && asset.height) {
+        cell.appendChild(el('span', 'asset-cell-badge', asset.width + '×' + asset.height))
+      }
       cell.addEventListener('click', function () {
         state.selectedAsset = asset.id === state.selectedAsset ? '' : asset.id
         renderAssets()
@@ -400,6 +554,7 @@
       grid.appendChild(cell)
     })
     var selected = findAsset(state.selectedAsset)
+    $('btn-view-image').classList.toggle('hidden', !selected)
     $('asset-selected').textContent = selected ? selected.name : '未选择'
   }
 
@@ -422,6 +577,7 @@
     var video = $('stage-video')
     video.pause()
     video.classList.add('hidden')
+    $('stage-image').classList.add('hidden')
     $('btn-export').classList.add('hidden')
     $('stage-note').textContent = '画面示意 · 最终以成片为准'
     var canvas = $('stage-canvas')
@@ -506,6 +662,9 @@
 
   // ── 跑任务 ────────────────────────────────────────────
   function submit() {
+    if (state.mode === 'code') {
+      try { applyPlan(validatePlan(JSON.parse($('f-code').value))) } catch (err) { fail(err); return }
+    }
     var lines = splitLines($('f-lines').value)
     if (!state.projectId) {
       $('run-hint').textContent = '先建一个项目。'
@@ -532,6 +691,8 @@
     }
     $('run-hint').classList.remove('help-error')
 
+    var pause = Number($('f-pause').value)
+    if (!Number.isFinite(pause) || pause < 0 || pause > 2) { fail('句间停顿须在 0 到 2 秒之间。'); return }
     var layout = currentLayout()
     var input = {
       kind: 'product',
@@ -544,9 +705,14 @@
       width: layout ? layout.width : 1080,
       height: layout ? layout.height : 1920,
       assetIds: state.selectedAsset ? [state.selectedAsset] : [],
+      prompt: $('ai-prompt').value.trim(),
+      planId: state.planId,
+      editingMode: state.mode,
+      settings: { pause: pause, motion: state.motion, transition: state.transition },
     }
 
     setRunning(true)
+    state.inspectedJob = null
     var submittedProjectID = state.projectId
     engine()
       .SubmitJob(submittedProjectID, input)
@@ -557,8 +723,7 @@
         startPolling()
       })
       .catch(function (err) {
-        setRunning(false)
-        fail(err)
+        if (submittedProjectID === state.projectId) { setRunning(false); fail(err) }
       })
   }
 
@@ -571,6 +736,7 @@
 
   function setRunning(running) {
     $('btn-run').disabled = running
+    $('btn-generate-plan').disabled = running
     $('btn-run').textContent = running ? '制作中…' : '开始制作'
     $('btn-cancel').classList.toggle('hidden', !running)
   }
@@ -609,7 +775,19 @@
   }
 
   function onJobFinished(job) {
-    if (job.status === 'succeeded' && job.assetId) {
+    refreshJobs()
+    if (job.status === 'succeeded' && job.assetId && job.input && job.input.kind === 'storyboard') {
+      var projectID = state.projectId
+      engine().ReadStoryboard(projectID, job.assetId).then(function (plan) {
+        if (state.projectId !== projectID) return
+        applyPlan(plan)
+        state.planId = job.assetId
+        if (state.mode !== 'code') setMode('code')
+        else $('f-code').value = JSON.stringify(plan, null, 2)
+        $('run-hint').textContent = '分镜已生成，请审阅后开始制作。'
+        $('run-hint').classList.remove('help-error')
+      }).catch(fail)
+    } else if (job.status === 'succeeded' && job.assetId) {
       showVideo(job.assetId)
       loadAssets()
       $('run-hint').textContent = '成片好了。'
@@ -623,7 +801,19 @@
     }
   }
 
+  function showImage() {
+    if (!state.selectedAsset) return
+    $('stage-video').pause()
+    $('stage-video').classList.add('hidden')
+    $('stage-canvas').classList.add('hidden')
+    $('btn-export').classList.add('hidden')
+    $('stage-image').src = '/media/' + state.selectedAsset
+    $('stage-image').classList.remove('hidden')
+    $('stage-note').textContent = '图片原图 · ' + (findAsset(state.selectedAsset).name || '')
+  }
+
   function showVideo(assetID) {
+    $('stage-image').classList.add('hidden')
     var video = $('stage-video')
     var canvas = $('stage-canvas')
     state.videoId = assetID
@@ -635,13 +825,72 @@
     layoutStage()
   }
 
+  function refreshJobs() {
+    var projectID = state.projectId
+    if (!projectID) return
+    engine().ListJobs().then(function (jobs) {
+      if (state.projectId !== projectID) return
+      state.jobs = (jobs || []).filter(function (job) { return job.projectId === projectID })
+      renderJobs()
+    }).catch(fail)
+  }
+
+  function renderJobs() {
+    var box = $('job-list')
+    clear(box)
+    if (!state.jobs.length) {
+      box.appendChild(el('p', 'text-2xs text-ink-lo', '这里会保存生成要求与每次制作过程。'))
+      return
+    }
+    state.jobs.forEach(function (job) {
+      var input = job.input || {}
+      var title = input.kind === 'storyboard' ? 'AI 分镜' : '视频制作'
+      var row = el('div', 'flex items-center gap-2')
+      var button = el('button', 'btn btn-ghost btn-sm min-w-0 flex-1 justify-start', title + ' · ' + (job.createdAt || '').replace('T', ' ').slice(0, 16))
+      button.type = 'button'
+      button.addEventListener('click', function () {
+        state.inspectedJob = job
+        renderSteps()
+        if (input.kind === 'product' && job.status === 'succeeded' && job.assetId) showVideo(job.assetId)
+      })
+      row.appendChild(button)
+      if (input.kind === 'storyboard' && job.status === 'succeeded' && job.assetId) {
+        var use = el('button', 'btn btn-secondary btn-sm', '载入分镜')
+        use.type = 'button'
+        use.addEventListener('click', function () {
+          var projectID = state.projectId
+          engine().ReadStoryboard(projectID, job.assetId).then(function (plan) {
+            if (state.projectId !== projectID) return
+            applyPlan(plan)
+            state.planId = job.assetId
+            $('ai-prompt').value = input.prompt || ''
+            if (state.mode !== 'code') setMode('code')
+            else $('f-code').value = JSON.stringify(plan, null, 2)
+          }).catch(fail)
+        })
+        row.appendChild(use)
+      }
+      box.appendChild(row)
+    })
+  }
+
   // ── 工序 ──────────────────────────────────────────────
   function renderSteps() {
     var box = $('steps')
     var empty = $('steps-empty')
     clear(box)
-    var job = state.job
+    var job = state.inspectedJob || state.job
     var labels = { queued: '排队中', running: '制作中', succeeded: '已完成', failed: '制作失败', canceled: '已取消', interrupted: '已中断' }
+    var input = job && job.input ? job.input : {}
+    var upstream = job && job.upstream ? job.upstream : {}
+    var details = []
+    if (input.prompt) details.push('生成要求：' + input.prompt)
+    if (Array.isArray(input.lines)) details.push('分镜文案：\n' + input.lines.join('\n'))
+    if (upstream.requestedModel) details.push('请求模型：' + upstream.requestedModel)
+    if (upstream.actualModel) details.push('实际模型：' + upstream.actualModel)
+    if (job && job.message) details.push('状态：' + job.message)
+    if (job && job.error) details.push('错误：' + job.error)
+    $('job-detail').textContent = details.join('\n')
     $('job-state').textContent = job ? (labels[job.status] || job.status || '') : ''
     if (job && job.message && (job.status === 'queued' || job.status === 'running')) $('run-hint').textContent = job.message
     if (!job || !job.steps || !job.steps.length) {
@@ -676,6 +925,10 @@
       row.appendChild(el('span', 'step-label', step.label))
       var meta = step.engine || step.origin || ''
       if (step.detail) meta = meta ? meta + ' · ' + step.detail : step.detail
+      if (step.startedAt && step.endedAt) {
+        var seconds = (Date.parse(step.endedAt) - Date.parse(step.startedAt)) / 1000
+        if (Number.isFinite(seconds) && seconds >= 0) meta += ' · ' + seconds.toFixed(1) + ' 秒'
+      }
       if (step.error) meta = step.error
       row.appendChild(el('span', 'step-meta', meta))
       box.appendChild(row)

@@ -52,7 +52,7 @@ function fixture(t) {
   const template = join(dir, 'template.html')
   writeFileSync(template, TEMPLATE)
   const image = join(dir, 'a.png')
-  execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=0x3366aa:s=240x240', '-frames:v', '1', '-update', '1', image])
+  execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=s=240x240:r=1', '-frames:v', '1', '-update', '1', image])
   return { dir, template, image }
 }
 
@@ -118,7 +118,7 @@ test('动效只作用于这一镜的画面，模板自带的装饰图不动', as
   const template = join(dir, 'template.html')
   writeFileSync(template, TEMPLATE_WITH_LOGO)
   const image = join(dir, 'a.png')
-  execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=0x3366aa:s=240x240', '-frames:v', '1', '-update', '1', image])
+  execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=s=240x240:r=1', '-frames:v', '1', '-update', '1', image])
 
   const frames = await renderFrames({
     template, shots: [{ image, caption: '动' }], vars: { width: 240, height: 320 },

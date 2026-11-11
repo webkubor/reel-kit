@@ -261,7 +261,16 @@ func (q *JobQueue) run(parent context.Context, job *Job) {
 		for _, s := range job.Steps {
 			if s.ID != step.ID {
 				steps = append(steps, s)
+			} else if step.StartedAt == nil {
+				step.StartedAt = s.StartedAt
 			}
+		}
+		now := nowISO()
+		if step.StartedAt == nil {
+			step.StartedAt = &now
+		}
+		if step.Status == "done" || step.Status == "failed" || step.Status == "canceled" {
+			step.EndedAt = &now
 		}
 		steps = append(steps, step)
 		job.Steps = steps
@@ -311,6 +320,16 @@ func (q *JobQueue) finish(job *Job, assetID string, err error) {
 		job.Status = "failed"
 		job.Error = Redact(err.Error())
 		job.Message = "执行失败；输入已保留，可查看步骤定位问题"
+	}
+	if err != nil {
+		ended := nowISO()
+		for i := range job.Steps {
+			if job.Steps[i].Status == "running" {
+				job.Steps[i].Status = job.Status
+				job.Steps[i].Error = job.Error
+				job.Steps[i].EndedAt = &ended
+			}
+		}
 	}
 	job.UpdatedAt = nowISO()
 	q.store.saveLocked()

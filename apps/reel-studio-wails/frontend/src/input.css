@@ -64,10 +64,13 @@
   }
 
   .btn-primary {
-    @apply bg-accent text-white hover:bg-accent-deep active:bg-accent-deep;
+    @apply border border-glass-edge bg-gradient-to-r from-glass-mint via-glass-milk to-glass-pink
+           text-accent-deep shadow-glass backdrop-blur-md
+           hover:from-glass-mint-hover hover:to-glass-pink-hover
+           active:shadow-glass-pressed;
   }
   .btn-secondary {
-    @apply border border-line bg-surface text-ink hover:border-line-strong hover:bg-raised;
+    @apply border border-line bg-white/70 text-ink shadow-card backdrop-blur-md hover:border-line-strong hover:bg-white/90;
   }
   .btn-ghost {
     @apply text-ink-mid hover:bg-raised hover:text-ink;
@@ -215,7 +218,7 @@
 
   /* ── 工序行 ───────────────────────────────────────────── */
   .step-row {
-    @apply flex items-center gap-2.5 rounded-md border border-line bg-raised px-3 py-2;
+    @apply flex flex-wrap items-center gap-2.5 rounded-md border border-line bg-raised px-3 py-2;
   }
   .step-row.is-running {
     @apply border-accent/40 bg-accent-soft;
@@ -242,7 +245,7 @@
     @apply min-w-0 flex-1 truncate text-xs font-medium text-ink;
   }
   .step-meta {
-    @apply shrink-0 truncate text-2xs text-ink-lo;
+    @apply min-w-0 basis-full break-words text-2xs leading-relaxed text-ink-lo;
   }
 
   /* ── 画面台 ─────────────────────────────────────────────

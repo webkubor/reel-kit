@@ -10,7 +10,7 @@
   <body>
     <div id="app" class="flex h-full">
       <!-- 侧栏：品牌、项目、状态 -->
-      <aside class="flex w-[210px] shrink-0 flex-col border-r border-line bg-paper">
+      <aside class="flex w-[210px] shrink-0 flex-col border-r border-line bg-gradient-to-b from-accent-soft to-blush">
         <div class="flex items-center gap-2.5 px-5 pb-3 pt-5">
           <span class="flex h-8 w-8 items-center justify-center rounded-md bg-ink font-serif text-lg text-white">r<i class="not-italic text-accent-soft">·</i></span>
           <span class="leading-tight">
@@ -32,7 +32,7 @@
           </div>
           <p class="mt-2 text-2xs leading-relaxed text-ink-lo">
             素材与成片留在这台机器上<br />
-            语音与出图用在线服务时才会联网
+            AI 分镜会连接你配置的模型服务
           </p>
         </div>
       </aside>
@@ -44,6 +44,7 @@
           <div id="project-select" class="w-56" aria-labelledby="label-project"></div>
           <button id="btn-new-project" class="btn btn-secondary btn-sm">＋ 新建项目</button>
           <div class="ml-auto flex items-center gap-2">
+            <button id="btn-ai-settings" class="btn btn-secondary btn-sm" type="button">AI 设置</button>
             <button id="btn-pick-images" class="btn btn-secondary btn-sm">＋ 导入素材</button>
           </div>
         </header>
@@ -60,11 +61,30 @@
             </div>
 
             <div class="panel mb-4 shrink-0">
+              <div class="panel-head"><h2 class="panel-title">AI 分镜</h2><span class="badge">可选</span></div>
+              <div class="panel-body">
+                <label class="label" for="ai-prompt">视频生成要求</label>
+                <textarea id="ai-prompt" class="input" rows="3" maxlength="4000" placeholder="描述产品、受众、重点和风格；不要填写不想发给模型服务的信息"></textarea>
+                <p class="help">发送给你在 AI 设置中指定的服务，可能产生费用。生成后可审阅或修改，再开始制作。</p>
+                <button id="btn-generate-plan" class="btn btn-secondary btn-md mt-3" type="button">生成分镜</button>
+              </div>
+            </div>
+            <div class="panel mb-4 shrink-0">
               <div class="panel-head">
                 <h2 class="panel-title">镜头内容</h2>
                 <span id="layout-badge" class="badge">—</span>
               </div>
               <div class="panel-body">
+                <div role="group" aria-label="分镜编辑方式" class="mb-4 flex gap-2">
+                  <button id="mode-form" class="btn btn-secondary btn-sm" type="button" aria-pressed="true">表单模式</button>
+                  <button id="mode-code" class="btn btn-secondary btn-sm" type="button" aria-pressed="false">分镜代码</button>
+                </div>
+                <div id="code-editor" class="field hidden">
+                  <label class="label" for="f-code">分镜 JSON</label>
+                  <textarea id="f-code" class="input font-mono" rows="10" spellcheck="false"></textarea>
+                  <p class="help">编辑标题、画幅和逐句文案；这是安全的数据格式，不执行任意代码。切回表单会校验。</p>
+                </div>
+                <div id="form-editor">
                 <div class="field">
                   <label class="label" for="f-title">标题</label>
                   <input id="f-title" class="input input-md" maxlength="40" placeholder="这支视频的一句话主题" />
@@ -96,7 +116,16 @@
                     <span id="lines-count" class="shrink-0 text-2xs text-ink-dim">0 / 8 行</span>
                   </div>
                 </div>
+                </div>
 
+                <details class="mb-4 border-t border-line pt-3">
+                  <summary class="cursor-pointer text-xs font-medium text-ink-mid">更多制作设置</summary>
+                  <div class="mt-3 grid grid-cols-2 gap-3">
+                    <div class="field"><label class="label" for="f-pause">句间停顿（秒）</label><input id="f-pause" type="number" class="input input-md" min="0" max="2" step="0.05" value="0.4" /></div>
+                    <div class="field"><label class="label" id="label-motion">画面运动</label><div id="select-motion" aria-labelledby="label-motion"></div></div>
+                    <div class="field"><label class="label" id="label-transition">镜间转场</label><div id="select-transition" aria-labelledby="label-transition"></div></div>
+                  </div>
+                </details>
                 <div class="mt-1 border-t border-line pt-4">
                   <p id="run-hint" class="mb-3 text-2xs leading-relaxed text-ink-lo" role="status" aria-live="polite"></p>
                   <div class="flex gap-2">
@@ -114,6 +143,7 @@
               </div>
               <div class="panel-body">
                 <div id="asset-grid" class="grid grid-cols-4 gap-2"></div>
+                <button id="btn-view-image" class="btn btn-secondary btn-sm mt-3 hidden" type="button">查看选中图片</button>
                 <p id="asset-empty" class="text-2xs leading-relaxed text-ink-lo">
                   还没有导入图片。没有素材也能出片 —— 会先用深色占位图，之后可以换真图重做。
                 </p>
@@ -132,6 +162,7 @@
                 <div class="flex justify-center">
                   <div id="stage-wrap" class="relative overflow-hidden rounded-lg bg-raised shadow-stage" style="width: 236px; height: 420px">
                     <div id="stage-canvas" class="stage-canvas mp"></div>
+                    <img id="stage-image" class="stage-video hidden" alt="选中的原始图片" />
                     <video id="stage-video" class="stage-video hidden" controls></video>
                   </div>
                 </div>
@@ -144,12 +175,17 @@
               <div class="panel-head"><h2 class="panel-title">项目成片</h2></div>
               <div id="video-list" class="panel-body flex flex-col gap-1"></div>
             </div>
+            <div class="panel mb-4 shrink-0">
+              <div class="panel-head"><h2 class="panel-title">生成历史</h2></div>
+              <div id="job-list" class="panel-body flex flex-col gap-1"></div>
+            </div>
             <div class="panel shrink-0">
               <div class="panel-head">
                 <h2 class="panel-title">制作过程</h2>
                 <span id="job-state" class="badge"></span>
               </div>
               <div class="panel-body">
+                <div id="job-detail" class="mb-3 whitespace-pre-wrap break-words text-2xs leading-relaxed text-ink-mid"></div>
                 <div id="steps" class="flex flex-col gap-1.5"></div>
                 <p id="steps-empty" class="text-2xs leading-relaxed text-ink-lo">
                   提交后这里显示每一步的进度。语音在哪个通道跑、哪一步开始联网，都写在这里。
@@ -160,6 +196,27 @@
         </div>
       </div>
     </div>
+
+    <dialog id="ai-dialog" aria-labelledby="ai-dialog-title" class="w-[460px] max-w-[90vw] rounded-lg border border-line bg-surface p-5 shadow-pop backdrop:bg-ink/20">
+      <form id="ai-settings-form">
+        <h2 id="ai-dialog-title" class="text-base font-semibold text-ink">AI 模型设置</h2>
+        <p class="help">用于生成可编辑的分镜 JSON；服务会收到你的生成要求，可能收费。视频渲染和中文配音仍在本机。</p>
+        <label class="label mt-4" for="ai-url">OpenAI 兼容 API 根地址</label>
+        <input id="ai-url" class="input input-md" type="url" placeholder="https://example.com/v1" required />
+        <label class="label mt-4" for="ai-model">模型 ID</label>
+        <input id="ai-model" class="input input-md" placeholder="由你的服务商提供" required />
+        <label class="label mt-4" for="ai-key">API Key</label>
+        <input id="ai-key" class="input input-md" type="password" autocomplete="off" placeholder="留空以保留该地址已有密钥" />
+        <p id="ai-key-status" class="help">密钥保存在系统钥匙串，不写入项目、任务或日志。</p>
+        <p id="ai-settings-status" class="help" role="status" aria-live="polite"></p>
+        <div class="mt-4 flex flex-wrap justify-end gap-2">
+          <button id="ai-clear-key" class="btn btn-ghost btn-sm" type="button">移除已保存密钥</button>
+          <button id="ai-test" class="btn btn-secondary btn-sm" type="button">检查连接</button>
+          <button id="ai-cancel" class="btn btn-ghost btn-sm" type="button">关闭</button>
+          <button class="btn btn-primary btn-sm" type="submit">保存</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog id="project-dialog" aria-labelledby="project-dialog-title" class="w-[380px] rounded-lg border border-line bg-surface p-5 shadow-pop backdrop:bg-ink/20">
       <form id="project-form" method="dialog">

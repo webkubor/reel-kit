@@ -234,6 +234,9 @@ func NewStudioStore() (*StudioStore, error) {
 
 // DefaultStudioRoot 默认工作台数据目录。
 func DefaultStudioRoot() string {
+	if override := strings.TrimSpace(os.Getenv("REEL_STUDIO_DATA_DIR")); override != "" && filepath.IsAbs(override) {
+		return override
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "."
@@ -386,7 +389,7 @@ func (s *StudioStore) AddAsset(projectID, name, mime string, bytes []byte, extra
 	}
 	ext := map[string]string{
 		"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif",
-		"video/mp4": ".mp4", "audio/wav": ".wav", "audio/mpeg": ".mp3",
+		"video/mp4": ".mp4", "audio/wav": ".wav", "audio/mpeg": ".mp3", "application/json": ".json",
 		"audio/mp4": ".m4a", "audio/ogg": ".ogg",
 	}[mime]
 	if ext == "" {

@@ -3,23 +3,24 @@ package main
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
 )
 
-// Engine 是桌面壳的本地引擎：零 HTTP，零 Node，不启动任何子进程、不占端口。
-// 所有状态留在内存里，通过 Go 绑定直接让界面调用。
-//
-// Phase 2 会把合成/TTS/供应商等逻辑从 Node 层搬进来，直接以 Go 方法
-// 挂到 Engine 上，不再依赖任何外部 Node 进程或运行时目录。
+// Engine 通过 Go 绑定提供业务能力，无 Node 运行时和本地 HTTP 业务服务。
+// 任务与素材落盘；本机制作启动随包的语音、渲染和编码子进程。
+// 显式的 AI 分镜请求由 Go 连接用户配置的外部服务。
 type Engine struct {
 	mu   sync.Mutex
 	note string
 
-	store  *StudioStore
-	queue  *JobQueue
-	cancel context.CancelFunc
+	store     *StudioStore
+	queue     *JobQueue
+	cancel    context.CancelFunc
+	aiSecrets secretStore
+	aiClient  *http.Client
 
 	// voxcraft：本机离线语音引擎的服务句柄（可能复用已有的）。
 	voxcraft *VoxcraftServer

@@ -17,6 +17,8 @@ import (
 func (e *Engine) runPipeline(ctx context.Context, job *Job, progress func(text string, upstream map[string]any), report func(Step)) (string, error) {
 	kind, _ := job.Input["kind"].(string)
 	switch kind {
+	case "storyboard":
+		return e.generateStoryboard(ctx, job, progress, report)
 	case "product":
 		input, err := productInputFromMap(job.Input)
 		if err != nil {
@@ -52,6 +54,7 @@ func productInputFromMap(input map[string]any) (ProductInput, error) {
 		Profile:      strOr(input["profile"], ""),
 		Tone:         strOr(input["tone"], ""),
 	}
+	out.Settings, _ = input["settings"].(map[string]any)
 	if lines, ok := input["lines"].([]any); ok {
 		for _, l := range lines {
 			if s, ok := l.(string); ok {

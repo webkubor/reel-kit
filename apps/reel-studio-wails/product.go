@@ -105,6 +105,7 @@ type ProductInput struct {
 	Ratio     string
 	Lines     []string
 	AssetIDs  []string
+	Settings  map[string]any
 	BGMID     string
 
 	VoiceBackend string
@@ -218,7 +219,7 @@ func (e *Engine) MakeProductVideo(ctx context.Context, input ProductInput, progr
 	}
 
 	// 旋钮走统一收敛逻辑：预设 → 默认值 → 用户填的值。
-	settings := ResolveSettings("product", map[string]any{}, "")
+	settings := ResolveSettings("product", input.Settings, "")
 
 	// 逐句配音：音色相同、语气相同，只是念的内容不同
 	voiceClips := []VoiceClip{}

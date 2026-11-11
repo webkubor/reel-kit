@@ -7,8 +7,8 @@
  *   画面是深色（成片本来就是深底，见 templates/product-presenter.html），
  *   所以画面是整个界面里唯一「重」的物体 —— 视线自然落在它上面。
  *
- * 因此强调色只给两处用：主操作按钮，和画面里的那一个点。
- * 别的地方一律灰阶，层级靠留白和描边拉开，不靠颜色。
+ * 薄荷绿与浅粉是浅色材质；深绿仅用于文字、选中标记和焦点。
+ * 主按钮保持高明度，以乳白过渡连接两端，避免深绿与莓红混出脏灰。
  */
 module.exports = {
   content: ['./src/**/*.{html,js}'],
@@ -16,9 +16,10 @@ module.exports = {
     extend: {
       colors: {
         // 界面底色：纸 → 面 → 浮起，三层就够，再多就没人分得清
-        paper: '#f6f5f2',
+        paper: '#f2f8f5',
         surface: '#ffffff',
-        raised: '#fbfaf7',
+        raised: '#f8f3f5',
+        blush: '#f9e9ef',
 
         // 文字四档：主 / 次 / 弱 / 极弱
         ink: {
@@ -34,11 +35,19 @@ module.exports = {
           strong: '#d2d1ca',
         },
 
-        // 品牌砖红：整个界面只出现两处，别扩散
+        // 深绿用于可读文字；主操作材质用高明度薄荷、乳白与浅粉。
         accent: {
-          DEFAULT: '#a7442d',
-          deep: '#8c3722',
-          soft: '#f8ece7',
+          DEFAULT: '#176958',
+          deep: '#115348',
+          soft: '#e0f3eb',
+        },
+        glass: {
+          mint: '#c8f2e1',
+          milk: '#f2faf6',
+          pink: '#fbe0ea',
+          edge: '#b4d2c8',
+          'mint-hover': '#b7ead4',
+          'pink-hover': '#f9d4e2',
         },
 
         ok: '#3f7d5c',
@@ -73,6 +82,8 @@ module.exports = {
 
       boxShadow: {
         card: '0 1px 2px rgba(34,37,42,.05)',
+        glass: 'inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(23,105,88,.04), 0 2px 4px rgba(23,105,88,.08)',
+        'glass-pressed': 'inset 0 1px 3px rgba(23,105,88,.12)',
         pop: '0 10px 30px rgba(34,37,42,.12)',
         stage: '0 3px 14px rgba(13,15,17,.20)',
       },
