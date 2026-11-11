@@ -6,8 +6,8 @@ import { workflowPanel } from '/workflow-panel.js'
 let state = { projects: [], assets: [], jobs: [], templates: [] }, providers = {}, mode = 'video', filter = 'all'
 let projectId = localStorage.getItem('reel-project'), previewId, selected = [], lastAssets = '', lastJobs = '', lastProjects = '', uploadTarget
 const kinds = { video: '视频', image: '图片', speech: '配音', clone: '克隆配音', 'voice-design': '新建音色', recommendation: '项目推荐', talk: '口播视频', export: '合成' }
-const labels = { queued: '排队中', running: '进行中', succeeded: '已完成', failed: '失败', interrupted: '已中断' }
-const origins = { ai: 'AI 生成', code: '本地制作', import: '导入素材', record: '我的录音' }
+const labels = { queued: '排队中', running: '进行中', succeeded: '已完成', failed: '失败', canceled: '已取消', interrupted: '已中断' }
+const origins = { ai: 'AI 生成', code: '本地制作', import: '导入素材', record: '我的录音', unknown: '未知来源' }
 const examples = {
   video: '写实时尚棚拍，一镜到底，9:16竖屏。浅灰白无缝摄影棚，高调柔光。一位20多岁的成年东亚女性模特，长直黑发，酒红色方领针织上衣、白色短裙与白色高跟凉鞋。她从画面右后方自然走向中央，短暂停步，一手扶腰，转头后看向镜头；随后缓慢走近，轻轻歪头，露出克制自信的微笑。固定正面机位，人物走近使全身景自然变为半身。动作符合重力，脚掌真实接地，人物、服装、首饰保持一致，无切镜、无文字、无水印。',
   image: '写实时尚摄影，全身构图，9:16竖幅。浅灰白色无缝摄影棚，大面积柔光。20多岁成年东亚女性模特，长直黑发，酒红色方领针织上衣、白色短裙和白色高跟凉鞋，自然站姿，一手轻扶腰侧。清冷柔和的商业摄影质感，保留细腻皮肤纹理，画面干净，无文字、无水印。',
@@ -97,7 +97,11 @@ function renderJobs() {
     // 重新生成等于再付一次钱 —— 通道是按量计费的。
     const resume = j.upstream?.taskId && ['failed', 'interrupted'].includes(j.status)
       ? `<button class="text-button" data-resume="${j.id}">取回已生成的素材</button>` : ''
-    return `<article class="job-item"><div class="job-row"><span class="job-kind">${kinds[j.input.kind]}</span><div><p class="job-prompt" title="${escape(j.input.prompt || j.input.title)}">${escape(j.input.prompt || j.input.title || '合成出片')}</p><p class="job-detail">${escape(j.error || j.message)}</p></div><span class="job-state ${j.status}">${labels[j.status]}</span>${resume}<button class="text-button" data-reuse="${j.id}">复用参数 ↗</button></div>${timeline}</article>`
+    // 正在跑的任务给一个「取消」：渲染、ffmpeg、语音都会被掐断，
+    // 上游云服务也不会白替一个没人要的结果计费。
+    const cancel = ['queued', 'running'].includes(j.status)
+      ? `<button class="text-button" data-cancel="${j.id}">取消</button>` : ''
+    return `<article class="job-item"><div class="job-row"><span class="job-kind">${kinds[j.input.kind]}</span><div><p class="job-prompt" title="${escape(j.input.prompt || j.input.title)}">${escape(j.input.prompt || j.input.title || '合成出片')}</p><p class="job-detail">${escape(j.error || j.message)}</p></div><span class="job-state ${j.status}">${labels[j.status]}</span>${cancel}${resume}<button class="text-button" data-reuse="${j.id}">复用参数 ↗</button></div>${timeline}</article>`
   }).join('') : '<p class="empty-history">还没有生成记录。每次提交的参数与结果都会保留。</p>'
   const latest = jobs.find(j => j.status === 'succeeded' && !previousIds.has(j.id))
   if (latest?.assetId) showPreview(latest.assetId)
@@ -741,6 +745,15 @@ $('jobs').onclick = event => {
     api('/api/jobs/resume', { method: 'POST', body: JSON.stringify({ jobId: resume }) })
       .then(() => { message('已取回上游生成的素材，费用没有重复产生。'); return refresh() })
       .catch(error => { message(error.message, true); button.disabled = false; button.textContent = '取回已生成的素材' })
+    return
+  }
+  const cancel = event.target.closest('[data-cancel]')?.dataset.cancel
+  if (cancel) {
+    const button = event.target.closest('[data-cancel]')
+    button.disabled = true; button.textContent = '正在取消…'
+    api(`/api/jobs/${cancel}/cancel`, { method: 'POST' })
+      .then(() => { message('已取消，正在停掉渲染与配音。'); return refresh() })
+      .catch(error => { message(error.message, true); button.disabled = false; button.textContent = '取消' })
     return
   }
   const fix = event.target.closest('[data-fix]')?.dataset.fix

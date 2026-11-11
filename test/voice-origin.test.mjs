@@ -21,8 +21,13 @@ test('本机离线引擎不会被标成云端，本机跑的步骤不花钱', ()
   }
 })
 
-test('未知通道按本机离线兜底，不臆测成付费通道', () => {
+test('未知通道标成「未知」，不替用户猜来源', () => {
+  // 以前这里回落成「本机离线」，等于告诉用户这一步不花钱、不联网。
+  // 实际通道可能是在线付费的 —— 猜错比不猜贵：用户会放心地反复重试。
   const { origin } = voiceChannelInfo('nope')
-  assert.equal(origin, 'local-offline')
+  assert.equal(origin, 'unknown')
+  assert.notEqual(origin, 'local-offline')
+  assert.notEqual(origin, 'free-online')
+  assert.notEqual(origin, 'cloud-paid')
   assert.ok(Object.keys(VOICE_ORIGINS).length >= 4)
 })

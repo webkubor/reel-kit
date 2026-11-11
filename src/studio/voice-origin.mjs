@@ -15,11 +15,15 @@ export const VOICE_ORIGINS = {
 }
 
 /**
- * 语音通道的来源标签。
+ * 未知通道的兜底。
  *
- * 未知通道按本机离线通道处理（与界面里「VoxFlow · 本地」的默认一致），
- * 因为服务端只会放行上面四个通道，这里的兜底只防脏数据。
+ * 以前这里回落到 VoxFlow（本机离线）。那是错的，而且错在最要命的方向：
+ * 猜成「本机离线」等于告诉用户「这一步不花钱、不联网」，
+ * 实际通道若是在线付费的，用户就会放心地反复重试、白花钱。
+ * 猜不出来就写「未知」—— 让用户自己看一眼配置，比替他猜一个错的强。
  */
+export const UNKNOWN_VOICE = { origin: 'unknown', engine: '未知语音通道' }
+
 export function voiceChannelInfo(backend) {
-  return VOICE_ORIGINS[backend] || VOICE_ORIGINS.voxflow
+  return VOICE_ORIGINS[backend] || UNKNOWN_VOICE
 }
