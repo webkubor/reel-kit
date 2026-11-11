@@ -101,31 +101,48 @@ h2 .small { font-size: 14px; color: var(--ink-faint); font-weight: 400; margin-l
 }
 .feature p { margin: 0; color: var(--ink-soft); font-size: 15px; }
 
-/* ───── 模板预览 grid ───── */
-.templates {
-  display: grid; gap: 20px;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+/* ───── 成片示例 ───── */
+.videos {
+  display: grid; gap: 24px;
+  grid-template-columns: repeat(2, 1fr);
+  align-items: start;
 }
-.template {
+.video {
+  margin: 0;
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
   background: var(--bg);
+}
+.video.wide { grid-column: 1 / -1; }
+.video .frame {
+  background: #000;
+  aspect-ratio: 9 / 16;
+  max-width: 400px;
+  margin: 0 auto;
+}
+.video.wide .frame { aspect-ratio: 16 / 9; max-width: none; }
+.video video {
+  display: block;
+  width: 100%; height: 100%;
+  object-fit: contain;
+}
+.video figcaption {
+  padding: 12px 16px;
+  font-size: 14px; color: var(--ink-soft);
+  border-top: 1px solid var(--line);
   text-align: center;
 }
-.template .preview {
-  aspect-ratio: 9 / 16;
-  background: linear-gradient(135deg, var(--brand-softest), #fff);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 14px; color: var(--ink-faint);
-  border-bottom: 1px solid var(--line);
+.video figcaption b { color: var(--ink); }
+.template-list {
+  margin: 8px 0 0;
+  color: var(--ink-faint);
+  font-size: 14px;
+  line-height: 1.9;
 }
-.template .preview.wide { aspect-ratio: 16 / 9; }
-.template .preview.square { aspect-ratio: 1 / 1; }
-.template .name {
-  padding: 14px;
-  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace;
-  font-size: 14px; color: var(--ink);
+@media (max-width: 720px) {
+  .videos { grid-template-columns: 1fr; }
+  .video.wide { grid-column: auto; }
 }
 
 /* ───── Quick Start ───── */
