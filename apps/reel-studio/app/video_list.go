@@ -325,6 +325,10 @@ func originLabel(origin string) string {
 		return "AI 模型生成"
 	case "import":
 		return "用户导入素材"
+	case "unknown":
+		// 猜不出来源就别猜。「本地工序」是在告诉用户这一步在自己机器上跑，
+		// 而实际可能在云端计费 —— 标错比不标更贵。
+		return "未知来源"
 	default:
 		return "本地工序"
 	}

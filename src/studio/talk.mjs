@@ -36,16 +36,16 @@ const templateFile = name => fileURLToPath(new URL(`../../templates/${name}.html
  * 新手第一次用往往手里只有一段话、没有任何图。让他先去找图再回来，
  * 大概率就走了。占位图用风格色做一个渐变 —— 至少版面是对的，之后换真图重做即可。
  */
-async function placeholderImage(file, style) {
+async function placeholderImage(file, style, signal) {
   const c0 = (style.bg || '#ece4d4').replace('#', '0x')
   const c1 = (style.accent1 || '#b23a2e').replace('#', '0x')
   await command('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi',
     '-i', `gradients=size=${WIDTH}x${HEIGHT}:c0=${c0}:c1=${c1}:nb_colors=2`,
-    '-frames:v', '1', file])
+    '-frames:v', '1', file], { signal })
   return file
 }
 
-export async function makeTalkVideo(input, store, backend, progress, report = () => {}) {
+export async function makeTalkVideo(input, store, backend, progress, report = () => {}, signal = undefined) {
   const lines = (input.captions || '').split('\n').map(s => s.trim()).filter(Boolean)
   if (!lines.length || lines.length > 8 || lines.some(s => s.length > 80)) {
     throw new Error('请填写 1–8 行脚本，每行不超过 80 字；过长的句子请拆成多镜')
@@ -71,7 +71,8 @@ export async function makeTalkVideo(input, store, backend, progress, report = ()
         return meta
       }
       return Promise.resolve().then(run).then(settle, error => {
-        report({ ...def, status: 'failed', error: redact(error.message), ms: Date.now() - started })
+        // 被取消不是失败：界面上的工序面板要能区分「用户主动停了」和「做坏了」。
+        report({ ...def, status: error?.cancelled ? 'canceled' : 'failed', error: redact(error.message), ms: Date.now() - started })
         throw error
       })
     }
@@ -81,7 +82,7 @@ export async function makeTalkVideo(input, store, backend, progress, report = ()
     let images = assets.map(asset => store.path(asset))
     if (!images.length) {
       progress('没有画面素材，先用风格色生成占位图…')
-      images = await Promise.all(lines.map((_, i) => placeholderImage(join(temp, `placeholder-${i}.png`), style)))
+      images = await Promise.all(lines.map((_, i) => placeholderImage(join(temp, `placeholder-${i}.png`), style, signal)))
       await step({ id: 'placeholder', label: '生成占位画面', origin: 'code', engine: 'ffmpeg 渐变', detail: `${images.length} 张占位图，之后可换真图重做` }, async () => ({}))
     }
 
@@ -98,12 +99,12 @@ export async function makeTalkVideo(input, store, backend, progress, report = ()
           backend: voiceBackend, model: input.voiceModel || undefined,
           voiceId: input.voiceId || undefined, profile: input.profile,
           speed: ['edge', 'minimax'].includes(voiceBackend) ? settings.speed : 1,
-        }, () => {})
+        }, () => {}, { signal })
         if (!asset?.mime?.startsWith('audio/')) throw new Error(`第 ${i + 1} 句配音没有生成成功`)
         let file = store.path(asset)
         if (!['edge', 'minimax'].includes(voiceBackend) && settings.speed !== 1) {
           const adjusted = join(temp, `speed-${i}.wav`)
-          await command('ffmpeg', ['-v', 'error', '-i', file, '-af', `atempo=${settings.speed}`, adjusted])
+          await command('ffmpeg', ['-v', 'error', '-i', file, '-af', `atempo=${settings.speed}`, adjusted], { signal })
           file = adjusted
         }
         return { _file: file, _duration: await probeDuration(file), assetId: asset.id, origin: voiceOrigin, engine: asset.engine || voiceEngine, detail: lines[i].slice(0, 40) }
@@ -129,6 +130,7 @@ export async function makeTalkVideo(input, store, backend, progress, report = ()
           width: WIDTH, height: HEIGHT,
         },
         width: WIDTH, height: HEIGHT, outDir: join(temp, 'frames'),
+        signal,
       }),
     }))
 
@@ -143,7 +145,7 @@ export async function makeTalkVideo(input, store, backend, progress, report = ()
         bgmGain, bgmCrossfade: 0,
         voiceGain: settings.voiceGain, duck: settings.duck, normalize: settings.normalize,
         transition: settings.transition, transitionDuration: settings.transitionDuration,
-        out,
+        out, signal,
       })
       return { _duration: await probeDuration(out) }
     })

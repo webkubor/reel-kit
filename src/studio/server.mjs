@@ -165,6 +165,9 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
   initializeWorkflow(store.state)
   store.save()
   const backend = providers || createProviders(store)
+  // 每个正在跑的任务一个 AbortController：取消要能真的把渲染、ffmpeg、语音掐断，
+  // 而不是把结果扔掉 —— 被取消的任务如果继续跑，上游云服务照样计费。
+  const controllers = new Map()
   let worker = false
   const pump = async () => {
     if (worker) return
@@ -191,10 +194,16 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
           job.updatedAt = now(); store.save()
         }
         job.status = 'running'; job.steps = []; progress('正在准备任务…')
+        const controller = new AbortController()
+        controllers.set(job.id, controller)
         try {
-          const asset = job.input.kind === 'export' ? await exportFn(job.input, store, progress) : job.input.kind === 'recommendation' ? await makeRecommendation(job.input, store, backend, progress, report) : job.input.kind === 'talk' ? await makeTalkVideo(job.input, store, backend, progress, report) : job.input.kind === 'product' ? await makeProductVideo(job.input, store, backend, progress, report) : await backend.generate(job.input, progress)
+          const asset = job.input.kind === 'export' ? await exportFn(job.input, store, progress, controller.signal) : job.input.kind === 'recommendation' ? await makeRecommendation(job.input, store, backend, progress, report, controller.signal) : job.input.kind === 'talk' ? await makeTalkVideo(job.input, store, backend, progress, report, controller.signal) : job.input.kind === 'product' ? await makeProductVideo(job.input, store, backend, progress, report, controller.signal) : await backend.generate(job.input, progress, { signal: controller.signal })
           job.assetId = asset?.id; job.status = 'succeeded'; progress('已完成，结果保存在本地项目中')
-        } catch (error) { job.status = 'failed'; job.error = redact(error.message); progress('执行失败；输入已保留，可查看步骤定位问题') }
+        } catch (error) {
+          // 用户主动停的，标「已取消」而不是「失败」：这两件事该分开，用户才知道要不要重来。
+          if (error?.cancelled) { job.status = 'canceled'; job.error = ''; progress('已取消') }
+          else { job.status = 'failed'; job.error = redact(error.message); progress('执行失败；输入已保留，可查看步骤定位问题') }
+        } finally { controllers.delete(job.id) }
       }
     } finally { worker = false }
   }
@@ -493,6 +502,21 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
           if (!/^[a-z0-9][a-z0-9._-]{0,40}$/i.test(entry.id)) fail('通道 id 只能用字母、数字、点、下划线和短横线')
           upsertChannel(entry)
           return json(res, 200, { ok: true, channels: channelList() })
+        }
+        const cancelMatch = path.match(/^\/api\/jobs\/([a-f\d-]{36})\/cancel$/)
+        if (cancelMatch) {
+          const job = store.state.jobs.find(j => j.id === cancelMatch[1])
+          if (!job) fail('找不到这个任务', 404)
+          if (['succeeded', 'failed', 'canceled'].includes(job.status)) fail('任务已经结束了，取消不了')
+          if (job.status === 'queued') {
+            job.status = 'canceled'; job.updatedAt = now(); store.save()
+            return json(res, 200, { ok: true, status: 'canceled' })
+          }
+          // 正在跑：掐断信号，让渲染/ffmpeg/语音各自停下来。
+          const controller = controllers.get(job.id)
+          if (controller) controller.abort()
+          job.updatedAt = now(); store.save()
+          return json(res, 200, { ok: true, status: 'canceling' })
         }
         if (path === '/api/jobs') {
           const value = validate(input, store)

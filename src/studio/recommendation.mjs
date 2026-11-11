@@ -43,7 +43,7 @@ export async function projectDraft(url, projectId, store) {
   }
   return { repo, title: info.name, description: summary, captions, images, source: `https://github.com/${repo}` }
 }
-export async function makeRecommendation(input, store, backend, progress, report = () => {}) {
+export async function makeRecommendation(input, store, backend, progress, report = () => {}, signal = undefined) {
   const lines = input.captions.split('\n').map(s => s.trim()).filter(Boolean)
   if (!lines.length || lines.length > 8 || lines.some(s => s.length > 80)) throw new Error('请填写 1–8 行旁白，每行不超过 80 字；过长的旁白请拆分为多镜')
   if (!input.assetIds.length) throw new Error('请先读取项目并选择至少一张项目画面')
@@ -61,7 +61,7 @@ export async function makeRecommendation(input, store, backend, progress, report
       report({ ...def, ...payload, status: 'done', ms: Date.now() - started })
       return meta
     }
-    return Promise.resolve().then(run).then(settle, error => { report({ ...def, status: 'failed', error: redact(error.message), ms: Date.now() - started }); throw error })
+    return Promise.resolve().then(run).then(settle, error => { report({ ...def, status: error?.cancelled ? 'canceled' : 'failed', error: redact(error.message), ms: Date.now() - started }); throw error })
   }
   const temp = mkdtempSync(join(tmpdir(), 'reel-recommend-'))
   try {
@@ -82,7 +82,7 @@ export async function makeRecommendation(input, store, backend, progress, report
         if (narration) {
           const end = i === lines.length - 1 ? narrationDuration : offset + narrationDuration * lines[i].length / totalChars
           const file = join(temp, `voice-${i}.wav`)
-          await command('ffmpeg', ['-v', 'error', '-i', store.path(narration), '-af', `atrim=start=${offset}:end=${end},asetpts=PTS-STARTPTS,atempo=${settings.speed}`, file])
+          await command('ffmpeg', ['-v', 'error', '-i', store.path(narration), '-af', `atrim=start=${offset}:end=${end},asetpts=PTS-STARTPTS,atempo=${settings.speed}`, file], { signal })
           offset = end
           return { _file: file, _duration: await probeDuration(file), detail: `${i === 0 ? '开头' : `${Math.round(offset - (end - offset))}s 起`}切分 · ${lines[i].slice(0, 36)}` }
         }
@@ -108,7 +108,7 @@ export async function makeRecommendation(input, store, backend, progress, report
             profile: settings.voiceProfile,
             // 在线语音直接按语速合成；本地引擎不支持语速参数，交给后面的 atempo 处理。
             speed: ['edge', 'minimax'].includes(voiceBackend) ? settings.speed : 1,
-          }, () => {})
+          }, () => {}, { signal })
           generated = true
         }
         if (!asset.mime.startsWith('audio/')) throw new Error(`第 ${i + 1} 句选择的素材不是音频`)
@@ -118,7 +118,7 @@ export async function makeRecommendation(input, store, backend, progress, report
         // 在线语音已经在合成时按语速出片；本地引擎不支持语速参数，在这里变速。
         if (settings.speed !== 1 && !['edge', 'minimax'].includes(voiceBackend)) {
           const adjusted = join(temp, `voice-${i}.wav`)
-          await command('ffmpeg', ['-v', 'error', '-i', file, '-af', `atempo=${settings.speed}`, adjusted])
+          await command('ffmpeg', ['-v', 'error', '-i', file, '-af', `atempo=${settings.speed}`, adjusted], { signal })
           file = adjusted
         }
         const source = generated ? '新生成' : reused ? '复用已生成' : chosen ? '使用所选素材' : '新生成'
@@ -129,7 +129,7 @@ export async function makeRecommendation(input, store, backend, progress, report
     const durations = voiceClips.map(v => v.duration + (narration ? 0 : settings.pause))
     progress(settings.motion === 'none' ? `正在渲染 ${settings.name} ${settings.width}×${settings.height} 画面…` : `正在逐帧渲染动效画面…`)
     const { _frames: frames } = await step({ id: 'frames', label: '渲染画面帧', origin: 'code', engine: 'playwright 本地渲染', detail: `${lines.length} 镜 · ${settings.width}×${settings.height} · ${settings.imageFit === 'cover' ? '铺满画布' : '完整画面'}${settings.motion === 'none' ? '' : ' · 轻柔运镜'}` }, async () =>
-      ({ _frames: await renderFrames({ template, shots: lines.map((caption, i) => ({ image: store.path(images[i % images.length]), caption: esc(caption) })), vars: { title: esc(input.title), subtitle: esc(input.repoUrl), width: settings.width, height: settings.height, fit: settings.imageFit }, width: settings.width, height: settings.height, outDir: join(temp, 'frames'), motion: settings.motion, durations, onProgress: progress }) }))
+      ({ _frames: await renderFrames({ template, shots: lines.map((caption, i) => ({ image: store.path(images[i % images.length]), caption: esc(caption) })), vars: { title: esc(input.title), subtitle: esc(input.repoUrl), width: settings.width, height: settings.height, fit: settings.imageFit }, width: settings.width, height: settings.height, outDir: join(temp, 'frames'), motion: settings.motion, durations, onProgress: progress, signal }) }))
     progress('正在混合旁白与 BGM，合成成片…')
     const out = join(temp, 'recommendation.mp4')
     const bgm = input.bgmId ? store.asset(input.bgmId, input.projectId) : undefined
@@ -140,7 +140,7 @@ export async function makeRecommendation(input, store, backend, progress, report
         bgmGain: settings.bgmGain, bgmCrossfade: 0,
         voiceGain: settings.voiceGain, duck: settings.duck, normalize: settings.normalize,
         transition: settings.transition, transitionDuration: settings.transitionDuration,
-        out,
+        out, signal,
       })
       const result = await command('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', out])
       const probe = JSON.parse(result), video = probe.streams?.find(s => s.codec_type === 'video')

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { command } from './process.mjs'
 
 const cli = fileURLToPath(new URL('../../bin/reel.mjs', import.meta.url))
-export async function exportVideo(input, store, progress) {
+export async function exportVideo(input, store, progress, signal = undefined) {
   const assets = input.assetIds.map(id => store.asset(id, input.projectId))
   if (!assets.length) throw new Error('先选择要合成的图片或视频')
   const audio = input.audioId ? store.asset(input.audioId, input.projectId) : null
@@ -23,10 +23,10 @@ export async function exportVideo(input, store, progress) {
         args.push('--caps', captions)
       }
       progress('正在用 reel-kit 渲染并合成图片…')
-      await command(process.execPath, args, { timeout: 900000 })
+      await command(process.execPath, args, { timeout: 900000, signal })
       if (audio) {
         const voiced = join(temp, 'voiced.mp4')
-        await command('ffmpeg', ['-y', '-i', out, '-i', store.path(audio), '-filter_complex', '[1:a]apad[a]', '-map', '0:v:0', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-shortest', voiced])
+        await command('ffmpeg', ['-y', '-i', out, '-i', store.path(audio), '-filter_complex', '[1:a]apad[a]', '-map', '0:v:0', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-shortest', voiced], { signal })
         renameSync(voiced, out)
       }
     } else if (assets.every(a => a.mime === 'video/mp4')) {
@@ -41,7 +41,7 @@ export async function exportVideo(input, store, progress) {
         const args = ['-y', '-i', store.path(assets[i])]
         if (!hasAudio) args.push('-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo')
         args.push('-map', '0:v:0', '-map', hasAudio ? '0:a:0' : '1:a:0', '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1`, '-r', '30', '-c:v', 'libx264', '-preset', 'fast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-ar', '48000', '-ac', '2', '-shortest', clip)
-        await command('ffmpeg', args)
+        await command('ffmpeg', args, { signal })
         list.push(`file '${clip}'`)
       }
       const concat = join(temp, 'clips.txt'); writeFileSync(concat, list.join('\n'))
@@ -49,7 +49,7 @@ export async function exportVideo(input, store, progress) {
       if (audio) args.push('-i', store.path(audio), '-filter_complex', '[1:a]apad[a]', '-map', '0:v:0', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-shortest')
       else args.push('-c', 'copy')
       args.push('-movflags', '+faststart', out)
-      await command('ffmpeg', args)
+      await command('ffmpeg', args, { signal })
     } else throw new Error('一次导出请选择同类型的图片或视频；音频在配音栏单独选择')
     const probe = JSON.parse(await command('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', out]))
     if (!probe.streams?.some(s => s.codec_type === 'video') || !(Number(probe.format?.duration) >= 0.5) || (audio && !probe.streams?.some(s => s.codec_type === 'audio'))) {

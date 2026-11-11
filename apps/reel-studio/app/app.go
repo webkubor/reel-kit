@@ -1214,6 +1214,14 @@ func (a *App) viewJobs(c *ui.Context) {
 					ui.Text(c, kindLabel(j.Input["kind"])).FontSize(design.FontBody).TextColor(a.kit.T.Ink)
 					a.kit.Tag(c, statusLabel(status), kind)
 					ui.Spacer(c)
+					// 正在跑的任务给一条取消路径
+					if status == "queued" || status == "running" {
+						b := ui.Button(c, "取消")
+						b = b.TextColor(a.kit.T.Accent).FontSize(design.FontSmall)
+						if b.Clicked() {
+							a.cancelJob(j.ID)
+						}
+					}
 					// 上游已经计费、只是没取回素材的，给一条取回路径
 					if j.Upstream != nil && j.Upstream["taskId"] != nil && (status == "failed" || status == "interrupted") {
 						b := ui.Button(c, "取回已生成的素材")
@@ -1512,6 +1520,27 @@ func (a *App) submitRecommendation(channel *studioapi.Channel) {
 }
 
 // resume 取回已在上游生成的产物。
+// cancelJob 取消一个正在跑的任务。
+func (a *App) cancelJob(jobID string) {
+	a.mutate(func() {
+		a.notice = "正在取消任务…"
+		a.noticeErr = false
+	})
+	go func() {
+		client := studioapi.New(a.opts.BaseURL)
+		_, err := client.CancelJob(jobID)
+		a.mutate(func() {
+			if err != nil {
+				a.notice = err.Error()
+				a.noticeErr = true
+			} else {
+				a.notice = "已取消，渲染与配音正在停掉。"
+				a.noticeErr = false
+			}
+		})
+	}()
+}
+
 func (a *App) resume(jobID string) {
 	a.busy.Store(true)
 	a.mutate(func() {
@@ -1592,6 +1621,8 @@ func statusLabel(status string) string {
 		return "进行中"
 	case "queued":
 		return "排队中"
+	case "canceled":
+		return "已取消"
 	case "interrupted":
 		return "已中断"
 	}

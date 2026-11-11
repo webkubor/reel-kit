@@ -14,9 +14,17 @@ export function redact(text) {
     // 必须以 / 开头才算路径，否则「480p/720p/1080p」这种分辨率会被误当成路径吃掉。
     .replace(/(?:^|(?<=\s))\/(?:[\w.@+-]+\/)+[\w.@+-]*/g, '[本地路径]')
 }
+// 取消信号：被取消的子进程必须真的停掉，而不是等它跑完再把结果扔掉。
+// 上游任务可能已经计费 —— 让它跑完再丢弃等于白花钱，所以 abort 要一路传到进程。
+export function cancelledError() {
+  return Object.assign(new Error('已取消'), { cancelled: true })
+}
+export function throwIfCancelled(signal) {
+  if (signal?.aborted) throw cancelledError()
+}
 // No shell, bounded output and lifetime. Never include argv (prompts/keys) in errors.
-export function command(bin, args, { timeout = 600000, onProgress, env = process.env, cwd } = {}) {
-  return commandFull(bin, args, { timeout, onProgress, env, cwd }).then(result => result.stdout)
+export function command(bin, args, { timeout = 600000, onProgress, env = process.env, cwd, signal } = {}) {
+  return commandFull(bin, args, { timeout, onProgress, env, cwd, signal }).then(result => result.stdout)
 }
 /**
  * 同 command，但把 stderr 原样带回来。
@@ -24,11 +32,21 @@ export function command(bin, args, { timeout = 600000, onProgress, env = process
  * 有些工具把「有用的东西」写在 stderr（CLI 的清单表、任务 ID 都在那儿），
  * 而 onProgress 传出去的是截断过的片段 —— 拿它拼不出完整内容，就不能拿它当依据。
  */
-export function commandFull(bin, args, { timeout = 600000, onProgress, onStderr, env = process.env, cwd } = {}) {
+export function commandFull(bin, args, { timeout = 600000, onProgress, onStderr, env = process.env, cwd, signal } = {}) {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(cancelledError())
     const child = spawn(bin, args, { env, cwd, stdio: ['ignore', 'pipe', 'pipe'] })
-    let stdout = '', stderr = '', timedOut = false
+    let stdout = '', stderr = '', timedOut = false, aborted = false
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL') }, timeout)
+    // 取消：先礼后兵。SIGTERM 给 ffmpeg 收尾的机会（写完 moov），
+    // 两秒还不走就 SIGKILL —— 留着半截 mp4 反而会让后面的合成拿到坏文件。
+    const onAbort = () => {
+      aborted = true
+      child.kill('SIGTERM')
+      const hard = setTimeout(() => { try { child.kill('SIGKILL') } catch {} }, 2000)
+      if (typeof hard.unref === 'function') hard.unref()
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
     child.stdout.on('data', chunk => { stdout = (stdout + chunk).slice(-1024 * 1024) })
     child.stderr.on('data', chunk => {
       const text = String(chunk)
@@ -39,10 +57,12 @@ export function commandFull(bin, args, { timeout = 600000, onProgress, onStderr,
       onStderr?.(text)
       onProgress?.(redact(text).trim().slice(-240))
     })
-    child.on('error', error => { clearTimeout(timer); reject(new Error(error.code === 'ENOENT' ? `${bin} 未安装或不在 PATH` : `${bin} 启动失败`)) })
+    child.on('error', error => { clearTimeout(timer); signal?.removeEventListener('abort', onAbort); reject(new Error(error.code === 'ENOENT' ? `${bin} 未安装或不在 PATH` : `${bin} 启动失败`)) })
     child.on('close', code => {
       clearTimeout(timer)
-      if (timedOut) reject(new Error('执行超时。请核对上游任务后再重试，避免重复计费。'))
+      signal?.removeEventListener('abort', onAbort)
+      if (aborted) reject(cancelledError())
+      else if (timedOut) reject(new Error('执行超时。请核对上游任务后再重试，避免重复计费。'))
       else if (code !== 0) reject(new Error(redact(stderr).slice(-600) || `${bin} 退出码 ${code}`))
       else resolve({ stdout: stdout.trim(), stderr })
     })
@@ -52,7 +72,10 @@ export async function available(bin) {
   try { await command(bin, [bin === 'ffmpeg' ? '-version' : '--version'], { timeout: 4000 }); return true } catch { return false }
 }
 export async function jsonFetch(url, options = {}) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(20000), ...options })
+  const { signal, ...rest } = options
+  const timeout = AbortSignal.timeout(20000)
+  const combined = signal ? AbortSignal.any([timeout, signal]) : timeout
+  const response = await fetch(url, { ...rest, signal: combined })
   if (!response.ok) throw new Error(`服务返回 HTTP ${response.status}`)
   return response.json()
 }
@@ -66,14 +89,15 @@ export async function jsonFetch(url, options = {}) {
  * 对象存储的握手本来就会抽风，所以重试几次；重试的是下载，不是重新生成，
  * 不会重复计费。
  */
-export async function download(url, max = 200 * 1024 * 1024, redirects = 0) {
+export async function download(url, max = 200 * 1024 * 1024, redirects = 0, signal = undefined) {
   const parsed = new URL(url)
   if (!['https:', 'http:'].includes(parsed.protocol)) throw new Error('生成服务返回了无效素材地址')
   let lastError
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      return await downloadOnce(parsed, max, redirects)
+      return await downloadOnce(parsed, max, redirects, signal)
     } catch (error) {
+      if (error?.cancelled) throw error
       lastError = error
       // 素材超过上限、地址非法这类错误重试也没用
       if (/超过|无效素材地址/.test(error.message)) break
@@ -83,7 +107,7 @@ export async function download(url, max = 200 * 1024 * 1024, redirects = 0) {
   throw lastError
 }
 
-function downloadOnce(parsed, max, redirects) {
+function downloadOnce(parsed, max, redirects, signal) {
   return new Promise((resolve, reject) => {
     const lib = parsed.protocol === 'https:' ? https : http
     const request = lib.get(parsed, { timeout: 60000 }, response => {
@@ -91,7 +115,7 @@ function downloadOnce(parsed, max, redirects) {
       if (status >= 300 && status < 400 && response.headers.location) {
         response.resume()
         if (redirects >= 5) return reject(new Error('素材地址重定向次数过多'))
-        return resolve(download(new URL(response.headers.location, parsed), max, redirects + 1))
+        return resolve(download(new URL(response.headers.location, parsed), max, redirects + 1, signal))
       }
       if (status !== 200) { response.resume(); return reject(new Error(`下载素材失败 HTTP ${status}`)) }
       const chunks = []
@@ -106,6 +130,11 @@ function downloadOnce(parsed, max, redirects) {
     })
     request.on('timeout', () => request.destroy(new Error('连接 60 秒无响应')))
     request.on('error', reject)
+    // 取消时立刻断开下载，别让一个已经没人要的素材继续占用带宽。
+    const onAbort = () => { request.destroy(cancelledError()) }
+    if (signal?.aborted) return reject(cancelledError())
+    signal?.addEventListener('abort', onAbort, { once: true })
+    request.on('close', () => signal?.removeEventListener('abort', onAbort))
   })
 }
 // ffprobe 探测素材真实尺寸/时长；失败不阻断入库（尺寸未知只是不显示）。

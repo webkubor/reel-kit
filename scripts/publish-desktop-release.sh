@@ -72,6 +72,98 @@ if [ "$tag" != "$want_tag" ]; then
 	exit 2
 fi
 
+# --carry 沿用别的平台已发布的清单时，先跟线上那份逐字段对一遍。
+#
+# 沿用清单里的 url / signature / deltas 全都指向旧发布页上的资产。
+# 只要有一处对不上，用户升级时就会撞到「签名校验失败」或 404 —— 而这类问题
+# 只在用户点「检查更新」时才炸，发版当场看不出来。所以这里当场比。
+if [ -n "$carried" ]; then
+	echo "== 核对沿用的清单与线上已发布版本"
+	python3 - "$repo" "$prefix" "$version" "$carried" <<'PYCARRY'
+import json, os, subprocess, sys
+
+repo, prefix, version, raw_targets = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+targets = [t.strip().replace("/", "-") for t in raw_targets.split() if t.strip()]
+current_tag = prefix + version
+errors = []
+
+def gh(args, binary=False):
+    # gh api 只收一个 endpoint 参数，所以这里永远传列表而不是字符串。
+    out = subprocess.check_output(["gh", "api"] + [list(args) if isinstance(args, (list, tuple)) else args])
+    return out if binary else json.loads(out)
+
+
+def gh_asset(asset_id):
+    # 下载发布页上的资产本体：默认的 Accept 头返回的是资产元信息，不是文件内容。
+    return subprocess.check_output([
+        "gh", "api", "-H", "Accept: application/octet-stream",
+        "repos/%s/releases/assets/%d" % (repo, asset_id),
+    ])
+
+try:
+    releases = gh("repos/%s/releases?per_page=100" % repo)
+except Exception as error:
+    print("读不到线上发布列表：%s" % error, file=sys.stderr)
+    sys.exit(8)
+
+def compare(name, online, local):
+    for field in ("version", "url", "size", "signature"):
+        if online.get(field) != local.get(field):
+            errors.append("%s 的 %s 与线上不一致：线上=%r 本地=%r"
+                          % (name, field, online.get(field), local.get(field)))
+    for key in ("deltas", "previous"):
+        a = {json.dumps(x, sort_keys=True) for x in online.get(key, [])}
+        b = {json.dumps(x, sort_keys=True) for x in local.get(key, [])}
+        if a != b:
+            errors.append("%s 的 %s 列表与线上不一致（线上 %s 条，本地 %s 条）"
+                          % (name, key, len(a), len(b)))
+
+for target in targets:
+    asset_name = "update-%s.json" % target
+    local_path = os.path.join("build", target, asset_name)
+    found = None
+    for release in releases:
+        if release.get("tag_name") == current_tag:
+            continue
+        for asset in release.get("assets", []):
+            if asset.get("name") == asset_name:
+                found = (release["tag_name"], asset)
+                break
+        if found:
+            break
+    if not found:
+        errors.append("%s：线上找不到已发布的 %s，沿用清单没有来源可核对" % (target, asset_name))
+        continue
+    tag, asset = found
+    try:
+        online = json.loads(gh_asset(asset["id"]))
+    except Exception as error:
+        errors.append("%s：读不下线上清单（%s）" % (target, error))
+        continue
+    if not os.path.isfile(local_path):
+        errors.append("%s：本地缺少沿用清单 %s" % (target, local_path))
+        continue
+    with open(local_path) as handle:
+        local = json.load(handle)
+    compare(asset_name, online, local)
+    url = online.get("url")
+    if not url:
+        errors.append("%s：线上清单没有 url" % asset_name)
+        continue
+    code = subprocess.run(["curl", "-sIL", "-o", "/dev/null", "-w", "%{http_code}", url],
+                          capture_output=True, text=True).stdout.strip()
+    if code != "200":
+        errors.append("%s：线上清单指向的归档取不到（HTTP %s）%s" % (asset_name, code, url))
+
+if errors:
+    print("沿用清单与线上对不上，已停止：", file=sys.stderr)
+    for error in errors:
+        print("  - " + error, file=sys.stderr)
+    sys.exit(8)
+print("沿用清单已与线上逐字段核对一致")
+PYCARRY
+fi
+
 if [ -z "$skip_build" ]; then
 	echo "== 构建 $version"
 	if [ -n "$platforms" ]; then
