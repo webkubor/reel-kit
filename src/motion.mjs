@@ -8,7 +8,9 @@ export async function prepareMotion(page, duration) {
   await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important}' })
   await page.evaluate(duration => {
     const tracks = []
-    for (const image of document.querySelectorAll('img')) {
+    // 只动这一镜的画面（render.mjs 打的 data-reel-shot 标记）。
+    // 不是页面上所有图片 —— logo、装饰图不该跟着镜头动。
+    for (const image of document.querySelectorAll('img[data-reel-shot]')) {
       if (!image.getAttribute('src')) continue
       image.parentElement.style.overflow = 'hidden'
       const track = image.animate([{ scale: '1' }, { scale: '1.04' }], { duration: duration * 1000, fill: 'both', easing: 'linear' })

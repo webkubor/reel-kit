@@ -105,7 +105,13 @@ export async function renderFrames({ template, shots, vars, outDir, width = 1080
   const chrome = findChrome()
   if (!chrome) throw new Error('找不到本机 Chrome,设 CHROME_PATH 指向可执行文件')
 
-  const tpl = readFileSync(template, 'utf-8')
+  const rawTpl = readFileSync(template, 'utf-8')
+  // 标记「这一镜的画面」：动效只作用在它身上。
+  //
+  // 以前是对页面上所有 <img> 做运镜。用户自带模板里放的 logo、角标、装饰图
+  // 也会跟着缩放漂移 —— 那些是模板的固定装饰，不是这一镜的内容，
+  // 动它们等于把版式弄坏，还会让用户以为是自己图片有问题。
+  const tpl = rawTpl.replace(/src=(["'])\{\{image\}\}\1/g, 'src=$1{{image}}$1 data-reel-shot="1"')
   // 画布尺寸优先从模板 body CSS 读,读不到再用参数默认值
   const size = readTemplateSize(tpl) || { width, height }
   mkdirSync(outDir, { recursive: true })
@@ -119,6 +125,8 @@ export async function renderFrames({ template, shots, vars, outDir, width = 1080
   const frames = []
   try {
     for (let i = 0; i < shots.length; i++) {
+      // 取消要在这里就停：否则一镜渲染完才停，用户按取消后还得等一整镜。
+      if (signal?.aborted) throw Object.assign(new Error('已取消'), { cancelled: true })
       const shot = shots[i]
       // 画布尺寸回填进模板占位符：模板写 `width:{{width}}px` 时，
       // 不回填会渲染成 `width:px`（非法声明）→ body 高度塌成 0 → 全屏黑。
