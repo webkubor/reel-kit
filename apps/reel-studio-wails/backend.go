@@ -34,3 +34,47 @@ func (e *Engine) Status() Status {
 
 // Stop 是窗口退出钩子：没有子进程要回收。
 func (e *Engine) Stop() {}
+
+// ──────────────────────────────────────────────────────────────
+// 配置旋钮（从 settings.mjs 搬）：零副作用，全在内存
+// ──────────────────────────────────────────────────────────────
+
+// ListSettingGroups 返回配置分节顺序。
+func (e *Engine) ListSettingGroups() []string {
+	return SettingGroups
+}
+
+// GetSettingSchema 返回全部旋钮定义。
+func (e *Engine) GetSettingSchema() map[string]SettingField {
+	return SettingSchema
+}
+
+// ListPresets 列出所有预设（只给前端看的部分）。
+func (e *Engine) ListPresets() []PresetItem {
+	return ListPresets()
+}
+
+// ResolveSettings 收敛一份完整配置。
+// 顺序：预设 → 流水线默认 → 字段默认 → 用户填的值。
+func (e *Engine) ResolveSettings(kind string, input map[string]interface{}, presetID string) map[string]interface{} {
+	return ResolveSettings(kind, input, presetID)
+}
+
+// DescribeSetting 把某个旋钮的当前值配成人话。
+func (e *Engine) DescribeSetting(key string, value interface{}) string {
+	return DescribeSetting(key, value)
+}
+
+// ──────────────────────────────────────────────────────────────
+// 知识短视频风格库（从 knowledge-styles.mjs 搬）：零副作用
+// ──────────────────────────────────────────────────────────────
+
+// GetKnowledgeStyles 返回 44 套风格元数据。
+func (e *Engine) GetKnowledgeStyles() []KnowledgeStyle {
+	return KnowledgeStyles
+}
+
+// GetStyle 根据风格 key 获取配色与推荐模板。
+func (e *Engine) GetStyle(key string) *StylePalette {
+	return GetStyle(key)
+}

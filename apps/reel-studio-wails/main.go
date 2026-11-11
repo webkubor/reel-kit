@@ -1,7 +1,7 @@
 // Reel Studio 桌面壳（Wails v2）。
 //
 // 零 HTTP：不再起 Node 工作台、不占端口、不常驻进程。所有逻辑通过
-// Go 绑定（window.go.App）直接调用本地引擎。界面由 frontend/dist
+// Go 绑定（window.go.App / window.go.engine）直接调用本地引擎。界面由 frontend/dist
 // 里的引导页提供，Phase 6 会把它换成本地控制台 UI。
 package main
 
@@ -34,7 +34,7 @@ func main() {
 		},
 		OnStartup:          app.startup,
 		OnShutdown:         app.shutdown,
-		Bind:               []interface{}{app},
+		Bind:               []interface{}{app, app.engine},
 		SingleInstanceLock: &options.SingleInstanceLock{UniqueId: "online.webkubor.reelstudio"},
 		Mac: &mac.Options{
 			About: &mac.AboutInfo{
