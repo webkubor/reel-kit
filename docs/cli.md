@@ -79,7 +79,7 @@ reel make --template sticker-promo \
 | `--motion <名>` | 镜内动效，默认 `gentle`（图片缓慢推进、字幕入场，逐帧渲染，更慢）；`none` 为静态画面 |
 | `--keep-frames` | 保留中间产物，调版式用 |
 | `--voice <音色>` | 开启配音，镜头时长改由念白决定 |
-| `--voice-engine <名>` | `voxcraft`（默认，本地 Qwen3-TTS，免费）\| `minimax`（云端 TTS，按量计费） |
+| `--voice-engine <名>` | `edge`（微软高保真 24kHz 在线，免费免 Key）\| `mimo`（小米 MiMo，限时免费）\| `voxcraft`（默认，本地 Qwen3-TTS，免费）\| `minimax`（云端 TTS，按量计费） |
 | `--voice-margin <秒>` | 每镜在念白之后多留的时间，默认 0.45 |
 | `--design <描述>` / `--instruction <文本>` | voxcraft 后端：设计音色 / 语气指令 |
 | `--no-duck` | 不做侧链：人声一响就把配乐压下去这件事关掉 |
@@ -91,8 +91,13 @@ reel make --template sticker-promo \
 
 ```bash
 reel make ... --voice <音色>                              # voxcraft 本地（默认）
+reel make ... --voice zh-CN-XiaoxiaoNeural --voice-engine edge     # 微软 Edge 在线，免 Key
 reel make ... --voice <音色ID> --voice-engine minimax     # MiniMax TTS 直连
+reel make ... --voice <音色ID> --voice-engine mimo        # 小米 MiMo TTS（限时免费）
 ```
+
+`edge` 与 `mimo` 都是免费档，适合批量流水线（一条片子几十句，按量计费会累积）。
+`mimo` 的密钥从 `MIMO_API_KEY` 环境变量或 `~/.reel-kit/config.json` 的 `mimoApiKey` 读取。
 
 | | voxcraft（默认） | MiniMax TTS |
 |---|---|---|
