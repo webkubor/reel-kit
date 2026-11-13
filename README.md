@@ -4,13 +4,13 @@
 
 Reel Studio 是本地桌面视频工作台，适合制作人物介绍、商品介绍和简单的图文讲解短片。写文案、选画幅、配图片，在同一个窗口里制作、播放并导出 MP4。
 
-[下载 macOS Apple Silicon 版](https://github.com/webkubor/reel-kit/releases/download/app-v1.6.1/reel-studio-1.6.1-darwin-arm64.zip) · [发布说明](https://github.com/webkubor/reel-kit/releases/tag/app-v1.6.1) · [官网](https://webkubor.github.io/reel-kit/)
+[下载 macOS Apple Silicon 版](https://github.com/webkubor/reel-kit/releases/download/app-v1.7.0/reel-studio-1.7.0-darwin-arm64.zip) · [发布说明](https://github.com/webkubor/reel-kit/releases/tag/app-v1.7.0) · [官网](https://webkubor.github.io/reel-kit/)
 
 ## 界面一览
 
 ![Reel Studio 桌面工作台：左侧项目列表，中间文案、画幅和素材，右侧画面与历史成片](docs/images/reel-studio-workspace.jpg)
 
-*1.6.1 实际桌面截图：制作与素材工作区。编辑画面用于示意，生成后可在同一区域播放真实成片。*
+*1.7.0 实际桌面截图：制作与素材工作区。编辑画面用于示意，生成后可在同一区域播放真实成片。*
 
 | 工作区 | 在这里做什么 |
 |---|---|
@@ -64,11 +64,11 @@ AI 负责生成文案与分镜数据，视频画面、配音和合成使用本�
 
 | 平台 | 当前发布状态 |
 |---|---|
-| macOS Apple Silicon（M 系列芯片） | [下载 1.6.1 ZIP](https://github.com/webkubor/reel-kit/releases/download/app-v1.6.1/reel-studio-1.6.1-darwin-arm64.zip)，需要 macOS 13 或更新 |
+| macOS Apple Silicon（M 系列芯片） | [下载 1.7.0 ZIP](https://github.com/webkubor/reel-kit/releases/download/app-v1.7.0/reel-studio-1.7.0-darwin-arm64.zip)，需要 macOS 13 或更新 |
 | Windows | 尚未发布本版安装包 |
 | macOS Intel | 尚未发布本版安装包 |
 
-解压后将 `Reel Studio.app` 放入应用程序目录。当前包为 **ad-hoc 签名、未 Apple 公证**，macOS 可能拦截首次启动。[发布页](https://github.com/webkubor/reel-kit/releases/tag/app-v1.6.1)提供 SHA256SUMS 与构建信息。
+解压后将 `Reel Studio.app` 放入应用程序目录。当前包为 **ad-hoc 签名、未 Apple 公证**，macOS 可能拦截首次启动。[发布页](https://github.com/webkubor/reel-kit/releases/tag/app-v1.7.0)提供 SHA256SUMS 与构建信息。
 
 采用手动下载安装，暂不支持自动升级和旧项目自动迁移；旧项目数据不会被删除。
 
