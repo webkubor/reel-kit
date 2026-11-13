@@ -93,46 +93,51 @@ async function speakViaMinimax({ text, out, voice }) {
  *
  * 注意桌面版从 Finder 启动时 PATH 很干净（没有 ~/.local/bin），所以 kyvault 要用
  * 绝对路径兜底，不能只写命令名。
+ *
+ * 来源顺序（先到先得）：
+ *   1. 环境变量 MIMO_API_KEY
+ *   2. ~/.reel-kit/config.json 的 mimoApiKey
+ *   3. kyvault 的 secret://mimo/api-key
+ *
+ * 为什么要有第 3 档：桌面版从 Finder 启动时没有终端环境变量，用户没法
+ * 自己 export；kyvault 是本机的凭据真源，让「装了就能出声」成立。
  */
 async function resolveMimoKey() {
   const fromEnv = process.env.MIMO_API_KEY
   if (fromEnv) return fromEnv.trim()
-
   const fromConfig = readReelConfig().mimoApiKey
   if (fromConfig) return String(fromConfig).trim()
-
-  for (const bin of ['kyvault', join(homedir(), '.local', 'bin', 'kyvault')]) {
-    try {
-      const { stdout } = await run(bin, ['get', 'secret://mimo/api-key'], { timeout: 15000 })
-      const key = String(stdout || '').trim()
-      if (key) return key
-    } catch {
-      // 这一档没装 / 没有这条密钥 —— 继续下一档，最后统一报「三处都没有」
-    }
-  }
+  try {
+    const { stdout } = await run('ky', ['get', 'secret://mimo/api-key'])
+    const v = String(stdout || '').trim()
+    if (v && !v.includes('secret://')) return v
+  } catch { /* 没装 ky 或没有这条凭据 —— 下面统一按「没配」处理 */ }
   return ''
 }
 
 /**
- * 云端配音：小米 MiMo TTS（限时免费）。
+ * 云端配音：小米 MiMo TTS（Token Plan 限时免费）。
  *
  * 为什么单独接一个免费后端：批量流水线一条片子几十句，按量计费的 API 会持续累积；
- * MiMo 的 TTS 目前免费，音色质量够用，且端点与 OpenAI 兼容。
+ * MiMo 的 TTS 在 Token Plan 里是免费的，音色质量够用。
  *
- * 端点是 **`/v1/chat/completions` 而不是 `/v1/audio/speech`** —— MiMo 的音频要走对话接口，
- * 在 messages 里放一条 role=assistant 的消息当要合成的文本，再用 audio 字段指定输出格式。
- * 打 `/v1/audio/speech` 会得到 404，那条路不存在。
+ * ## 三个必须记住的点（都踩过）
  *
- * 认证用 `api-key` 请求头（同时也接受 Authorization: Bearer）。
+ * 1. **域名要用 Token Plan 专用的** `token-plan-cn.xiaomimimo.com`。
+ *    通用域名 `api.xiaomimimo.com` 对 Token Plan 的 key 一律 401。
  *
- * 密钥来源顺序：环境变量 → ~/.reel-kit/config.json → kyvault（secret://mimo/api-key）。
- * kyvault 是本机的凭据真源，最后一档让「桌面版从 Finder 启动」也能出声，
- * 不必让用户手动 export。
+ * 2. **端点是 `/v1/chat/completions` 而不是 `/v1/audio/speech`** —— MiMo 的音频要走
+ *    对话接口：在 messages 里放一条 role=assistant 的消息当待合成文本，
+ *    再用 audio 字段指定输出格式。打 `/v1/audio/speech` 得到 404。
+ *
+ * 3. **认证用 `api-key` 请求头**。只带 `Authorization: Bearer` 的话，
+ *    对话模型能通、TTS 模型会 401 —— 两条路走的是不同的鉴权分支。
  */
 async function speakViaMimo({ text, out, voice }) {
   const key = await resolveMimoKey()
   if (!key) throw new Error('未配置小米 MiMo 密钥（MIMO_API_KEY / ~/.reel-kit/config.json 的 mimoApiKey / kyvault 的 secret://mimo/api-key 三处都没有）')
-  const response = await fetch(process.env.MIMO_BASE_URL || 'https://api.xiaomimimo.com/v1/chat/completions', {
+  const base = process.env.MIMO_BASE_URL || 'https://token-plan-cn.xiaomimimo.com/v1'
+  const response = await fetch(`${base}/chat/completions`, {
     method: 'POST',
     headers: {
       'api-key': key,
