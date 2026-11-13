@@ -120,7 +120,7 @@ make 选项:
 
 配音（让念白驱动镜头时长，而非固定 --per-shot）:
   --voice <音色>       开启配音。edge 默认为 zh-CN-XiaoxiaoNeural；voxcraft 为已注册音色 key；minimax 为音色 ID
-  --voice-engine <名>  edge（微软高保真 24kHz 在线免费，免 Key）| voxcraft（默认本地 Qwen3-TTS，免费）| minimax（云端 TTS，按量计费）
+  --voice-engine <名>  edge（微软高保真 24kHz 在线免费，免 Key）| mimo（小米 MiMo TTS，限时免费）| voxcraft（默认本地 Qwen3-TTS，免费）| minimax（云端 TTS，按量计费）
   --design <描述>      voxcraft 后端：一句话描述音色
   --instruction <文本> 语气/风格指令（voxcraft 后端）
   --voice-margin <秒>  每镜在念白之后多留的时间，默认 0.45

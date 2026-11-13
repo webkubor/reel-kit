@@ -78,6 +78,94 @@ async function speakViaMinimax({ text, out, voice }) {
   return out
 }
 
+/**
+ * 取小米 MiMo 密钥。
+ *
+ * 三档来源，按优先级：
+ *   1. 环境变量 MIMO_API_KEY —— CI / 手动 export 走这条。
+ *   2. ~/.reel-kit/config.json 的 mimoApiKey —— 桌面版从 Finder 启动时没有终端环境变量，
+ *      用户没法自己 export，所以密钥要能落在配置文件里（该文件权限 0600）。
+ *   3. kyvault 的 secret://mimo/api-key —— 本机凭据真源，最后一档兜底。
+ *
+ * 为什么第 3 档要用子进程而不是 SDK：reel-kit 是零依赖工具（package.json 只依赖
+ * playwright-core），引 kyvault SDK 等于给发布包加一条原生依赖链。kyvault 的 CLI
+ * 契约是「stdout 是明文，stderr 给人看」，子进程读 stdout 就够。
+ *
+ * 注意桌面版从 Finder 启动时 PATH 很干净（没有 ~/.local/bin），所以 kyvault 要用
+ * 绝对路径兜底，不能只写命令名。
+ */
+async function resolveMimoKey() {
+  const fromEnv = process.env.MIMO_API_KEY
+  if (fromEnv) return fromEnv.trim()
+
+  const fromConfig = readReelConfig().mimoApiKey
+  if (fromConfig) return String(fromConfig).trim()
+
+  for (const bin of ['kyvault', join(homedir(), '.local', 'bin', 'kyvault')]) {
+    try {
+      const { stdout } = await run(bin, ['get', 'secret://mimo/api-key'], { timeout: 15000 })
+      const key = String(stdout || '').trim()
+      if (key) return key
+    } catch {
+      // 这一档没装 / 没有这条密钥 —— 继续下一档，最后统一报「三处都没有」
+    }
+  }
+  return ''
+}
+
+/**
+ * 云端配音：小米 MiMo TTS（限时免费）。
+ *
+ * 为什么单独接一个免费后端：批量流水线一条片子几十句，按量计费的 API 会持续累积；
+ * MiMo 的 TTS 目前免费，音色质量够用，且端点与 OpenAI 兼容。
+ *
+ * 端点是 **`/v1/chat/completions` 而不是 `/v1/audio/speech`** —— MiMo 的音频要走对话接口，
+ * 在 messages 里放一条 role=assistant 的消息当要合成的文本，再用 audio 字段指定输出格式。
+ * 打 `/v1/audio/speech` 会得到 404，那条路不存在。
+ *
+ * 认证用 `api-key` 请求头（同时也接受 Authorization: Bearer）。
+ *
+ * 密钥来源顺序：环境变量 → ~/.reel-kit/config.json → kyvault（secret://mimo/api-key）。
+ * kyvault 是本机的凭据真源，最后一档让「桌面版从 Finder 启动」也能出声，
+ * 不必让用户手动 export。
+ */
+async function speakViaMimo({ text, out, voice }) {
+  const key = await resolveMimoKey()
+  if (!key) throw new Error('未配置小米 MiMo 密钥（MIMO_API_KEY / ~/.reel-kit/config.json 的 mimoApiKey / kyvault 的 secret://mimo/api-key 三处都没有）')
+  const response = await fetch(process.env.MIMO_BASE_URL || 'https://api.xiaomimimo.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'api-key': key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: process.env.REEL_MIMO_TTS_MODEL || 'mimo-v2.5-tts',
+      messages: [
+        { role: 'assistant', content: text },
+      ],
+      audio: { format: 'mp3', voice: voice || process.env.REEL_MIMO_TTS_VOICE || 'mimo_default' },
+    }),
+    signal: AbortSignal.timeout(120000),
+  })
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const msg = result?.error?.message || result?.message || ''
+    throw new Error(`MiMo HTTP ${response.status}${msg ? `：${msg}` : ''}`)
+  }
+  const audio = result?.choices?.[0]?.message?.audio
+  const b64 = audio?.data
+  if (!b64) throw new Error('MiMo 未返回音频数据')
+  const tmp = out.replace(/\.wav$/, '.mp3')
+  writeFileSync(tmp, Buffer.from(b64, 'base64'))
+  // 流水线后面统一按 wav 处理（拼接、混音），所以这里转一次
+  try {
+    await run('ffmpeg', ['-y', '-loglevel', 'error', '-i', tmp, '-ar', '24000', '-ac', '1', out])
+  } finally { rmSync(tmp, { force: true }) }
+  if (!existsSync(out)) throw new Error(`MiMo 音频转换失败: ${out}`)
+  return out
+}
+
 export async function probeDuration(file) {
   const { stdout } = await run('ffprobe', [
     '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', file,
@@ -146,11 +234,11 @@ export async function synthesizeCaptions({
   if (engine === 'museav') {
     throw new Error(
       'museav 配音已下线：中台的 CLI 里没有 speak 命令，这条路径从来没能跑通。\n' +
-      '  改用 --voice-engine edge（微软 Edge 在线免费高保真）、--voice-engine minimax（云端 TTS），或在 Reel Studio 里选相应通道。',
+      '  改用 --voice-engine edge（微软 Edge 在线免费高保真）、--voice-engine mimo（小米 MiMo，限时免费）、--voice-engine minimax（云端 TTS），或在 Reel Studio 里选相应通道。',
     )
   }
-  if (!['voxcraft', 'minimax', 'edge'].includes(engine)) {
-    throw new Error(`未知的配音后端 "${engine}"；可用：edge（微软在线高保真·免费）、voxcraft（本地）、minimax（云端 TTS）`)
+  if (!['voxcraft', 'minimax', 'edge', 'mimo'].includes(engine)) {
+    throw new Error(`未知的配音后端 "${engine}"；可用：edge（微软在线高保真·免费）、mimo（小米 MiMo·限时免费）、voxcraft（本地）、minimax（云端 TTS·按量计费）`)
   }
   if (engine === 'edge') {
     const { edgeSynthesize } = await import('./edge-tts.mjs')
@@ -171,6 +259,26 @@ export async function synthesizeCaptions({
   }
   if (engine === 'minimax' && (design || instruction)) {
     throw new Error('MiniMax TTS 只做文字配音，不支持音色设计（--design）与指令（--instruction）；这两项请用本地 voxcraft')
+  }
+  if (engine === 'mimo' && (design || instruction)) {
+    throw new Error('MiMo TTS 只做文字配音，不支持音色设计（--design）与指令（--instruction）；这两项请用本地 voxcraft')
+  }
+  // MiMo 走独立分支：它的响应结构（audio.data base64）与 MiniMax 的 hex 不同，
+  // 而且要逐句合成才能把出错位置报到句号。
+  if (engine === 'mimo') {
+    for (let i = 0; i < captions.length; i++) {
+      const text = captions[i]
+      const out = join(outDir, `voice_${String(i).padStart(4, '0')}.wav`)
+      try {
+        await speakViaMimo({ text, out, voice })
+      } catch (e) {
+        throw new Error(`第 ${i + 1} 句配音失败（"${text.slice(0, 20)}"）: ${e.message}`)
+      }
+      const duration = await probeDuration(out)
+      results.push({ file: out, duration })
+      onProgress?.(i + 1, captions.length, duration)
+    }
+    return results
   }
 
   /*
