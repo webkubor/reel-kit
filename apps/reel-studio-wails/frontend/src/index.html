@@ -81,6 +81,22 @@
             </div>
             <div class="panel mb-4 shrink-0">
               <div class="panel-head">
+                <h2 class="panel-title">角色素材库</h2>
+                <button id="btn-new-character" class="btn btn-secondary btn-sm" type="button">＋ 新建角色</button>
+              </div>
+              <div class="panel-body">
+                <p class="help mb-3">
+                  角色资产存在中台，这里只管创建与查看。一个角色要有<strong>名称、体貌四项、五视图</strong>才算建好。
+                </p>
+                <div id="character-list" class="flex flex-col gap-2"></div>
+                <p id="character-empty" class="text-2xs leading-relaxed text-ink-lo">
+                  还没有角色。点「新建角色」，上传一张人脸就能开始。
+                </p>
+              </div>
+            </div>
+
+            <div class="panel mb-4 shrink-0">
+              <div class="panel-head">
                 <h2 class="panel-title">镜头内容</h2>
                 <span id="layout-badge" class="badge">—</span>
               </div>
@@ -237,6 +253,57 @@
         <div class="mt-4 flex justify-end gap-2">
           <button type="button" id="btn-cancel-project" class="btn btn-ghost btn-sm">取消</button>
           <button type="submit" class="btn btn-primary btn-sm">创建</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="character-dialog" aria-labelledby="character-dialog-title" class="w-[520px] max-w-[92vw] rounded-lg border border-line bg-surface p-5 shadow-pop backdrop:bg-ink/20">
+      <form id="character-form">
+        <h2 id="character-dialog-title" class="text-base font-semibold tracking-tight text-ink">新建角色</h2>
+        <p class="mt-1 text-2xs leading-relaxed text-ink-lo">
+          角色档案存在中台。出图与出视频会联网，可能产生费用。
+        </p>
+
+        <div class="field mt-4">
+          <label class="label" for="ch-name">角色名称</label>
+          <input id="ch-name" class="input input-md" maxlength="60" required placeholder="例如：顾栖月" />
+        </div>
+
+        <div class="field">
+          <label class="label" for="ch-persona">形象来源</label>
+          <div id="select-persona" aria-labelledby="ch-persona"></div>
+        </div>
+
+        <div class="field">
+          <label class="label" for="ch-face">人脸照片</label>
+          <div class="flex items-center gap-2">
+            <button id="btn-pick-face" class="btn btn-secondary btn-sm shrink-0" type="button">选择照片</button>
+            <span id="ch-face-name" class="truncate text-2xs text-ink-lo">还没选</span>
+          </div>
+          <p class="help">只要一张能看清五官的正面照。五视图会以它为参考生成，所以脸才锁得住。</p>
+        </div>
+
+        <fieldset class="mb-4">
+          <legend class="label">体貌特征 <span class="label-hint">四项必填</span></legend>
+          <div class="grid grid-cols-2 gap-3">
+            <input id="ch-trait-hair" class="input input-md" placeholder="发型，如 长直发" />
+            <input id="ch-trait-face" class="input input-md" placeholder="脸型，如 鹅蛋脸" />
+            <input id="ch-trait-skin" class="input input-md" placeholder="肤色，如 冷白" />
+            <input id="ch-trait-body" class="input input-md" placeholder="体型，如 纤细高挑" />
+          </div>
+          <p class="help">这四项是「脸像不像」的地基，缺一项就可能换个镜头长成另一个人。</p>
+        </fieldset>
+
+        <div class="field">
+          <label class="label" for="ch-outfit">服装设定 <span class="label-hint">建议填</span></label>
+          <input id="ch-outfit" class="input input-md" maxlength="200" placeholder="如 月白色交领长衫，绣银丝缠枝纹" />
+        </div>
+
+        <p id="character-hint" class="help mb-3" role="status" aria-live="polite"></p>
+
+        <div class="flex justify-end gap-2">
+          <button type="button" id="btn-cancel-character" class="btn btn-ghost btn-sm">取消</button>
+          <button type="submit" id="btn-create-character" class="btn btn-primary btn-sm">创建角色</button>
         </div>
       </form>
     </dialog>

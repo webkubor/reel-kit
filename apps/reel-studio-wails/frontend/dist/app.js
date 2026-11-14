@@ -32,7 +32,21 @@
     planId: '',
     pollTimer: null,
     stageScale: 1,
+    characters: [],
+    characterFace: '',
+    characterBusy: false,
   }
+
+  // 五视图的固定顺序：正面 → 背面。
+  // 跟 Go 侧 CharacterViews 一致 —— 顺序固定，界面每次刷新都一样，
+  // 不按生成顺序排（生成顺序是随机的，会让人以为出问题了）。
+  var CHARACTER_VIEWS = [
+    { key: 'front', label: '正面' },
+    { key: 'left45', label: '左45°' },
+    { key: 'side', label: '正侧面' },
+    { key: 'right45', label: '右45°' },
+    { key: 'back', label: '背面' },
+  ]
 
   // 下拉组件只建一次，之后用 setItems 换内容 ——
   // 重建会在同一个节点上叠事件监听，点一次触发多次。
@@ -81,6 +95,15 @@
       value: state.transition,
       onChange: function (value) { state.transition = value },
     })
+    state.characterPersona = 'real'
+    selects.persona = window.ReelSelect.create($('select-persona'), {
+      items: [
+        { value: 'real', label: '真人', note: '来自真实人物照片' },
+        { value: 'virtual', label: '虚拟人', note: '完全虚构的形象' },
+      ],
+      value: state.characterPersona,
+      onChange: function (value) { state.characterPersona = value },
+    })
     engine()
       .Status()
       .then(function (status) {
@@ -123,6 +146,7 @@
       .catch(fail)
 
     refreshProjects()
+    refreshCharacters()
   }
 
   function layoutItems() {
@@ -144,6 +168,10 @@
   function wire() {
     $('btn-new-project').addEventListener('click', openProjectDialog)
     $('btn-new-project-icon').addEventListener('click', openProjectDialog)
+    $('btn-new-character').addEventListener('click', openCharacterDialog)
+    $('btn-pick-face').addEventListener('click', pickFace)
+    $('btn-cancel-character').addEventListener('click', closeCharacterDialog)
+    $('character-form').addEventListener('submit', createCharacter)
     $('btn-cancel-project').addEventListener('click', function () {
       $('project-dialog').close()
     })
@@ -296,6 +324,175 @@
     if (dialog.showModal) dialog.showModal()
     else dialog.setAttribute('open', 'open')
     $('new-name').focus()
+  }
+
+  // ── 角色素材库 ──────────────────────────────────────────
+  //
+  // 角色资产在中台，这里只管「看完成度」和「从一张脸建一个角色」。
+  // 完成度必须显示缺了什么 —— 只给「未完成」用户不知道下一步做什么。
+  function paintCharacters() {
+    var list = $('character-list')
+    var empty = $('character-empty')
+    clear(list)
+    if (!state.characters.length) {
+      empty.classList.remove('hidden')
+      return
+    }
+    empty.classList.add('hidden')
+    state.characters.forEach(function (character) {
+      list.appendChild(characterCard(character))
+    })
+  }
+
+  function characterCard(character) {
+    var card = el('div', 'character-card' + (character.complete ? ' is-complete' : ''))
+
+    var head = el('div', 'character-head')
+    var left = el('div', 'min-w-0')
+    left.appendChild(el('div', 'character-name', character.name || '未命名角色'))
+    var persona = character.persona === 'virtual' ? '虚拟人' : character.persona === 'real' ? '真人' : ''
+    left.appendChild(el('div', 'text-2xs text-ink-lo', persona))
+    head.appendChild(left)
+    head.appendChild(el('span', 'badge' + (character.complete ? ' badge-accent' : ''), character.complete ? '已建好' : '未建好'))
+    card.appendChild(head)
+
+    // 五视图格子。
+    var views = el('div', 'character-views')
+    var byView = {}
+    ;(character.assets || []).forEach(function (asset) {
+      byView[asset.view] = asset
+    })
+    CHARACTER_VIEWS.forEach(function (view) {
+      var asset = byView[view.key]
+      var cell = el('div', 'character-view' + (asset ? '' : ' is-missing'))
+      if (asset && asset.url) {
+        var img = el('img')
+        img.src = asset.url
+        img.alt = character.name + ' ' + view.label
+        img.loading = 'lazy'
+        cell.appendChild(img)
+      }
+      cell.appendChild(el('span', 'character-view-label', asset ? view.label : '缺 ' + view.label))
+      views.appendChild(cell)
+    })
+    card.appendChild(views)
+
+    if (character.missing && character.missing.length) {
+      card.appendChild(el('p', 'character-missing', '还差：' + character.missing.join('、')))
+    }
+    // 风险提示不拦出片，但要说出来 —— 「无法确认五视图同源」这种，
+    // 悄悄藏起来等于骗用户说样貌锁住了。
+    if (character.warnings && character.warnings.length) {
+      card.appendChild(el('p', 'character-missing', '注意：' + character.warnings.join('、')))
+    }
+    return card
+  }
+
+  function refreshCharacters() {
+    return engine()
+      .ListCharacters('')
+      .then(function (characters) {
+        state.characters = characters || []
+        paintCharacters()
+      })
+      .catch(function (err) {
+        // 中台没登录或不可用不该让整个界面报错 —— 只在角色区说清楚。
+        state.characters = []
+        paintCharacters()
+        var empty = $('character-empty')
+        empty.classList.remove('hidden')
+        empty.textContent = '读不到角色：' + (err && err.message ? err.message : err)
+      })
+  }
+
+  function openCharacterDialog() {
+    var dialog = $('character-dialog')
+    if (dialog.showModal) dialog.showModal()
+    else dialog.setAttribute('open', 'open')
+    $('ch-name').focus()
+  }
+
+  function closeCharacterDialog() {
+    var dialog = $('character-dialog')
+    if (dialog.close) dialog.close()
+    else dialog.removeAttribute('open')
+  }
+
+  function characterTraits() {
+    return {
+      发型: ($('ch-trait-hair').value || '').trim(),
+      脸型: ($('ch-trait-face').value || '').trim(),
+      肤色: ($('ch-trait-skin').value || '').trim(),
+      体型: ($('ch-trait-body').value || '').trim(),
+    }
+  }
+
+  function pickFace() {
+    app()
+      .PickFaceImage()
+      .then(function (path) {
+        if (!path) return
+        state.characterFace = path
+        $('ch-face-name').textContent = path.split('/').pop()
+      })
+      .catch(fail)
+  }
+
+  function createCharacter(event) {
+    event.preventDefault()
+    if (state.characterBusy) return
+    var name = ($('ch-name').value || '').trim()
+    if (!name) { characterHint('角色名不能为空', true); return }
+    if (!state.characterFace) { characterHint('先选一张人脸照片', true); return }
+    var traits = characterTraits()
+    var missing = Object.keys(traits).filter(function (key) { return !traits[key] })
+    if (missing.length) {
+      characterHint('体貌还缺：' + missing.join('、'), true)
+      return
+    }
+
+    state.characterBusy = true
+    $('btn-create-character').disabled = true
+    characterHint('正在中台建角色并生成五视图，这一步会联网计费，请稍候…', false)
+
+    engine()
+      .CreateCharacter({
+        projectId: state.projectId || '',
+        workspace: '',
+        name: name,
+        persona: state.characterPersona || 'real',
+        traits: traits,
+        facePath: state.characterFace,
+        outfit: ($('ch-outfit').value || '').trim(),
+        ratio: '3:4',
+      })
+      .then(function (result) {
+        state.characterBusy = false
+        $('btn-create-character').disabled = false
+        var character = result && result.character
+        if (character && character.complete) {
+          characterHint('角色建好了，可以出片了。', false)
+          closeCharacterDialog()
+        } else {
+          var gap = character && character.missing && character.missing.length
+            ? character.missing.join('、')
+            : '（未知原因）'
+          characterHint('角色还差：' + gap, true)
+        }
+        return refreshCharacters()
+      })
+      .catch(function (err) {
+        state.characterBusy = false
+        $('btn-create-character').disabled = false
+        characterHint(err && err.message ? err.message : String(err), true)
+      })
+  }
+
+  function characterHint(text, isError) {
+    var hint = $('character-hint')
+    hint.textContent = text
+    if (isError) hint.classList.add('help-error')
+    else hint.classList.remove('help-error')
   }
 
   function fail(err) {

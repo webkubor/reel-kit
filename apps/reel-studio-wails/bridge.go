@@ -38,6 +38,46 @@ func (a *App) shutdown(_ context.Context) {
 	a.engine.Stop()
 }
 
+// PickFaceImage 选一张人脸照片，只返回磁盘路径。
+//
+// 不导入成素材：人脸是「建角色的输入」，由 0→1 流程直接交给中台。
+// 先存一份进素材库再从素材库读回来只是多绕一圈，还会让素材列表
+// 混进一堆不是成片素材的人脸图。
+func (a *App) PickFaceImage() (string, error) {
+	if a.ctx == nil {
+		return "", errNoStore
+	}
+	paths, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "选择人脸照片",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "图片", Pattern: "*.png;*.jpg;*.jpeg;*.webp"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if len(paths) == 0 {
+		return "", nil
+	}
+	return string(paths[0]), nil
+}
+
+// ListCharacters 列中台角色（含完成度）。
+func (a *App) ListCharacters(workspace string) ([]*Character, error) {
+	return a.engine.ListCharacters(a.ctx, workspace)
+}
+
+// CreateCharacter 走完 0→1 建角色：一张脸 → 名称 + 体貌 + 五视图齐全的角色。
+//
+// 联网且可能计费（中台出图），所以调用方必须明确触发。
+func (a *App) CreateCharacter(input CharacterCreateInput) (*CharacterResult, error) {
+	return a.engine.CreateCharacter(a.ctx, input, func(text string) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "character:progress", text)
+		}
+	})
+}
+
 // Status 给界面问引擎状态用（Go 绑定，前端调 window.go…Status()）。
 func (a *App) Status() Status {
 	return a.engine.Status()
