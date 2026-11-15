@@ -389,7 +389,9 @@
   }
 
   function refreshCharacters() {
-    return engine()
+    // 走 App 层而不是 Engine 层：App 层是给界面用的薄封装，
+    // Engine 层的方法签名会随内部实现变（带 ctx 之类），界面不该依赖它。
+    return app()
       .ListCharacters('')
       .then(function (characters) {
         state.characters = characters || []
@@ -455,7 +457,7 @@
     $('btn-create-character').disabled = true
     characterHint('正在中台建角色并生成五视图，这一步会联网计费，请稍候…', false)
 
-    engine()
+    app()
       .CreateCharacter({
         projectId: state.projectId || '',
         workspace: '',

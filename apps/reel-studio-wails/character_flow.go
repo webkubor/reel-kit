@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // 角色 0→1 创建流程：一张脸 → 一个可用的角色。
@@ -21,6 +22,12 @@ import (
 // 中台的两条硬约束（见 docs.museav.top/cli/advanced）：
 //   1. 同一张图不能注册两次 —— 五张必须是五张不同的图；
 //   2. 主体和它的图必须在同一个工作区里。
+
+// 中台出五视图要排队，出图本身也要等，给足时间。
+const (
+	characterRequestTimeout = 60 * time.Second
+	characterCreateTimeout  = 20 * time.Minute
+)
 
 // CharacterCreateInput 建角色的输入。
 type CharacterCreateInput struct {
@@ -52,10 +59,14 @@ type CharacterResult struct {
 //
 // 最后一步「重新读回」是故意的：完成度必须按中台真实状态算，
 // 不能按「我刚发了 5 个请求」算 —— 中台可能拒了其中一张。
-func (e *Engine) CreateCharacter(ctx context.Context, input CharacterCreateInput, progress ProgressFunc) (*CharacterResult, error) {
+func (e *Engine) CreateCharacter(input CharacterCreateInput, progress ProgressFunc) (*CharacterResult, error) {
 	if e.store == nil {
 		return nil, errNoStore
 	}
+	// 中台出五视图要排队，可能几分钟；给足时间，但仍要有上限，
+	// 不然界面会一直转。
+	ctx, cancel := context.WithTimeout(context.Background(), characterCreateTimeout)
+	defer cancel()
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
 		return nil, errors.New("角色名不能为空")
@@ -257,7 +268,9 @@ func missingTraitKeys(traits map[string]string) []string {
 //
 // 读的是中台主体列表，逐个拉详情算完成度 —— 列表接口不给名下的图，
 // 只有详情接口给。
-func (e *Engine) ListCharacters(ctx context.Context, workspace string) ([]*Character, error) {
+func (e *Engine) ListCharacters(workspace string) ([]*Character, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), characterRequestTimeout)
+	defer cancel()
 	client := &MuseavClient{Workspace: strings.TrimSpace(workspace)}
 	if err := client.Available(ctx); err != nil {
 		return nil, err
@@ -289,7 +302,9 @@ func (e *Engine) ListCharacters(ctx context.Context, workspace string) ([]*Chara
 }
 
 // GetCharacter 拉一个角色的详情与完成度。
-func (e *Engine) GetCharacter(ctx context.Context, subjectID string) (*Character, error) {
+func (e *Engine) GetCharacter(subjectID string) (*Character, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), characterRequestTimeout)
+	defer cancel()
 	client := &MuseavClient{}
 	if err := client.Available(ctx); err != nil {
 		return nil, err

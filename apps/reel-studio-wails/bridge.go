@@ -64,14 +64,14 @@ func (a *App) PickFaceImage() (string, error) {
 
 // ListCharacters 列中台角色（含完成度）。
 func (a *App) ListCharacters(workspace string) ([]*Character, error) {
-	return a.engine.ListCharacters(a.ctx, workspace)
+	return a.engine.ListCharacters(workspace)
 }
 
 // CreateCharacter 走完 0→1 建角色：一张脸 → 名称 + 体貌 + 五视图齐全的角色。
 //
 // 联网且可能计费（中台出图），所以调用方必须明确触发。
 func (a *App) CreateCharacter(input CharacterCreateInput) (*CharacterResult, error) {
-	return a.engine.CreateCharacter(a.ctx, input, func(text string) {
+	return a.engine.CreateCharacter(input, func(text string) {
 		if a.ctx != nil {
 			runtime.EventsEmit(a.ctx, "character:progress", text)
 		}
