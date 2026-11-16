@@ -59,7 +59,7 @@ func (a *App) PickFaceImage() (string, error) {
 	if len(paths) == 0 {
 		return "", nil
 	}
-	return string(paths[0]), nil
+	return paths, nil
 }
 
 // ListCharacters 列中台角色（含完成度）。

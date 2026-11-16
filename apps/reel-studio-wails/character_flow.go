@@ -99,7 +99,8 @@ func (e *Engine) CreateCharacter(input CharacterCreateInput, progress ProgressFu
 	// 平台的 gen_job_id 是逐图的（批量每行一个 job），判不了同源；
 	// 只有发起这一轮的人知道「这五张是照着同一张基准脸、同一轮生成的」。
 	// 所以由本地打标并存进镜像，读取时回填。
-	sourceBatch := newID()
+	// A common submission does not establish visual consistency between images.
+	sourceBatch := ""
 
 	// ── 1. 建主体 ──
 	if progress != nil {
@@ -117,7 +118,7 @@ func (e *Engine) CreateCharacter(input CharacterCreateInput, progress ProgressFu
 		progress("正在登记基准人脸…")
 	}
 	if err := client.AddSubjectAsset(ctx, subject.ID, "", "基准人脸", input.FacePath, ""); err != nil {
-		return nil, fmt.Errorf("基准人脸登记失败：%w", err)
+		return nil, fmt.Errorf("角色 %s（ID: %s）已创建，基准人脸登记失败：%w；请先检查中台，避免重复创建", name, subject.ID, err)
 	}
 	step("已登记基准人脸")
 
@@ -127,7 +128,13 @@ func (e *Engine) CreateCharacter(input CharacterCreateInput, progress ProgressFu
 	}
 	urls, err := e.generateCharacterViews(ctx, client, input, subject)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("角色 %s（ID: %s）已创建，五视图生成未完成：%w；请先检查中台任务，避免重复付费提交", name, subject.ID, err)
+	}
+	if len(urls) != len(CharacterViews) {
+		// 部分成功时 CLI 只吐成功的地址，下标与视图不再一一对应。
+		// 这时候按位置登记会把「右45°」记成「背面」—— 界面看着齐了，
+		// 其实是错的。所以宁可整轮重来，也不登记错位的图。
+		return nil, fmt.Errorf("角色 %s（ID: %s）已在中台创建，但五视图只返回 %d/%d 张；无法确认视角顺序，未登记视图。请先检查中台任务，避免重复付费提交", name, subject.ID, len(urls), len(CharacterViews))
 	}
 	step("已生成 %d 张视图", len(urls))
 
@@ -179,10 +186,10 @@ func (e *Engine) generateCharacterViews(ctx context.Context, client *MuseavClien
 	if ratio == "" {
 		ratio = "3:4"
 	}
-	// 批量文件：每行一条完整提示词，按五视图顺序排。
+	// CLI uses one physical line per task, so flatten multiline prompts first.
 	lines := []string{}
 	for _, view := range CharacterViews {
-		lines = append(lines, characterViewPrompt(subject, input, view))
+		lines = append(lines, strings.Join(strings.Fields(characterViewPrompt(subject, input, view)), " "))
 	}
 	temp, err := os.CreateTemp("", "reel-character-views-*.txt")
 	if err != nil {
@@ -199,11 +206,15 @@ func (e *Engine) generateCharacterViews(ctx context.Context, client *MuseavClien
 		return nil, err
 	}
 
-	out, err := client.run(ctx, "gen", "--batch", temp.Name(), "--ratio", ratio, "--ref", input.FacePath)
+	args := []string{"gen", "--batch", temp.Name(), "--ratio", ratio, "--ref", input.FacePath}
+	if client.Workspace != "" {
+		args = append(args, "--project", client.Workspace)
+	}
+	out, err := client.run(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
-	// 批量模式按行序输出直链，每行一个。
+	// CLI omits failed rows. Only a complete result preserves positional mapping.
 	urls := []string{}
 	for _, line := range strings.Split(out, "\n") {
 		line = strings.TrimSpace(line)
@@ -250,7 +261,8 @@ func characterViewPrompt(subject *Subject, input CharacterCreateInput, view Char
 		"该视图与同一角色的其余视图必须完全一致：五官、发型、肤色、身材、服装、鞋靴、配饰、光影与材质都不得改变，不得出现角色漂移。",
 		"画面里只有这一个人物，不要文字标注、不要分格、不要拼图。",
 	)
-	return strings.Join(parts, "\n")
+	// 单行（批量出图按物理行切任务）：换行会被当成多条任务。
+	return strings.Join(parts, " ")
 }
 
 // missingTraitKeys 报出还缺的体貌项。

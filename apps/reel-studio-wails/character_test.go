@@ -123,7 +123,7 @@ func TestEvaluateCharacterNoBatchInfo(t *testing.T) {
 	if len(warnings) == 0 {
 		t.Fatal("无法确认同源时应有风险提示")
 	}
-	if !strings.Contains(strings.Join(warnings, "、"), "定妆") {
+	if !strings.Contains(strings.Join(warnings, "、"), "一致性") {
 		t.Fatalf("提示应说明无法确认同一次定妆，实际：%s", strings.Join(warnings, "、"))
 	}
 }
@@ -135,8 +135,8 @@ func TestEvaluateCharacterSameBatch(t *testing.T) {
 	if !complete {
 		t.Fatalf("同批次五视图应判定完成，实际缺件：%v", missing)
 	}
-	if len(warnings) != 0 {
-		t.Fatalf("同批次不应有警示：%v", warnings)
+	if len(warnings) == 0 {
+		t.Fatal("同批提交不能证明人物一致，应提示检查")
 	}
 }
 

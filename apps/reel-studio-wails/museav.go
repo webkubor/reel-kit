@@ -11,7 +11,17 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/google/uuid"
 )
+
+func stringTraits(traits map[string]string) map[string]any {
+	out := make(map[string]any, len(traits))
+	for k, v := range traits {
+		out[k] = v
+	}
+	return out
+}
 
 // museav 中台客户端。
 //
@@ -200,7 +210,11 @@ func (m *MuseavClient) CreateSubject(ctx context.Context, name, kind, persona st
 	if list, err := parseSubjectList(extractJSONArray(out)); err == nil && len(list) > 0 {
 		return &list[0], nil
 	}
-	return nil, errors.New("中台已受理建主体，但回执里没读到主体 ID")
+	// subjects create prints the new UUID on stdout; descriptive text is on stderr.
+	if subjectID, err := uuid.Parse(strings.TrimSpace(out)); err == nil {
+		return &Subject{ID: subjectID.String(), Name: name, Kind: kind, Traits: stringTraits(traits)}, nil
+	}
+	return nil, errors.New("中台已受理建主体，但回执里没读到主体 ID；请先在角色库检查，避免重复创建")
 }
 
 // AddSubjectAsset 把一张图登记到主体名下。

@@ -223,10 +223,8 @@ func (c *Character) consistencyCheck() (string, string) {
 	if len(batches) > 1 {
 		return fmt.Sprintf("五视图来自 %d 个不同批次（不是同一次定妆），样貌会漂", len(batches)), ""
 	}
-	if len(batches) == 0 {
-		return "", "五视图的生成批次没记录，无法确认是不是同一次定妆；出片前留意样貌是否漂"
-	}
-	return "", ""
+	return "", "五视图的样貌一致性尚未核验；请逐张检查人物、服装和视角"
+
 }
 
 // ──────────────────────────────────────────────────────────────
