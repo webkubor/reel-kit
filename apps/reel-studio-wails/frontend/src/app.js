@@ -215,6 +215,13 @@
       })
     }
 
+    $('episode-form').addEventListener('submit', submitEpisode)
+    $('btn-cancel-episode').addEventListener('click', function () { $('episode-dialog').close() })
+    if (window.runtime && window.runtime.EventsOn) {
+      window.runtime.EventsOn('episode:progress', function (text) {
+        if (state.episodeBusy) $('episode-hint').textContent = String(text || '')
+      })
+    }
     $('shoot-form').addEventListener('submit', submitShoot)
     $('btn-cancel-shoot').addEventListener('click', function () { $('shoot-dialog').close() })
     $('btn-run').addEventListener('click', submit)
@@ -799,8 +806,60 @@
       var button = el('button', 'project-item', asset.name || '成片')
       button.type = 'button'
       button.addEventListener('click', function () { showVideo(asset.id) })
+      // 中台出的出镜素材还不是成片：旁边给一个「做成片」，加旁白、混声音。
+      if (asset.source === 'museav') {
+        var row = el('div', 'flex items-center gap-1')
+        button.classList.add('min-w-0', 'flex-1')
+        row.appendChild(button)
+        var make = el('button', 'btn btn-ghost btn-sm shrink-0', '做成片')
+        make.type = 'button'
+        make.addEventListener('click', function () { openEpisodeDialog(asset) })
+        row.appendChild(make)
+        list.appendChild(row)
+        return
+      }
       list.appendChild(button)
     })
+  }
+
+  function openEpisodeDialog(asset) {
+    state.episodeClip = asset
+    $('episode-dialog-title').textContent = '做成片：' + (asset.name || '出镜素材')
+    $('episode-hint').textContent = ''
+    $('episode-hint').classList.remove('help-error')
+    var dialog = $('episode-dialog')
+    if (dialog.showModal) dialog.showModal()
+    else dialog.setAttribute('open', 'open')
+    $('episode-lines').focus()
+  }
+
+  function submitEpisode(event) {
+    event.preventDefault()
+    if (state.episodeBusy || !state.episodeClip) return
+    var lines = ($('episode-lines').value || '').split('\n').map(function (l) { return l.trim() }).filter(Boolean)
+    state.episodeBusy = true
+    $('btn-submit-episode').disabled = true
+    $('episode-hint').classList.remove('help-error')
+    $('episode-hint').textContent = '正在本机配音与合成…'
+    app()
+      .MakeEpisode({
+        ProjectID: state.projectId || '',
+        ClipAssetID: state.episodeClip.id,
+        Lines: lines,
+        KeepAmbient: $('episode-ambient').checked,
+      })
+      .then(function (asset) {
+        state.episodeBusy = false
+        $('btn-submit-episode').disabled = false
+        $('episode-dialog').close()
+        return loadAssets().then(function () { if (asset && asset.id) showVideo(asset.id) })
+      })
+      .catch(function (err) {
+        state.episodeBusy = false
+        $('btn-submit-episode').disabled = false
+        $('episode-hint').classList.add('help-error')
+        $('episode-hint').textContent = String(err && err.message ? err.message : err)
+      })
   }
 
   function findAsset(id) {

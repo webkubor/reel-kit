@@ -335,6 +335,33 @@
       </form>
     </dialog>
 
+    <dialog id="episode-dialog" aria-labelledby="episode-dialog-title" class="w-[480px] max-w-[92vw] rounded-lg border border-line bg-surface p-5 shadow-pop backdrop:bg-ink/20">
+      <form id="episode-form">
+        <h2 id="episode-dialog-title" class="text-base font-semibold tracking-tight text-ink">做成片</h2>
+        <p class="mt-1 text-2xs leading-relaxed text-ink-lo">
+          画面不改，只加旁白、混声音。本机配音与合成，不花钱。按交付红线不烧字幕。
+        </p>
+
+        <div class="field mt-4">
+          <label class="label" for="episode-lines">旁白 <span class="label-hint">一行一句，最多 6 句，可留空</span></label>
+          <textarea id="episode-lines" class="input input-md h-28" placeholder="江湖人只见过那杆枪，&#10;没人见过持枪的人。"></textarea>
+          <p class="help">旁白必须在镜头内念完；念不完会提示删句，不会拉长画面或加速念白。</p>
+        </div>
+
+        <label class="mt-2 flex items-center gap-2 text-sm text-ink">
+          <input id="episode-ambient" type="checkbox" checked />
+          保留素材自带的环境声（有旁白时自动压低）
+        </label>
+
+        <p id="episode-hint" class="help mb-3 mt-3" role="status" aria-live="polite"></p>
+
+        <div class="flex justify-end gap-2">
+          <button type="button" id="btn-cancel-episode" class="btn btn-ghost btn-sm">取消</button>
+          <button type="submit" id="btn-submit-episode" class="btn btn-primary btn-sm">合成</button>
+        </div>
+      </form>
+    </dialog>
+
     <script src="./select.js"></script>
     <script src="./app.js"></script>
   </body>

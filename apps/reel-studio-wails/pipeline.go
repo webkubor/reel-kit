@@ -47,6 +47,36 @@ func (e *Engine) runPipeline(ctx context.Context, job *Job, progress func(text s
 			return "", err
 		}
 		return asset.ID, nil
+	case "episode":
+		lines := []string{}
+		if arr, ok := job.Input["lines"].([]any); ok {
+			for _, v := range arr {
+				if t, ok := v.(string); ok {
+					lines = append(lines, t)
+				}
+			}
+		}
+		keep := true
+		if v, ok := job.Input["keepAmbient"].(bool); ok {
+			keep = v
+		}
+		asset, err := e.MakeEpisode(ctx, EpisodeInput{
+			ProjectID:    job.ProjectID,
+			ClipAssetID:  strOr(job.Input["clipAssetId"], ""),
+			Title:        strOr(job.Input["title"], ""),
+			Lines:        lines,
+			KeepAmbient:  keep,
+			BGMID:        strOr(job.Input["bgmId"], ""),
+			VoiceBackend: strOr(job.Input["voiceBackend"], ""),
+			VoiceModel:   strOr(job.Input["voiceModel"], ""),
+			VoiceID:      strOr(job.Input["voiceId"], ""),
+			Profile:      strOr(job.Input["profile"], ""),
+			Tone:         strOr(job.Input["tone"], ""),
+		}, func(text string) { progress(text, nil) }, report)
+		if err != nil {
+			return "", err
+		}
+		return asset.ID, nil
 	case "":
 		return "", fmt.Errorf("任务缺少类型")
 	default:

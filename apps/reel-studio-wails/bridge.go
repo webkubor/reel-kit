@@ -89,6 +89,17 @@ func (a *App) MakeCharacterVideo(input CharacterVideoInput) (*Asset, error) {
 	}, nil)
 }
 
+// MakeEpisode 把一条出镜素材做成一集：加旁白、混环境声，不烧字幕。
+//
+// 纯本机（本机离线配音 + ffmpeg），不计费。
+func (a *App) MakeEpisode(input EpisodeInput) (*Asset, error) {
+	return a.engine.MakeEpisode(context.Background(), input, func(text string) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "episode:progress", text)
+		}
+	}, nil)
+}
+
 // Status 给界面问引擎状态用（Go 绑定，前端调 window.go…Status()）。
 func (a *App) Status() Status {
 	return a.engine.Status()
