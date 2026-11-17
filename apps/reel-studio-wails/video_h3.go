@@ -127,7 +127,14 @@ func h3ShotPrompt(c *Character, look, action string, spec shotSpec, refs []shotR
 		person = append(person, t.Key+"："+t.Value)
 	}
 	if len(person) > 0 {
-		head = append(head, "【人物】"+c.Name+"。"+strings.Join(person, "；")+"。五官、发型、肤色、体型全程不得改变。")
+		line := "【人物】" + c.Name + "。" + strings.Join(person, "；") + "。五官、发型、肤色、体型全程不得改变。"
+		// 角色卡的外貌/服装字段写的是默认那一套（如「黑金交织战袍」）。选了别的装扮时，
+		// 文字和参考图会打架 —— 明确告诉模型衣服以参考图为准，文字里的衣着描述作废。
+		// 不改中台数据：同一张角色卡还要服务默认装扮。
+		if look != "" && look != DefaultLook {
+			line += "以上文字中的服装、披风、甲胄等衣着描述仅适用于默认装扮，本镜一律以「" + look + "」定妆参考图为准。"
+		}
+		head = append(head, line)
 	} else {
 		head = append(head, "【人物】"+c.Name+"，外貌以参考图为准，全程不得改变。")
 	}

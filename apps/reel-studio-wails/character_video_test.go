@@ -200,3 +200,16 @@ func TestH3ShotPromptCap(t *testing.T) {
 		t.Fatalf("核心约束被截：%s", p[:200])
 	}
 }
+
+// 选了非默认装扮：文字里的默认衣着要让位给该装扮的参考图。
+func TestH3ShotPromptLookOverridesOutfitText(t *testing.T) {
+	c := &Character{Name: "夜惊鸿", Traits: []CharacterTrait{{Key: "外貌", Value: "银色面具，黑金交织战袍"}}}
+	royal := h3ShotPrompt(c, "王服", "回望", shotSpec{Ratio: "16:9", Duration: 15}, nil, "")
+	if !strings.Contains(royal, "本镜一律以「王服」定妆参考图为准") {
+		t.Fatalf("王服应声明衣着以参考图为准：%s", royal)
+	}
+	def := h3ShotPrompt(c, DefaultLook, "回望", shotSpec{Ratio: "16:9", Duration: 15}, nil, "")
+	if strings.Contains(def, "仅适用于默认装扮") {
+		t.Fatalf("默认装扮不该加覆盖声明：%s", def)
+	}
+}
