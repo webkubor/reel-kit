@@ -232,6 +232,13 @@
       })
     }
     $('btn-bind-workspace').addEventListener('click', openBindDialog)
+    if (window.runtime && window.runtime.EventsOn) {
+      window.runtime.EventsOn('shot:progress', function (text) {
+        if (!state.shotBusy) return
+        state.shotNote = String(text || '')
+        paintShots()
+      })
+    }
     $('bind-workspace-form').addEventListener('submit', submitBind)
     $('bind-workspace-cancel').addEventListener('click', function () { $('bind-workspace-dialog').close() })
     $('tab-make').addEventListener('click', function () { setView('make') })
@@ -642,8 +649,7 @@
     state.shots.forEach(function (shot) {
       var card = el('div', 'shot-card' + (shot.status === 'done' ? ' is-done' : ''))
       var head = el('div', 'flex items-center justify-between gap-2')
-      var title = el('div', 'min-w-0')
-      title.appendChild(el('div', 'flex items-baseline gap-2'))
+      var title = el('div', 'flex min-w-0 items-baseline gap-2')
       title.appendChild(el('span', 'text-[10px] font-semibold tabular-nums text-ink-dim', String(shot.number).padStart(2, '0')))
       title.appendChild(el('span', 'truncate text-sm font-medium text-ink', shot.title || '未命名镜头'))
       head.appendChild(title)
@@ -655,8 +661,33 @@
       if (shot.lines && shot.lines.length) {
         card.appendChild(el('p', 'mt-1 text-2xs leading-relaxed text-ink-dim', '旁白：' + shot.lines.join(' / ')))
       }
-      // 镜头与生成任务的关联尚未接通，避免提交后素材无法回填到镜头。
-      card.appendChild(el('p', 'mt-2 text-2xs text-ink-lo', '镜头出镜与成片关联尚未接通'))
+      var who = subjectName(shot.characterId) || '未选角色'
+      var where = shot.sceneId ? (subjectName(shot.sceneId) || '场景已不在中台') : '未指定场景'
+      card.appendChild(el('p', 'mt-1.5 text-2xs text-ink-mid', who + (shot.look ? ' · ' + shot.look : '') + ' · ' + where))
+      var actions = el('div', 'mt-2.5 flex flex-wrap items-center gap-1.5')
+      var busy = shot.status === 'shooting' || state.shotBusy === shot.id
+      var shoot = el('button', 'btn btn-secondary btn-sm', shot.clipAssetId ? '重新出镜' : '出镜')
+      shoot.type = 'button'
+      shoot.disabled = busy || !shot.characterId || !shot.action
+      shoot.title = !shot.characterId ? '先选角色' : 'MiniMax H3 出一段镜头，占用套餐额度'
+      shoot.addEventListener('click', function () { shootShot(shot) })
+      actions.appendChild(shoot)
+      var finish = el('button', 'btn btn-secondary btn-sm', '做成片')
+      finish.type = 'button'
+      finish.disabled = busy || !shot.clipAssetId
+      finish.addEventListener('click', function () { finishShot(shot) })
+      actions.appendChild(finish)
+      var watchID = shot.assetId || shot.clipAssetId
+      if (watchID) {
+        var watch = el('button', 'btn btn-ghost btn-sm', shot.assetId ? '看成片' : '看素材')
+        watch.type = 'button'
+        watch.addEventListener('click', function () { loadAssets().then(function () { showVideo(watchID) }) })
+        actions.appendChild(watch)
+      }
+      card.appendChild(actions)
+      if (state.shotBusy === shot.id && state.shotNote) {
+        card.appendChild(el('p', 'mt-1.5 text-2xs text-accent', state.shotNote))
+      }
       box.appendChild(card)
     })
   }
@@ -679,6 +710,9 @@
       return
     }
     $('new-shot-form').reset()
+    $('new-shot-error').textContent = ''
+    fillSubjectSelect($('shot-character'), 'person', state.subjects.length ? '— 选角色 —' : '— 先绑定中台项目 —')
+    fillSubjectSelect($('shot-scene'), 'scene', '不指定')
     var dialog = $('new-shot-dialog')
     if (dialog.showModal) dialog.showModal()
     else dialog.setAttribute('open', 'open')
@@ -725,6 +759,9 @@
         Title: $('shot-title').value || '',
         Action: $('shot-action').value || '',
         Lines: lines,
+        CharacterID: $('shot-character').value || '',
+        SceneID: $('shot-scene').value || '',
+        Look: ($('shot-look').value || '').trim(),
       })
       .then(function () {
         $('new-shot-dialog').close()
@@ -742,6 +779,54 @@
         return refreshSubjects()
       })
       .catch(fail)
+  }
+
+  function subjectName(id) {
+    if (!id) return ''
+    var hit = state.subjects.filter(function (s) { return s.id === id })[0]
+    return hit ? hit.name : ''
+  }
+
+  function shootShot(shot) {
+    if (state.shotBusy) return
+    if (!window.confirm('用 MiniMax H3 为「' + (shot.title || '镜头') + '」出一段镜头，会占用套餐额度，约 1–5 分钟。继续？')) return
+    runShot(shot, '正在出镜…', function () { return app().ShootShot(shot.id) })
+  }
+
+  function finishShot(shot) {
+    if (state.shotBusy) return
+    runShot(shot, '正在本机配音与合成…', function () { return app().FinishShot(shot.id, true) })
+  }
+
+  function runShot(shot, note, call) {
+    state.shotBusy = shot.id
+    state.shotNote = note
+    paintShots()
+    call().then(function (saved) {
+      state.shotBusy = ''
+      state.shotNote = ''
+      return refreshShots().then(function () {
+        var id = saved && (saved.assetId || saved.clipAssetId)
+        if (id) return loadAssets().then(function () { showVideo(id) })
+      })
+    }).catch(function (err) {
+      state.shotBusy = ''
+      state.shotNote = ''
+      refreshShots()
+      fail(err)
+    })
+  }
+
+  function fillSubjectSelect(select, kind, emptyLabel) {
+    clear(select)
+    var none = el('option', '', emptyLabel)
+    none.value = ''
+    select.appendChild(none)
+    state.subjects.filter(function (s) { return s.kind === kind }).forEach(function (s) {
+      var opt = el('option', '', s.name)
+      opt.value = s.id
+      select.appendChild(opt)
+    })
   }
 
   function shotStatusLabel(status) {
@@ -778,6 +863,7 @@
         state.subjects = subjects || []
         paintCast()
         paintScenes()
+        paintShots()
       })
       .catch(function (err) {
         if (projectID !== state.projectId) return

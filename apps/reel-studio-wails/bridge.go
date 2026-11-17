@@ -120,6 +120,29 @@ func (a *App) CreateShot(input ShotInput) (*EpisodeShot, error) {
 	return a.engine.CreateShot(input)
 }
 
+// SetShotCast 改镜头的内容与选角。
+func (a *App) SetShotCast(input ShotCast) (*EpisodeShot, error) {
+	return a.engine.SetShotCast(input)
+}
+
+// ShootShot 按镜头选角出镜（中台 H3，占套餐额度），结果回填镜头。
+func (a *App) ShootShot(shotID string) (*EpisodeShot, error) {
+	return a.engine.ShootShot(context.Background(), shotID, a.emitter("shot:progress"), nil)
+}
+
+// FinishShot 把镜头素材做成成片（本机，不计费），结果回填镜头。
+func (a *App) FinishShot(shotID string, keepAmbient bool) (*EpisodeShot, error) {
+	return a.engine.FinishShot(context.Background(), shotID, keepAmbient, a.emitter("shot:progress"), nil)
+}
+
+func (a *App) emitter(event string) ProgressFunc {
+	return func(text string) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, event, text)
+		}
+	}
+}
+
 // ListWorkspaces 列可绑定的中台项目。
 func (a *App) ListWorkspaces() ([]WorkspaceOption, error) {
 	return a.engine.ListWorkspaces()

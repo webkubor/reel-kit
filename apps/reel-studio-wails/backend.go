@@ -28,6 +28,9 @@ type Engine struct {
 	// speechOverride 是测试替身：非 nil 时 GenerateSpeech 走它。
 	// 生产路径永远是 nil —— 真实通道（VoxFlow / MiniMax）不受影响。
 	speechOverride func(ctx context.Context, projectID, text, tone, backend, model, voiceID, profile string, speed float64) (*Asset, error)
+	// shootOverride / sceneOverride 同为测试替身：出镜要付费调中台，测试不能真跑。
+	shootOverride func(ctx context.Context, input CharacterVideoInput) (*Asset, error)
+	sceneOverride func(ctx context.Context, workspace, sceneID string) (string, error)
 }
 
 // Status 是引擎当前状态，给界面看。

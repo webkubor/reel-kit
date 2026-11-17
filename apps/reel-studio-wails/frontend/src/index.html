@@ -478,10 +478,25 @@
     <dialog id="new-shot-dialog" aria-labelledby="new-shot-title" class="w-[460px] max-w-[92vw] rounded-lg border border-line bg-surface p-5 shadow-pop">
       <form id="new-shot-form">
         <h2 id="new-shot-title" class="text-base font-semibold tracking-tight text-ink">新建镜头</h2>
+        <p id="new-shot-error" class="help help-error" role="status"></p>
         <p class="mt-1 text-2xs leading-relaxed text-ink-lo">一个镜头 = 一次出镜，出完镜再做成片。</p>
         <div class="field mt-4">
           <label class="label" for="shot-title">镜头小标题</label>
           <input id="shot-title" class="input input-md" maxlength="80" required placeholder="例如：长街回望" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="field">
+            <label class="label" for="shot-character">出镜角色</label>
+            <select id="shot-character" class="input input-md"></select>
+          </div>
+          <div class="field">
+            <label class="label" for="shot-scene">场景 <span class="label-hint">可选</span></label>
+            <select id="shot-scene" class="input input-md"></select>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="shot-look">装扮 <span class="label-hint">留空 = 默认那套定妆</span></label>
+          <input id="shot-look" class="input input-md" maxlength="40" placeholder="例如：王服" />
         </div>
         <div class="field">
           <label class="label" for="shot-action">角色在镜头里做什么</label>

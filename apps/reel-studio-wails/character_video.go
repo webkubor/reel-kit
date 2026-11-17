@@ -26,6 +26,11 @@ type CharacterVideoInput struct {
 	Duration int
 	// Look 这场戏穿哪一套（定妆稿名里的装扮名），空 = 第一套。
 	Look string
+	// Scene 场景画面描述（来自场景主体），空 = 不指定场景。
+	Scene string
+	// ExpectWorkspace 镜头所属项目绑定的中台工作区。非空时角色必须属于它：
+	// 别的片子的角色不能出现在这部戏里。
+	ExpectWorkspace string
 }
 
 // characterVideoTimeout 视频比图慢得多（中台通常 1-5 分钟），给 15 分钟。
@@ -71,6 +76,13 @@ func (e *Engine) MakeCharacterVideo(ctx context.Context, input CharacterVideoInp
 	// 哲学和计费都跟着角色所属的工作区走：沸腾之雪的角色就用沸腾之雪的
 	// 口径、记在沸腾之雪名下。不能用「账号下第一个项目」去猜。
 	client.Workspace = character.Workspace
+	if input.ExpectWorkspace != "" && character.Workspace != input.ExpectWorkspace {
+		return nil, fmt.Errorf("角色「%s」不属于当前项目绑定的中台项目", character.Name)
+	}
+	action := input.Action
+	if scene := strings.TrimSpace(input.Scene); scene != "" {
+		action += "\n【场景】" + scene
+	}
 
 	look := resolveLook(character, input.Look)
 	refs := characterReferences(character, look)
@@ -84,7 +96,7 @@ func (e *Engine) MakeCharacterVideo(ctx context.Context, input CharacterVideoInp
 		philosophy = ws.Philosophy
 	}
 	spec := h3Profile.resolve(input.Ratio, input.Duration, philosophy)
-	prompt := h3ShotPrompt(character, look, input.Action, spec, refs, philosophy.CompileShot(characterTrait(character, "武器")))
+	prompt := h3ShotPrompt(character, look, action, spec, refs, philosophy.CompileShot(characterTrait(character, "武器")))
 	urls := make([]string, 0, len(refs))
 	for _, r := range refs {
 		urls = append(urls, r.URL)
