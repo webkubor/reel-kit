@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"testing"
 )
@@ -61,7 +62,8 @@ func TestStoreConcurrentProgressAndImports(t *testing.T) {
 		defer wg.Done()
 		<-start
 		for i := 0; i < 30; i++ {
-			if _, err := s.AddAsset(p.ID, "image", "image/png", []byte("fixture"), nil); err != nil {
+			// 各用不同内容：同内容会被去重成一份，那测的就不是并发写不丢了。
+			if _, err := s.AddAsset(p.ID, "image", "image/png", []byte(fmt.Sprintf("fixture-%d", i)), nil); err != nil {
 				t.Error(err)
 				return
 			}
@@ -94,5 +96,45 @@ func TestStoreConcurrentProgressAndImports(t *testing.T) {
 	state := reopened.State()
 	if len(state.Projects) != 31 || len(state.Assets) != 30 || len(state.Jobs) != 1 || state.Jobs[0].Status != "succeeded" {
 		t.Fatal("concurrent writes were not all persisted")
+	}
+}
+
+// 并发导入同一张图：只有第一份落盘，其余都拿到同一份 ——
+// 去重必须在锁内判，否则并发下每份都以为自己是首份，照样写十份。
+func TestStoreConcurrentDedup(t *testing.T) {
+	s := newTestStore(t)
+	p, err := s.AddProject("dedup")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	results := make([]*Asset, 20)
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			a, err := s.AddAsset(p.ID, fmt.Sprintf("same-%d.png", i), "image/png", []byte("同一张图"), nil)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			results[i] = a
+		}(i)
+	}
+	wg.Wait()
+	first := results[0]
+	if first == nil {
+		t.Fatal("首份没落盘")
+	}
+	for i, a := range results {
+		if a == nil {
+			t.Fatalf("%d 为空", i)
+		}
+		if a.ID != first.ID {
+			t.Fatalf("%d 拿到不同素材 %s，应全部去重到 %s", i, a.ID, first.ID)
+		}
+	}
+	if got := len(s.State().Assets); got != 1 {
+		t.Fatalf("应只存 1 份，实际 %d 份", got)
 	}
 }

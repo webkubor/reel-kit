@@ -22,6 +22,10 @@ type StudioStore struct {
 	mu    sync.Mutex // Shared by queue updates, imports and snapshots.
 	root  string
 	state *StudioState
+	// local 是素材去重与任务恢复的账本（SQLite）。
+	// studio.json 管「界面看到什么」，local 管「什么内容进来过」——
+	// 没有它，同一张图换个名字导十次就是十份文件。
+	local *LocalDB
 }
 
 // StudioState 对应 store.mjs 里 studio.json 的整体结构。
@@ -48,6 +52,10 @@ type Asset struct {
 	MIME      string `json:"mime"`
 	File      string `json:"file"`
 	CreatedAt string `json:"createdAt"`
+
+	// Hash 内容指纹（sha256）：同项目同内容只存一份。
+	// 旧数据没有这个字段（空串）——空 hash 不参与去重，等它下次被导入时补上。
+	Hash string `json:"hash,omitempty"`
 
 	Width    int     `json:"width,omitempty"`
 	Height   int     `json:"height,omitempty"`
@@ -273,6 +281,17 @@ func NewStudioStoreRoot(root string) (*StudioStore, error) {
 		state.Voices = []*Voice{}
 	}
 	s := &StudioStore{root: root, state: state}
+	// 本地账本（素材去重 + 任务恢复）。打不开就退化为无账本模式：
+	// 导入照常、只是不去重 —— 本地功能不该被一个数据库文件卡死。
+	if ldb, err := OpenLocalDB(filepath.Join(root, "local.db")); err == nil {
+		s.local = ldb
+		// 上次进程退出时还在跑的任务标成中断，不留在「转圈」状态。
+		if stale, err := ldb.InterruptedJobs(); err == nil {
+			for _, j := range stale {
+				_ = ldb.UpdateJobStatus(j.ID, "interrupted", "工作台已重启。请先核对上游任务，避免重复消耗额度。")
+			}
+		}
+	}
 
 	// A restart must not silently submit the same paid request a second time.
 	for _, job := range state.Jobs {
@@ -383,10 +402,18 @@ func (s *StudioStore) AddProject(name string) (*Project, error) {
 }
 
 // AddAsset 写一份素材到媒体目录并登记。
+//
+// 同项目同内容只存一份：按 sha256 查重，命中就直接返回已有的那条。
+// 这挡住的是「同一张图换个名字导十次 = 十份文件」——去重按内容不按名字。
+//
+// 查重必须在锁内做：放锁外的话两个 goroutine 同时导同一张图，都会判
+// 「无重复」，照样写两份。state.Assets 是权威（它就是本地账本里的数据），
+// 账本只补跨重启的老数据。
 func (s *StudioStore) AddAsset(projectID, name, mime string, bytes []byte, extra map[string]any) (*Asset, error) {
 	if _, err := s.Project(projectID); err != nil {
 		return nil, err
 	}
+	hash := HashBytes(bytes)
 	ext := map[string]string{
 		"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif",
 		"video/mp4": ".mp4", "audio/wav": ".wav", "audio/mpeg": ".mp3", "application/json": ".json",
@@ -399,6 +426,7 @@ func (s *StudioStore) AddAsset(projectID, name, mime string, bytes []byte, extra
 		ID: newID(), ProjectID: projectID,
 		Name: truncate(name, 160), MIME: mime, File: newID() + ext,
 		CreatedAt: nowISO(),
+		Hash:      hash,
 	}
 	if extra != nil {
 		// Normalize JSON values before ownership transfer; reject non-serializable data.
@@ -440,16 +468,32 @@ func (s *StudioStore) AddAsset(projectID, name, mime string, bytes []byte, extra
 			a.SetExtra(k, v)
 		}
 	}
+	// 查重到落账本全程持锁：这一段就是「同内容只存一份」的临界区。
+	// 锁内做磁盘写会挡一下 UI 读，但并发导入同一张图时，不锁住就会
+	// 各判一次「无重复」、各写一份 —— 去重就名存实亡了。
+	// saveLocked() 本来就在锁内写盘，这里不比它更慢。
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, existing := range s.state.Assets {
+		if existing.ProjectID == projectID && existing.Hash == hash {
+			return cloneAsset(existing), nil
+		}
+	}
 	if err := os.WriteFile(s.Path(a), bytes, 0o600); err != nil {
 		return nil, fmt.Errorf("写入素材失败: %w", err)
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.state.Assets = append(s.state.Assets, a)
 	if err := s.saveLocked(); err != nil {
 		s.state.Assets = s.state.Assets[:len(s.state.Assets)-1]
 		_ = os.Remove(s.Path(a)) // Only the file created by this failed import.
 		return nil, err
+	}
+	if s.local != nil {
+		// 账本写失败不回滚素材：素材已经存下了，账本丢了大不了下次不去重。
+		_, _, _ = s.local.PutAsset(AssetRow{
+			ID: a.ID, ProjectID: a.ProjectID, Name: a.Name, MIME: a.MIME, File: a.File,
+			Hash: hash, Bytes: int64(len(bytes)), Source: a.Source, Origin: a.Origin, CreatedAt: a.CreatedAt,
+		})
 	}
 	return cloneAsset(a), nil
 }
