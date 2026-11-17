@@ -33,6 +33,12 @@
     pollTimer: null,
     stageScale: 1,
     characters: [],
+    subjects: [],
+    episodes: [],
+    shots: [],
+    episodeId: '',
+    view: 'make',
+    castQuery: '',
     characterFace: '',
     characterBusy: false,
   }
@@ -171,6 +177,7 @@
     $('btn-new-project').addEventListener('click', openProjectDialog)
     $('btn-new-project-icon').addEventListener('click', openProjectDialog)
     $('btn-new-character').addEventListener('click', openCharacterDialog)
+    $('btn-new-cast-character').addEventListener('click', openCharacterDialog)
     $('btn-pick-face').addEventListener('click', pickFace)
     $('btn-cancel-character').addEventListener('click', closeCharacterDialog)
     $('character-form').addEventListener('submit', createCharacter)
@@ -224,6 +231,9 @@
         if (state.episodeBusy) $('episode-hint').textContent = String(text || '')
       })
     }
+    $('btn-bind-workspace').addEventListener('click', openBindDialog)
+    $('bind-workspace-form').addEventListener('submit', submitBind)
+    $('bind-workspace-cancel').addEventListener('click', function () { $('bind-workspace-dialog').close() })
     $('tab-make').addEventListener('click', function () { setView('make') })
     $('tab-product').addEventListener('click', function () { setView('product') })
     $('tab-cast').addEventListener('click', function () { setView('cast') })
@@ -645,16 +655,8 @@
       if (shot.lines && shot.lines.length) {
         card.appendChild(el('p', 'mt-1 text-2xs leading-relaxed text-ink-dim', '旁白：' + shot.lines.join(' / ')))
       }
-      var actions = el('div', 'mt-2 flex items-center gap-1.5')
-      var shoot = el('button', 'btn btn-secondary btn-sm', '出镜')
-      shoot.type = 'button'
-      shoot.addEventListener('click', function () { openShootDialog({ id: shot.characterId, name: shot.title, looks: shot.look ? [shot.look] : [] }) })
-      actions.appendChild(shoot)
-      var finish = el('button', 'btn btn-ghost btn-sm', '做成片')
-      finish.type = 'button'
-      finish.addEventListener('click', function () { openEpisodeDialog({ id: shot.assetId, name: shot.title }) })
-      actions.appendChild(finish)
-      card.appendChild(actions)
+      // 镜头与生成任务的关联尚未接通，避免提交后素材无法回填到镜头。
+      card.appendChild(el('p', 'mt-2 text-2xs text-ink-lo', '镜头出镜与成片关联尚未接通'))
       box.appendChild(card)
     })
   }
@@ -684,6 +686,11 @@
   }
 
   function openSceneDialog() {
+    var project = currentProject()
+    if (!project || !project.workspaceId) {
+      fail(new Error('这个项目还没绑定中台项目：先绑定，场景才知道建在哪'))
+      return
+    }
     $('new-scene-form').reset()
     var dialog = $('new-scene-dialog')
     if (dialog.showModal) dialog.showModal()
@@ -729,7 +736,7 @@
   function submitNewScene(event) {
     event.preventDefault()
     engine()
-      .CreateScene('', $('scene-name').value || '', $('scene-desc').value || '')
+      .CreateProjectScene(state.projectId || '', $('scene-name').value || '', $('scene-desc').value || '')
       .then(function () {
         $('new-scene-dialog').close()
         return refreshSubjects()
@@ -748,19 +755,85 @@
   //
   // 30 个角色、十几个场景，网格 + 搜索才找得动；列表一页放不下几个。
   // 角色卡和场景卡都从同一份主体表来，只按 kind 分开。
+  function currentProject() {
+    return state.projects.filter(function (p) { return p.id === state.projectId })[0] || null
+  }
+
   function refreshSubjects() {
-    return engine()
-      .ListAllSubjects('')
+    var project = currentProject()
+    state.subjectsError = ''
+    paintBinding()
+    if (!project || !project.workspaceId) {
+      state.subjects = []
+      state.subjectsError = project ? '这个项目还没绑定中台项目，角色和场景不知道该从哪读。点顶部「绑定中台项目」。' : '先选一个项目。'
+      paintCast()
+      paintScenes()
+      return Promise.resolve()
+    }
+    var projectID = project.id
+    return app()
+      .ListProjectSubjects(projectID)
       .then(function (subjects) {
+        if (projectID !== state.projectId) return
         state.subjects = subjects || []
         paintCast()
         paintScenes()
       })
       .catch(function (err) {
+        if (projectID !== state.projectId) return
         state.subjects = []
+        state.subjectsError = '读不到中台角色：' + (err && err.message ? err.message : err)
         paintCast()
         paintScenes()
       })
+  }
+
+  function paintBinding() {
+    var project = currentProject()
+    var btn = $('btn-bind-workspace')
+    if (!btn) return
+    btn.textContent = project && project.workspaceName ? '中台：' + project.workspaceName
+      : project && project.workspaceId ? '中台：已绑定' : '绑定中台项目'
+    btn.disabled = !project
+  }
+
+  function openBindDialog() {
+    var project = currentProject()
+    if (!project) { fail(new Error('先选一个项目')); return }
+    var select = $('bind-workspace-select')
+    var err = $('bind-workspace-error')
+    clear(select)
+    err.textContent = '正在读取中台项目…'
+    var dialog = $('bind-workspace-dialog')
+    if (dialog.showModal) dialog.showModal()
+    else dialog.setAttribute('open', 'open')
+    app().ListWorkspaces().then(function (rows) {
+      state.workspaces = rows || []
+      err.textContent = rows && rows.length ? '' : '这个账号下没有中台项目。'
+      ;(rows || []).forEach(function (w) {
+        var opt = el('option', '', w.name || w.id)
+        opt.value = w.id
+        if (w.id === project.workspaceId) opt.selected = true
+        select.appendChild(opt)
+      })
+    }).catch(function (e) {
+      err.textContent = '读不到中台项目：' + (e && e.message ? e.message : e)
+    })
+  }
+
+  function submitBind(event) {
+    event.preventDefault()
+    var project = currentProject()
+    var workspaceID = $('bind-workspace-select').value
+    if (!project || !workspaceID) return
+    app().BindProjectWorkspace(project.id, workspaceID).then(function (saved) {
+      project.workspaceId = saved.workspaceId
+      project.workspaceName = saved.workspaceName || ''
+      $('bind-workspace-dialog').close()
+      return refreshSubjects()
+    }).catch(function (e) {
+      $('bind-workspace-error').textContent = String(e && e.message ? e.message : e)
+    })
   }
 
   function people() {
@@ -782,8 +855,8 @@
       return hay.toLowerCase().indexOf(query) >= 0
     })
     $('cast-count').textContent = list.length + ' 个'
-    if (!state.subjects.length) {
-      empty.textContent = '读不到中台角色：检查 museav 登录态。'
+    if (state.subjectsError) {
+      empty.textContent = state.subjectsError
       return
     }
     if (!list.length) {
@@ -818,6 +891,10 @@
     clear(grid)
     var list = scenes()
     $('scene-count').textContent = list.length + ' 个'
+    if (state.subjectsError) {
+      empty.textContent = state.subjectsError
+      return
+    }
     if (!list.length) {
       empty.textContent = '还没有场景。新建一个场景主体（kind=scene），给参考图和画面描述。'
       return
@@ -848,12 +925,6 @@
       .catch(function (err) {
         // 中台没登录或不可用不该让整个界面报错 —— 只在角色区说清楚。
         state.characters = []
-    state.subjects = []
-    state.episodes = []
-    state.shots = []
-    state.episodeId = ''
-    state.view = 'make'
-    state.castQuery = ''
         paintCharacters()
         var empty = $('character-empty')
         empty.classList.remove('hidden')

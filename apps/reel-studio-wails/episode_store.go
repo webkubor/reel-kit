@@ -103,6 +103,8 @@ func (s *StudioStore) AddEpisode(in EpisodeDraft) (*Episode, error) {
 	if title == "" || len([]rune(title)) > 80 {
 		return nil, errors.New("集名须为 1–80 字")
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	number := in.Number
 	if number <= 0 {
 		number = 1
@@ -115,18 +117,17 @@ func (s *StudioStore) AddEpisode(in EpisodeDraft) (*Episode, error) {
 	now := nowISO()
 	ep := &Episode{
 		ID: newID(), ProjectID: in.ProjectID, Number: number, Title: title,
-		Summary: strings.TrimSpace(in.Summary), CharacterIDs: in.CharacterIDs,
+		Summary: strings.TrimSpace(in.Summary), CharacterIDs: append([]string(nil), in.CharacterIDs...),
 		SceneID: strings.TrimSpace(in.SceneID), Status: "draft",
 		CreatedAt: now, UpdatedAt: now,
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.state.Episodes = append(s.state.Episodes, ep)
 	if err := s.saveLocked(); err != nil {
 		s.state.Episodes = s.state.Episodes[:len(s.state.Episodes)-1]
 		return nil, err
 	}
 	cp := *ep
+	cp.CharacterIDs = append([]string(nil), ep.CharacterIDs...)
 	return &cp, nil
 }
 
@@ -138,6 +139,7 @@ func (s *StudioStore) ListEpisodes(projectID string) []*Episode {
 	for _, e := range s.state.Episodes {
 		if projectID == "" || e.ProjectID == projectID {
 			cp := *e
+			cp.CharacterIDs = append([]string(nil), e.CharacterIDs...)
 			out = append(out, &cp)
 		}
 	}
@@ -152,6 +154,7 @@ func (s *StudioStore) Episode(id string) (*Episode, error) {
 	for _, e := range s.state.Episodes {
 		if e.ID == id {
 			cp := *e
+			cp.CharacterIDs = append([]string(nil), e.CharacterIDs...)
 			return &cp, nil
 		}
 	}
@@ -172,6 +175,7 @@ func (s *StudioStore) UpdateEpisode(id string, apply func(*Episode)) (*Episode, 
 			return nil, err
 		}
 		cp := *e
+		cp.CharacterIDs = append([]string(nil), e.CharacterIDs...)
 		return &cp, nil
 	}
 	return nil, errors.New("剧集不存在")
@@ -179,8 +183,20 @@ func (s *StudioStore) UpdateEpisode(id string, apply func(*Episode)) (*Episode, 
 
 // AddShot 新建一个镜头。
 func (s *StudioStore) AddShot(in ShotInput) (*EpisodeShot, error) {
-	if _, err := s.Episode(in.EpisodeID); err != nil {
-		return nil, err
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var episode *Episode
+	for _, e := range s.state.Episodes {
+		if e.ID == in.EpisodeID {
+			episode = e
+			break
+		}
+	}
+	if episode == nil {
+		return nil, errors.New("剧集不存在")
+	}
+	if episode.ProjectID != in.ProjectID {
+		return nil, errors.New("镜头和剧集必须属于同一项目")
 	}
 	title := strings.TrimSpace(in.Title)
 	if title == "" {
@@ -195,19 +211,18 @@ func (s *StudioStore) AddShot(in ShotInput) (*EpisodeShot, error) {
 	now := nowISO()
 	shot := &EpisodeShot{
 		ID: newID(), ProjectID: in.ProjectID, EpisodeID: in.EpisodeID, Number: number,
-		Title: title, Action: strings.TrimSpace(in.Action), Lines: in.Lines,
+		Title: title, Action: strings.TrimSpace(in.Action), Lines: append([]string(nil), in.Lines...),
 		CharacterID: strings.TrimSpace(in.CharacterID), Look: strings.TrimSpace(in.Look),
 		SceneID: strings.TrimSpace(in.SceneID), Duration: in.Duration,
 		Status: "planned", CreatedAt: now, UpdatedAt: now,
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.state.Shots = append(s.state.Shots, shot)
 	if err := s.saveLocked(); err != nil {
 		s.state.Shots = s.state.Shots[:len(s.state.Shots)-1]
 		return nil, err
 	}
 	cp := *shot
+	cp.Lines = append([]string(nil), shot.Lines...)
 	return &cp, nil
 }
 
@@ -219,6 +234,7 @@ func (s *StudioStore) ListShots(episodeID string) []*EpisodeShot {
 	for _, sh := range s.state.Shots {
 		if episodeID == "" || sh.EpisodeID == episodeID {
 			cp := *sh
+			cp.Lines = append([]string(nil), sh.Lines...)
 			out = append(out, &cp)
 		}
 	}
@@ -233,6 +249,7 @@ func (s *StudioStore) EpisodeShot(id string) (*EpisodeShot, error) {
 	for _, sh := range s.state.Shots {
 		if sh.ID == id {
 			cp := *sh
+			cp.Lines = append([]string(nil), sh.Lines...)
 			return &cp, nil
 		}
 	}
@@ -253,6 +270,7 @@ func (s *StudioStore) UpdateShot(id string, apply func(*EpisodeShot)) (*EpisodeS
 			return nil, err
 		}
 		cp := *sh
+		cp.Lines = append([]string(nil), sh.Lines...)
 		return &cp, nil
 	}
 	return nil, errors.New("镜头不存在")
@@ -338,6 +356,9 @@ func (e *Engine) ListScenes(workspace string) ([]*Subject, error) {
 // 界面需要一次拿到「人物 + 场景」再自己分组 —— 分两次请求会让角色库
 // 面板在载入时闪一下。
 func (e *Engine) ListAllSubjects(workspace string) ([]*Subject, error) {
+	if strings.TrimSpace(workspace) == "" {
+		return nil, errProjectUnbound
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), characterRequestTimeout)
 	defer cancel()
 	client := &MuseavClient{Workspace: strings.TrimSpace(workspace)}
@@ -357,6 +378,9 @@ func (e *Engine) ListAllSubjects(workspace string) ([]*Subject, error) {
 
 // CreateScene 新建一个场景主体。
 func (e *Engine) CreateScene(workspace, name, description string) (*Subject, error) {
+	if strings.TrimSpace(workspace) == "" {
+		return nil, errProjectUnbound
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), characterRequestTimeout)
 	defer cancel()
 	client := &MuseavClient{Workspace: strings.TrimSpace(workspace)}

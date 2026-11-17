@@ -43,9 +43,12 @@ type StudioState struct {
 
 // Project 一个视频项目。
 type Project struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"createdAt"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	CreatedAt   string `json:"createdAt"`
+	WorkspaceID string `json:"workspaceId,omitempty"`
+	// WorkspaceName 绑定时记下的中台项目名，只用于显示。
+	WorkspaceName string `json:"workspaceName,omitempty"`
 }
 
 // Asset 一份素材（图片/视频/音频）。

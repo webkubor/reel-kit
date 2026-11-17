@@ -120,6 +120,26 @@ func (a *App) CreateShot(input ShotInput) (*EpisodeShot, error) {
 	return a.engine.CreateShot(input)
 }
 
+// ListWorkspaces 列可绑定的中台项目。
+func (a *App) ListWorkspaces() ([]WorkspaceOption, error) {
+	return a.engine.ListWorkspaces()
+}
+
+// BindProjectWorkspace 把本地项目绑到中台项目。
+func (a *App) BindProjectWorkspace(projectID, workspaceID string) (*Project, error) {
+	return a.engine.BindProjectWorkspace(projectID, workspaceID)
+}
+
+// ListProjectSubjects 列项目绑定的中台项目里的角色与场景。
+func (a *App) ListProjectSubjects(projectID string) ([]*Subject, error) {
+	return a.engine.ListProjectSubjects(projectID)
+}
+
+// CreateProjectScene 在项目绑定的中台项目里新建场景。
+func (a *App) CreateProjectScene(projectID, name, description string) (*Subject, error) {
+	return a.engine.CreateProjectScene(projectID, name, description)
+}
+
 // ListAllSubjects 列中台全部主体（人物 + 场景），界面自己按 kind 分组。
 func (a *App) ListAllSubjects(workspace string) ([]*Subject, error) {
 	return a.engine.ListAllSubjects(workspace)

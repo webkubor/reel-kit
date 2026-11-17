@@ -61,6 +61,7 @@
           <span id="label-project" class="text-xs text-ink-lo">当前项目</span>
           <div id="project-select" class="w-56" aria-labelledby="label-project"></div>
           <button id="btn-new-project" class="btn btn-secondary btn-sm">＋ 新建项目</button>
+          <button id="btn-bind-workspace" class="btn btn-ghost btn-sm" type="button">绑定中台项目</button>
           <div role="tablist" aria-label="工作区" class="ml-6 flex items-center gap-1">
             <button id="tab-make" class="tab" role="tab" aria-selected="true" aria-controls="view-make">短剧制作</button>
             <button id="tab-product" class="tab" role="tab" aria-selected="false" aria-controls="view-product">产品短片</button>
@@ -277,7 +278,7 @@
                 <h2 class="panel-title">角色</h2>
                 <div class="flex items-center gap-2">
                   <span id="cast-count" class="badge">—</span>
-                  <button id="btn-new-character" class="btn btn-secondary btn-sm" type="button">＋ 新建角色</button>
+                  <button id="btn-new-cast-character" class="btn btn-secondary btn-sm" type="button">＋ 新建角色</button>
                 </div>
               </div>
               <div class="panel-body">
@@ -516,6 +517,16 @@
       </form>
     </dialog>
 
+    <dialog id="bind-workspace-dialog" class="w-[460px] max-w-[92vw] rounded-lg border border-line bg-surface p-5 shadow-pop" aria-labelledby="bind-workspace-title">
+      <form id="bind-workspace-form">
+        <h2 id="bind-workspace-title" class="text-base font-semibold">绑定中台项目</h2>
+        <p class="help">角色和场景将从选中的中台项目读取。</p>
+        <label class="label mt-4" for="bind-workspace-select">中台项目</label>
+        <select id="bind-workspace-select" class="input input-md" required></select>
+        <p id="bind-workspace-error" class="help help-error" role="status"></p>
+        <div class="mt-4 flex justify-end gap-2"><button id="bind-workspace-cancel" type="button" class="btn btn-ghost btn-sm">取消</button><button type="submit" class="btn btn-primary btn-sm">绑定</button></div>
+      </form>
+    </dialog>
     <script src="./select.js"></script>
     <script src="./app.js"></script>
   </body>
