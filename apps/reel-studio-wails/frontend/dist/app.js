@@ -206,6 +206,17 @@
         if (path) $('stage-note').textContent = '成片已导出'
       }).catch(fail)
     })
+    // Go 端 bridge 一直在发 character:progress，前端此前从没订阅过，
+    // 所以建角色时的「正在出第 3 张」这类进度提示根本没显示过。
+    if (window.runtime && window.runtime.EventsOn) {
+      window.runtime.EventsOn('character:progress', function (text) {
+        if (!state.characterBusy) return
+        characterHint(String(text || ''), false)
+      })
+    }
+
+    $('shoot-form').addEventListener('submit', submitShoot)
+    $('btn-cancel-shoot').addEventListener('click', function () { $('shoot-dialog').close() })
     $('btn-run').addEventListener('click', submit)
     $('btn-cancel').addEventListener('click', cancel)
 
@@ -385,7 +396,68 @@
     if (character.warnings && character.warnings.length) {
       card.appendChild(el('p', 'character-missing', '注意：' + character.warnings.join('、')))
     }
+
+    var actions = el('div', 'flex justify-end gap-2 mt-3')
+    var shoot = el('button', 'btn btn-secondary btn-sm', '出镜')
+    shoot.type = 'button'
+    shoot.disabled = !(character.assets && character.assets.length)
+    if (shoot.disabled) {
+      shoot.title = '角色名下还没有定妆稿，先补图才能出镜'
+    } else {
+      shoot.addEventListener('click', function () { openShootDialog(character) })
+    }
+    actions.appendChild(shoot)
+    card.appendChild(actions)
     return card
+  }
+
+  // 出镜：选角色 → 让 ta 出一段镜头。中台出无声素材，配音合成是下一步的事。
+  function openShootDialog(character) {
+    state.shootCharacter = character
+    $('shoot-dialog-title').textContent = '让「' + (character.name || '未命名角色') + '」出镜'
+    $('shoot-hint').textContent = ''
+    $('shoot-action').value = ''
+    var dialog = $('shoot-dialog')
+    if (dialog.showModal) dialog.showModal()
+    else dialog.setAttribute('open', 'open')
+    $('shoot-action').focus()
+  }
+
+  function submitShoot(event) {
+    event.preventDefault()
+    if (state.characterBusy || !state.shootCharacter) return
+    var action = ($('shoot-action').value || '').trim()
+    if (!action) {
+      $('shoot-hint').textContent = '先写清角色在镜头里做什么'
+      $('shoot-hint').classList.add('help-error')
+      return
+    }
+    state.characterBusy = true
+    $('btn-submit-shoot').disabled = true
+    $('shoot-hint').classList.remove('help-error')
+    $('shoot-hint').textContent = '正在提交出镜任务（联网计费）…'
+    app()
+      .MakeCharacterVideo({
+        projectId: state.projectId || '',
+        subjectId: state.shootCharacter.id,
+        action: action,
+      })
+      .then(function (asset) {
+        state.characterBusy = false
+        $('btn-submit-shoot').disabled = false
+        $('shoot-dialog').close()
+        $('shoot-hint').textContent = ''
+        if (asset && asset.id) {
+          $('stage-note').textContent = '出镜素材已入库：' + (asset.name || '出镜.mp4')
+          loadAssets()
+        }
+      })
+      .catch(function (err) {
+        state.characterBusy = false
+        $('btn-submit-shoot').disabled = false
+        $('shoot-hint').classList.add('help-error')
+        $('shoot-hint').textContent = String(err && err.message ? err.message : err)
+      })
   }
 
   function refreshCharacters() {

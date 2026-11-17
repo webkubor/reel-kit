@@ -308,6 +308,27 @@
       </form>
     </dialog>
 
+    <dialog id="shoot-dialog" aria-labelledby="shoot-dialog-title" class="w-[460px] max-w-[92vw] rounded-lg border border-line bg-surface p-5 shadow-pop backdrop:bg-ink/20">
+      <form id="shoot-form">
+        <h2 id="shoot-dialog-title" class="text-base font-semibold tracking-tight text-ink">让角色出镜</h2>
+        <p class="mt-1 text-2xs leading-relaxed text-ink-lo">
+          以定妆稿为参考，中台出一段无声素材。联网且计费，配音与合成在这之后做。
+        </p>
+
+        <div class="field mt-4">
+          <label class="label" for="shoot-action">角色在镜头里做什么</label>
+          <textarea id="shoot-action" class="input input-md h-24" maxlength="400" required placeholder="如 雪巅枯坐，单手按剑，雪粒在肩头堆积"></textarea>
+        </div>
+
+        <p id="shoot-hint" class="help mb-3" role="status" aria-live="polite"></p>
+
+        <div class="flex justify-end gap-2">
+          <button type="button" id="btn-cancel-shoot" class="btn btn-ghost btn-sm">取消</button>
+          <button type="submit" id="btn-submit-shoot" class="btn btn-primary btn-sm">出镜</button>
+        </div>
+      </form>
+    </dialog>
+
     <script src="./select.js"></script>
     <script src="./app.js"></script>
   </body>
