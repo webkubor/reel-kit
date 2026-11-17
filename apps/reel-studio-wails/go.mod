@@ -8,6 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/wailsapp/wails/v2 v2.17.1
 	github.com/zalando/go-keyring v0.2.6
+	modernc.org/sqlite v1.62.0
 )
 
 require (
@@ -47,5 +48,4 @@ require (
 	modernc.org/libc v1.80.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
-	modernc.org/sqlite v1.62.0 // indirect
 )
