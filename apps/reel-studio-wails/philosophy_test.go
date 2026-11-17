@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -61,5 +62,60 @@ func TestPhilosophyCompileKeepsUnknownKeys(t *testing.T) {
 	text := p.Compile().Text
 	if !strings.Contains(text, "【神兵镜头逻辑】螺旋环绕") {
 		t.Fatalf("未知维度被丢掉了：%s", text)
+	}
+}
+
+// 不指定工作区绝不退回第一个：第一个往往是「默认项目」，会套错口径。
+func TestPickWorkspacePhilosophyNoFallback(t *testing.T) {
+	rows := []workspaceRow{
+		{ID: "ws-default", Name: "默认项目", Philosophy: Philosophy{"叙事基调": "温馨"}},
+		{ID: "ws-snow", Name: "沸腾之雪", Philosophy: Philosophy{"叙事基调": "举世皆敌"}},
+	}
+	if _, err := pickWorkspacePhilosophy(rows, ""); err == nil {
+		t.Fatal("未指定工作区应报错，不能退回第一个")
+	}
+	for _, key := range []string{"ws-snow", "沸腾之雪"} {
+		got, err := pickWorkspacePhilosophy(rows, key)
+		if err != nil || got.Name != "沸腾之雪" {
+			t.Fatalf("按 %s 应取到沸腾之雪：%+v %v", key, got, err)
+		}
+	}
+	if _, err := pickWorkspacePhilosophy(rows, "不存在"); err == nil {
+		t.Fatal("找不到的工作区应报错")
+	}
+}
+
+// 出镜提示词不能混进分镜的「只返回 JSON」指令。
+func TestCharacterVideoPromptNoStoryboardInstruction(t *testing.T) {
+	e := &Engine{}
+	p := characterVideoPrompt(&Character{Name: "慕北歌"}, "雪巅枯坐", e.philosophyText(context.Background(), ""))
+	if strings.Contains(p, "JSON") || strings.Contains(p, "分镜编辑") {
+		t.Fatalf("出镜提示词混进了分镜指令：%s", p)
+	}
+}
+
+// 单镜头口径：只留画面维度；神兵谱只留总纲和本角色的兵器。
+func TestPhilosophyCompileShot(t *testing.T) {
+	p := Philosophy{
+		"交付红线": []any{"无字幕"},
+		"画面哲学": "低调摄影",
+		"世界观":  "乾明十七年",
+		"配音体系": "说书人视角",
+		"神兵谱": map[string]any{
+			"总纲": "拒绝玄幻光效",
+			"问天": "至尊汉剑",
+			"惊鸿": "银白透甲长枪",
+		},
+	}
+	got := p.CompileShot("至尊汉剑【问天】，一体龙骨")
+	for _, want := range []string{"无字幕", "低调摄影", "拒绝玄幻光效", "问天：至尊汉剑"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("缺 %q：%s", want, got)
+		}
+	}
+	for _, bad := range []string{"乾明十七年", "说书人", "惊鸿", "长枪"} {
+		if strings.Contains(got, bad) {
+			t.Fatalf("不该带 %q：%s", bad, got)
+		}
 	}
 }

@@ -50,3 +50,43 @@ func TestMimeOrVideo(t *testing.T) {
 		t.Fatalf("已是视频 mime 不该动，实际 %s", got)
 	}
 }
+
+// 沸腾之雪的真实形态：全部 role=raw，名字是「X-三视图 / X-问天剑」。
+// 这些图归不进五视图，但必须进出镜参考，且三视图排在兵器图前面。
+func TestSubjectToCharacterKeepsRawDesignSheets(t *testing.T) {
+	detail := SubjectDetail{
+		Subject: Subject{ID: "s1", WorkspaceID: "ws-snow", Name: "慕北歌", Kind: "person"},
+		Assets: []SubjectAsset{
+			{ID: "a1", Role: "raw", Name: "慕北歌-问雪剑", URL: "u-sword1"},
+			{ID: "a2", Role: "raw", Name: "慕北歌-问天剑", URL: "u-sword2"},
+			{ID: "a3", Role: "raw", Name: "慕北歌-三视图", URL: "u-sheet"},
+		},
+	}
+	c := subjectToCharacter(detail, "", "")
+	if len(c.Assets) != 0 {
+		t.Fatalf("组合稿不该被硬塞进五视图格子：%+v", c.Assets)
+	}
+	if len(c.References) != 3 {
+		t.Fatalf("三张图都应进参考：%+v", c.References)
+	}
+	if c.Workspace != "ws-snow" {
+		t.Fatalf("工作区应来自主体：%q", c.Workspace)
+	}
+	got := characterReferenceURLs(c)
+	if len(got) != 3 || got[0] != "u-sheet" {
+		t.Fatalf("三视图应排第一：%v", got)
+	}
+}
+
+// 五视图 + 同 URL 重复时不重复提交，且总数封顶 9。
+func TestCharacterReferenceURLsDedupAndCap(t *testing.T) {
+	c := &Character{Assets: []CharacterAsset{{View: ViewFront, URL: "u0"}}}
+	c.References = append(c.References, CharacterAsset{View: ViewFront, URL: "u0"})
+	for i := 1; i <= 12; i++ {
+		c.References = append(c.References, CharacterAsset{Name: "道具", URL: "u" + string(rune('a'+i))})
+	}
+	got := characterReferenceURLs(c)
+	if len(got) != 9 || got[0] != "u0" {
+		t.Fatalf("应去重并封顶 9：%v", got)
+	}
+}

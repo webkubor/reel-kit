@@ -66,6 +66,9 @@ func (e *Engine) MakeCharacterVideo(ctx context.Context, input CharacterVideoInp
 		return nil, err
 	}
 	character := subjectToCharacter(*detail, input.ProjectID, e.sourceBatchFor(detail.Subject.ID))
+	// 哲学和计费都跟着角色所属的工作区走：沸腾之雪的角色就用沸腾之雪的
+	// 口径、记在沸腾之雪名下。不能用「账号下第一个项目」去猜。
+	client.Workspace = character.Workspace
 
 	// 参考图：五视图优先（模型能拼出转面），没有就退而求其次用名下任意图。
 	refs := characterReferenceURLs(character)
@@ -78,7 +81,7 @@ func (e *Engine) MakeCharacterVideo(ctx context.Context, input CharacterVideoInp
 
 	report(Step{ID: "video", Label: "角色出镜", Status: "running", Origin: "cloud-paid", Engine: "museav 视频出片"})
 	progress(fmt.Sprintf("正在提交视频任务（计费 %d 张参考图）", len(refs)))
-	prompt := characterVideoPrompt(character, input.Action, e.systemInstruction(ctx, nil))
+	prompt := characterVideoPrompt(character, input.Action, e.shotPhilosophyText(ctx, character.Workspace, characterTrait(character, "武器")))
 	url, err := client.GenerateVideo(ctx, prompt, input.Ratio, input.Duration, refs)
 	if err != nil {
 		report(Step{ID: "video", Label: "角色出镜", Status: "failed", Origin: "cloud-paid", Detail: err.Error()})
@@ -107,26 +110,52 @@ func (e *Engine) MakeCharacterVideo(ctx context.Context, input CharacterVideoInp
 	return asset, nil
 }
 
-// characterReferenceURLs 挑参考图：五视图按固定顺序在前，其余补上。
+// characterReferenceURLs 挑参考图，按「锁脸价值」排序：
+//  1. 归位的五视图（按正→左45→侧→右45→背）
+//  2. 名字带「三视图 / 定妆 / 设定」的组合稿 —— 设计师定稿，最稳
+//  3. 其余（兵器、面具等道具图）—— 有助于道具一致，但不锁脸
+//
+// 同一 URL 只出现一次，上限 9 张（中台限制）。
 func characterReferenceURLs(c *Character) []string {
 	out := []string{}
+	seen := map[string]bool{}
+	add := func(u string) {
+		if u == "" || seen[u] || len(out) >= 9 {
+			return
+		}
+		seen[u] = true
+		out = append(out, u)
+	}
 	for _, view := range CharacterViews {
 		for _, a := range c.Assets {
-			if a.View == view && a.URL != "" {
-				out = append(out, a.URL)
+			if a.View == view {
+				add(a.URL)
 				break
 			}
 		}
 	}
-	for _, a := range c.Assets {
-		if a.View == "" && a.URL != "" {
-			out = append(out, a.URL)
-			if len(out) >= 9 {
-				break
-			}
+	pool := c.References
+	if len(pool) == 0 {
+		pool = c.Assets
+	}
+	for _, a := range pool {
+		if isDesignSheet(a.Name) {
+			add(a.URL)
 		}
+	}
+	for _, a := range pool {
+		add(a.URL)
 	}
 	return out
+}
+
+func isDesignSheet(name string) bool {
+	for _, k := range []string{"三视图", "定妆", "设定", "turnaround"} {
+		if strings.Contains(strings.ToLower(name), k) {
+			return true
+		}
+	}
+	return false
 }
 
 // characterVideoPrompt 组装出镜提示词：角色卡管「这个人长什么样」，
@@ -155,4 +184,14 @@ func mimeOrVideo(mime string) string {
 		return mime
 	}
 	return "video/mp4"
+}
+
+// characterTrait 取角色卡里某一项体貌/设定。
+func characterTrait(c *Character, key string) string {
+	for _, t := range c.Traits {
+		if t.Key == key {
+			return t.Value
+		}
+	}
+	return ""
 }

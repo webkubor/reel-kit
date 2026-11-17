@@ -400,7 +400,10 @@
     var actions = el('div', 'flex justify-end gap-2 mt-3')
     var shoot = el('button', 'btn btn-secondary btn-sm', '出镜')
     shoot.type = 'button'
-    shoot.disabled = !(character.assets && character.assets.length)
+    // 能不能出镜看 references（含三视图组合稿），不看五视图格子：
+    // 导入的定妆稿多是一张拼好的三视图，归不进格子，但它就是最稳的参考。
+    var refs = (character.references && character.references.length) ? character.references : (character.assets || [])
+    shoot.disabled = !refs.length
     if (shoot.disabled) {
       shoot.title = '角色名下还没有定妆稿，先补图才能出镜'
     } else {

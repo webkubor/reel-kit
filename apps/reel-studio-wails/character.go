@@ -123,6 +123,13 @@ type Character struct {
 	Persona string           `json:"persona"`
 	Traits  []CharacterTrait `json:"traits"`
 	Assets  []CharacterAsset `json:"assets"`
+	// References 名下全部可作参考的图（含认不出视图的定妆稿/三视图组合稿/兵器图）。
+	//
+	// 与 Assets 分开：Assets 只放能归位到五视图的图，决定完成度判定；
+	// References 决定「出镜时能拿什么当参考」。导入的设计稿多是一张拼好的
+	// 三视图（role=raw），归不了位，但恰恰是最稳的定妆源 —— 不能因为它
+	// 不进五视图就让角色出不了镜。
+	References []CharacterAsset `json:"references"`
 	// Complete 是否创建完成。
 	Complete bool `json:"complete"`
 	// Missing 缺件清单（可读中文），Complete 为 false 时告诉用户还差什么。
@@ -350,18 +357,23 @@ func subjectToCharacter(detail SubjectDetail, projectID, sourceBatch string) *Ch
 		Persona:     strings.TrimSpace(derefStr(detail.Subject.PersonaSource)),
 		Traits:      subjectTraits(detail.Subject.Traits),
 		Assets:      []CharacterAsset{},
+		References:  []CharacterAsset{},
 		SourceBatch: sourceBatch,
 		CreatedAt:   detail.Subject.CreatedAt,
 		UpdatedAt:   detail.Subject.UpdatedAt,
 	}
 	for _, a := range detail.Assets {
-		view, ok := CharacterViewFromSubjectRole(a.Role, a.Name)
-		if !ok {
+		if a.URL == "" || a.Role == "output" {
 			continue
 		}
-		c.Assets = append(c.Assets, CharacterAsset{
+		view, ok := CharacterViewFromSubjectRole(a.Role, a.Name)
+		item := CharacterAsset{
 			ID: a.ID, View: view, Role: a.Role, Name: a.Name, URL: a.URL, JobID: a.JobID, SourceBatch: sourceBatch,
-		})
+		}
+		c.References = append(c.References, item)
+		if ok {
+			c.Assets = append(c.Assets, item)
+		}
 	}
 	c.Complete, c.Missing, c.Warnings = EvaluateCharacter(c)
 	return c

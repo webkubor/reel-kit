@@ -64,26 +64,35 @@ func (m *MuseavClient) GetWorkspacePhilosophy(ctx context.Context, workspace str
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("读取中台工作区失败：HTTP %d", resp.StatusCode)
 	}
-	var rows []struct {
-		ID         string     `json:"id"`
-		Name       string     `json:"name"`
-		Philosophy Philosophy `json:"philosophy"`
-	}
+	var rows []workspaceRow
 	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil {
 		return nil, err
 	}
-	if workspace != "" {
-		for i := range rows {
-			if rows[i].ID == workspace || rows[i].Name == workspace {
-				return &WorkspacePhilosophy{Name: rows[i].Name, Philosophy: rows[i].Philosophy}, nil
-			}
+	return pickWorkspacePhilosophy(rows, workspace)
+}
+
+type workspaceRow struct {
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	Philosophy Philosophy `json:"philosophy"`
+}
+
+// pickWorkspacePhilosophy 按 id 或名字挑工作区。
+//
+// 不给工作区就报错，绝不退回「第一个」：账号下有多个项目时，第一个
+// 往往是「默认项目」，武侠角色会被套上别的片子的口径 —— 宁可没哲学，
+// 也不要错哲学。
+func pickWorkspacePhilosophy(rows []workspaceRow, workspace string) (*WorkspacePhilosophy, error) {
+	workspace = strings.TrimSpace(workspace)
+	if workspace == "" {
+		return nil, errors.New("未指定中台工作区，不读创作哲学")
+	}
+	for i := range rows {
+		if rows[i].ID == workspace || rows[i].Name == workspace {
+			return &WorkspacePhilosophy{Name: rows[i].Name, Philosophy: rows[i].Philosophy}, nil
 		}
-		return nil, fmt.Errorf("中台没有工作区「%s」", workspace)
 	}
-	if len(rows) == 0 {
-		return nil, errors.New("中台没有工作区")
-	}
-	return &WorkspacePhilosophy{Name: rows[0].Name, Philosophy: rows[0].Philosophy}, nil
+	return nil, fmt.Errorf("中台没有工作区「%s」", workspace)
 }
 
 // Compile 把项目哲学编译成提示词片段。
@@ -130,6 +139,49 @@ func (p Philosophy) Compile() PhilosophyFragment {
 		}
 	}
 	return PhilosophyFragment{Text: b.String(), Redlines: redlines}
+}
+
+// shotKeys 单镜头出镜用得上的维度。世界观、配音、技能方法论、三视图 SOP
+// 是写剧本/做角色的口径，塞进视频提示词只会稀释约束、让模型抓不住重点。
+var shotKeys = []string{"交付红线", "叙事基调", "画面哲学", "动作美学", "镜头语言", "出片规格"}
+
+// CompileShot 编译单镜头出镜的哲学片段。
+//
+// 神兵谱只留总纲和这个角色自己的兵器：把十四把神兵全写进去，
+// 模型会把别人的枪画到这个人手里。weapon 是角色卡里的「武器」字段。
+func (p Philosophy) CompileShot(weapon string) string {
+	if len(p) == 0 {
+		return ""
+	}
+	sub := Philosophy{}
+	for _, k := range shotKeys {
+		if v, ok := p[k]; ok {
+			sub[k] = v
+		}
+	}
+	text := sub.Compile().Text
+	if armory, ok := p["神兵谱"].(map[string]any); ok {
+		parts := []string{}
+		if s := flattenValue(armory["总纲"], 0); s != "" {
+			parts = append(parts, s)
+		}
+		names := make([]string, 0, len(armory))
+		for k := range armory {
+			names = append(names, k)
+		}
+		sort.Strings(names)
+		for _, k := range names {
+			if k != "总纲" && weapon != "" && strings.Contains(weapon, k) {
+				if s := flattenValue(armory[k], 0); s != "" {
+					parts = append(parts, k+"："+s)
+				}
+			}
+		}
+		if len(parts) > 0 {
+			text += "【神兵】" + strings.Join(parts, "；") + "。"
+		}
+	}
+	return text
 }
 
 // flattenValue 把嵌套的哲学结构压成一段可读文本。
@@ -210,25 +262,47 @@ func museavCredentials() (token, baseURL string, err error) {
 	return cfg.Token, strings.TrimRight(cfg.BaseURL, "/"), nil
 }
 
+// philosophyText 读指定工作区的哲学并编译成一段提示词。
+//
+// 取不到（没登录 / 没指定工作区 / 工作区没写哲学）就返回空串：
+// 本地功能不该被中台可用性绑架。
+func (e *Engine) philosophyText(ctx context.Context, workspace string) string {
+	if strings.TrimSpace(workspace) == "" {
+		return ""
+	}
+	ws, err := (&MuseavClient{}).GetWorkspacePhilosophy(ctx, workspace)
+	if err != nil || ws == nil {
+		return ""
+	}
+	return ws.Philosophy.Compile().Text
+}
+
+// shotPhilosophyText 读指定工作区的哲学，按单镜头口径编译。
+func (e *Engine) shotPhilosophyText(ctx context.Context, workspace, weapon string) string {
+	if strings.TrimSpace(workspace) == "" {
+		return ""
+	}
+	ws, err := (&MuseavClient{}).GetWorkspacePhilosophy(ctx, workspace)
+	if err != nil || ws == nil {
+		return ""
+	}
+	return ws.Philosophy.CompileShot(weapon)
+}
+
 // systemInstruction 组装分镜生成的系统提示词。
 //
-// 哲学在这里进提示词：项目哲学管「这类画面长什么样」，跟角色卡一起编译。
-// 取不到哲学（没登录中台 / 项目没绑工作区）就退回裸指令 —— 本地功能不该
-// 被中台可用性绑架，但要把原因说出来。
+// 工作区取自任务入参 workspace；没给就只用裸指令，不猜项目。
 func (e *Engine) systemInstruction(ctx context.Context, job *Job) string {
-	base := storyboardInstruction
 	workspace := ""
 	if job != nil && job.Input != nil {
 		workspace, _ = job.Input["workspace"].(string)
 	}
-	client := &MuseavClient{}
-	ws, err := client.GetWorkspacePhilosophy(ctx, workspace)
-	if err != nil || ws == nil || len(ws.Philosophy) == 0 {
+	return withPhilosophy(storyboardInstruction, e.philosophyText(ctx, workspace))
+}
+
+func withPhilosophy(base, philosophy string) string {
+	if philosophy == "" {
 		return base
 	}
-	frag := ws.Philosophy.Compile()
-	if frag.Text == "" {
-		return base
-	}
-	return base + "\n\n本片的创作哲学（画面与动作的口径，分镜必须体现）：" + frag.Text
+	return base + "\n\n本片的创作哲学（画面与动作的口径，分镜必须体现）：" + philosophy
 }
