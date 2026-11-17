@@ -253,6 +253,7 @@
     $('new-episode-form').addEventListener('submit', submitNewEpisode)
     $('btn-cancel-new-episode').addEventListener('click', function () { $('new-episode-dialog').close() })
     $('new-shot-form').addEventListener('submit', submitNewShot)
+    $('shot-character').addEventListener('change', function (event) { loadLooksFor(event.target.value) })
     $('btn-cancel-new-shot').addEventListener('click', function () { $('new-shot-dialog').close() })
     $('new-scene-form').addEventListener('submit', submitNewScene)
     $('btn-cancel-new-scene').addEventListener('click', function () { $('new-scene-dialog').close() })
@@ -713,6 +714,7 @@
     $('new-shot-error').textContent = ''
     fillSubjectSelect($('shot-character'), 'person', state.subjects.length ? '— 选角色 —' : '— 先绑定中台项目 —')
     fillSubjectSelect($('shot-scene'), 'scene', '不指定')
+    fillLooks([])
     var dialog = $('new-shot-dialog')
     if (dialog.showModal) dialog.showModal()
     else dialog.setAttribute('open', 'open')
@@ -761,7 +763,7 @@
         Lines: lines,
         CharacterID: $('shot-character').value || '',
         SceneID: $('shot-scene').value || '',
-        Look: ($('shot-look').value || '').trim(),
+        Look: $('shot-look').value || '',
       })
       .then(function () {
         $('new-shot-dialog').close()
@@ -826,6 +828,36 @@
       var opt = el('option', '', s.name)
       opt.value = s.id
       select.appendChild(opt)
+    })
+  }
+
+  // 装扮只能从角色名下的定妆稿里选：手填的名字对不上定妆稿，就会退回默认那套。
+  function fillLooks(looks) {
+    var select = $('shot-look')
+    clear(select)
+    var def = el('option', '', looks.length ? '默认' : '— 先选角色 —')
+    def.value = ''
+    select.appendChild(def)
+    looks.forEach(function (look) {
+      if (look === '默认') return
+      var opt = el('option', '', look)
+      opt.value = look
+      select.appendChild(opt)
+    })
+    select.disabled = looks.length < 2
+  }
+
+  function loadLooksFor(characterID) {
+    fillLooks([])
+    if (!characterID) return
+    state.looksFor = characterID
+    $('shot-look').firstChild.textContent = '读取定妆稿…'
+    engine().GetCharacter(characterID).then(function (c) {
+      if (state.looksFor !== characterID) return
+      var looks = (c && c.looks) || []
+      fillLooks(looks.length ? looks : ['默认'])
+    }).catch(function () {
+      if (state.looksFor === characterID) fillLooks(['默认'])
     })
   }
 
@@ -1440,6 +1472,7 @@
 
   // ── 画面台 ────────────────────────────────────────────
   function paintStage() {
+    state.stageMedia = null
     var video = $('stage-video')
     video.pause()
     video.classList.add('hidden')
@@ -1490,6 +1523,12 @@
     var portrait = canvas.classList.contains('mp')
     var cw = portrait ? 1080 : 1920
     var ch = portrait ? 1920 : 1080
+    // 看真实视频/原图时跟着素材本身的比例走：H3 出的是 1344×768 横版，
+    // 塞进竖版框里人物只剩一条，看不清脸也看不清镜头。
+    if (state.stageMedia && state.stageMedia.w && state.stageMedia.h) {
+      cw = state.stageMedia.w
+      ch = state.stageMedia.h
+    }
 
     var available = wrap.parentElement.clientWidth
     var maxHeight = 460
@@ -1673,8 +1712,13 @@
     $('stage-video').classList.add('hidden')
     $('stage-canvas').classList.add('hidden')
     $('btn-export').classList.add('hidden')
-    $('stage-image').src = '/media/' + state.selectedAsset
-    $('stage-image').classList.remove('hidden')
+    var image = $('stage-image')
+    image.onload = function () {
+      state.stageMedia = { w: image.naturalWidth, h: image.naturalHeight }
+      layoutStage()
+    }
+    image.src = '/media/' + state.selectedAsset
+    image.classList.remove('hidden')
     $('stage-note').textContent = '图片原图 · ' + (findAsset(state.selectedAsset).name || '')
   }
 
@@ -1683,6 +1727,10 @@
     var video = $('stage-video')
     var canvas = $('stage-canvas')
     state.videoId = assetID
+    video.onloadedmetadata = function () {
+      state.stageMedia = { w: video.videoWidth, h: video.videoHeight }
+      layoutStage()
+    }
     video.src = '/media/' + assetID
     $('btn-export').classList.remove('hidden')
     video.classList.remove('hidden')
