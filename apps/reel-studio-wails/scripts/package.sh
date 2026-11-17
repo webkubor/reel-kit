@@ -20,9 +20,9 @@ MACOSX_DEPLOYMENT_TARGET=13.0 \
   CGO_LDFLAGS="${CGO_LDFLAGS:-} -mmacosx-version-min=13.0" \
   "$wails" build -platform darwin/arm64 -s
 bash package-local.sh "$output" "$resources"
-version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$output/Reel Studio.app/Contents/Info.plist")
-ditto -c -k --sequesterRsrc --keepParent "$output/Reel Studio.app" "$output/reel-studio-${version}-darwin-arm64.zip"
-(cd "$output" && shasum -a 256 "reel-studio-${version}-darwin-arm64.zip" > SHA256SUMS)
+version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$output/muse-tv.app/Contents/Info.plist")
+ditto -c -k --sequesterRsrc --keepParent "$output/muse-tv.app" "$output/muse-tv-${version}-darwin-arm64.zip"
+(cd "$output" && shasum -a 256 "muse-tv-${version}-darwin-arm64.zip" > SHA256SUMS)
 # Only a clean committed source tree can provide release provenance.
 git diff --quiet HEAD -- . || { printf 'Commit source changes before making a release package.\n' >&2; exit 1; }
 commit=$(git rev-parse HEAD)

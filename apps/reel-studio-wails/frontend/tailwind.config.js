@@ -1,61 +1,57 @@
 /**
- * tailwind.config.js —— Reel Studio 桌面控制台的设计令牌。
+ * tailwind.config.js —— muse-tv 桌面控制台的设计令牌（唯一真源）。
  *
- * 这套语言是给「桌面工具」定的，不是给网页定的：
+ * 方向（用户 2026-11-17 定）：高级深色、大气；灰色冷光；像一束光从上方打下来。
  *
- *   界面是浅色纸面（安静、像一张工作台），
- *   画面是深色（成片本来就是深底，见 templates/product-presenter.html），
- *   所以画面是整个界面里唯一「重」的物体 —— 视线自然落在它上面。
- *
- * 薄荷绿与浅粉是浅色材质；深绿仅用于文字、选中标记和焦点。
- * 主按钮保持高明度，以乳白过渡连接两端，避免深绿与莓红混出脏灰。
+ *   底色是近黑的冷灰（低饱和，不发蓝不发紫），层级靠「离光近不近」拉开：
+ *   越靠上、越被光照到的面越亮一点。光是银白色的冷光，不是彩色霓虹。
+ *   唯一被光正面打亮的物体是主按钮 —— 银白实体，深字；其余控件都在暗处。
+ *   强调色只用一点淡钢蓝，做焦点、选中、进行中，不铺大面。
  */
 module.exports = {
   content: ['./src/**/*.{html,js}'],
   theme: {
     extend: {
       colors: {
-        // 界面底色：纸 → 面 → 浮起，三层就够，再多就没人分得清
-        paper: '#f2f8f5',
-        surface: '#ffffff',
-        raised: '#f8f3f5',
-        blush: '#f9e9ef',
+        // 底色四层：暗室 → 面 → 浮起 → 受光面
+        paper: '#0b0c0e',
+        surface: '#121417',
+        raised: '#181b1f',
+        lit: '#20242a',
 
-        // 文字四档：主 / 次 / 弱 / 极弱
+        // 文字四档（在 paper 上对比度：主 15:1 / 次 8:1 / 弱 5:1 / 极弱 3:1，极弱只用于占位与装饰）
         ink: {
-          DEFAULT: '#22252a',
-          mid: '#5b6169',
-          lo: '#616873',
-          dim: '#6c7178',
+          DEFAULT: '#e8eaed',
+          mid: '#a9afb8',
+          lo: '#848b95',
+          dim: '#5f6670',
         },
 
-        // 描边两档
         line: {
-          DEFAULT: '#e4e3dd',
-          strong: '#d2d1ca',
+          DEFAULT: '#23272d',
+          strong: '#323840',
         },
 
-        // 深绿用于可读文字；主操作材质用高明度薄荷、乳白与浅粉。
+        // 冷光强调：淡钢蓝，克制使用
         accent: {
-          DEFAULT: '#176958',
-          deep: '#115348',
-          soft: '#e0f3eb',
-        },
-        glass: {
-          mint: '#c8f2e1',
-          milk: '#f2faf6',
-          pink: '#fbe0ea',
-          edge: '#b4d2c8',
-          'mint-hover': '#b7ead4',
-          'pink-hover': '#f9d4e2',
+          DEFAULT: '#9dbbd8',
+          deep: '#6f93b8',
+          soft: '#16202a',
         },
 
-        ok: '#3f7d5c',
-        warn: '#a8761f',
-        err: '#b53f34',
+        // 受光的银白：主按钮材质
+        silver: {
+          hi: '#f3f5f7',
+          DEFAULT: '#d9dde2',
+          lo: '#aeb4bc',
+        },
 
-        // 画面台底色，跟 templates/product-presenter.html 的 body 一致
-        stage: '#0d0f11',
+        ok: '#6fb394',
+        warn: '#d1a64a',
+        err: '#e0786b',
+
+        // 画面台：最深
+        stage: '#050607',
       },
 
       borderRadius: {
@@ -81,21 +77,28 @@ module.exports = {
       },
 
       boxShadow: {
-        card: '0 1px 2px rgba(34,37,42,.05)',
-        glass: 'inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(23,105,88,.04), 0 2px 4px rgba(23,105,88,.08)',
-        'glass-pressed': 'inset 0 1px 3px rgba(23,105,88,.12)',
-        pop: '0 10px 30px rgba(34,37,42,.12)',
-        stage: '0 3px 14px rgba(13,15,17,.20)',
+        // 面板：顶边一道受光细线 + 落在暗处的投影
+        card: 'inset 0 1px 0 rgba(255,255,255,.05), 0 1px 0 rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6)',
+        // 主按钮：被光照亮的银白实体
+        lit: 'inset 0 1px 0 rgba(255,255,255,.9), inset 0 -1px 0 rgba(0,0,0,.18), 0 0 0 1px rgba(255,255,255,.06), 0 6px 22px -6px rgba(220,228,238,.28)',
+        'lit-hover': 'inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,.18), 0 0 0 1px rgba(255,255,255,.1), 0 8px 30px -6px rgba(220,228,238,.42)',
+        pressed: 'inset 0 2px 6px rgba(0,0,0,.35)',
+        pop: 'inset 0 1px 0 rgba(255,255,255,.06), 0 24px 64px rgba(0,0,0,.65), 0 2px 8px rgba(0,0,0,.4)',
+        stage: '0 0 0 1px rgba(255,255,255,.04), 0 18px 48px -12px rgba(0,0,0,.8)',
+        // 选中/当前：一圈冷光
+        halo: '0 0 0 1px rgba(157,187,216,.28), 0 0 18px -4px rgba(157,187,216,.25)',
+      },
+
+      backgroundImage: {
+        // 面板受光：顶部略亮，向下沉入暗处
+        'surface-lit': 'linear-gradient(180deg, rgba(255,255,255,.035) 0%, rgba(255,255,255,0) 42%)',
+        // 主按钮的银白金属面
+        'silver-face': 'linear-gradient(180deg, #f3f5f7 0%, #d9dde2 55%, #c3c9d0 100%)',
+        'silver-face-hover': 'linear-gradient(180deg, #ffffff 0%, #e4e7eb 55%, #ccd2d8 100%)',
       },
 
       fontFamily: {
-        sans: [
-          '-apple-system',
-          'BlinkMacSystemFont',
-          '"PingFang SC"',
-          '"Helvetica Neue"',
-          'sans-serif',
-        ],
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"PingFang SC"', '"Helvetica Neue"', 'sans-serif'],
         serif: ['Georgia', '"Songti SC"', 'serif'],
         mono: ['"SF Mono"', 'ui-monospace', 'Menlo', 'monospace'],
       },

@@ -3,8 +3,13 @@
 @tailwind utilities;
 
 /*
- * 基础层：只做浏览器默认行为的归零，不在这里另立一套色板。
- * 所有颜色、字号、圆角、间距都来自 tailwind.config.js 的令牌。
+ * muse-tv 深色冷光主题。颜色、字号、圆角、阴影只取 tailwind.config.js 的令牌。
+ *
+ * 光的设定：一束银白冷光从窗口顶部正中打下来。
+ *   · 整屏底色是暗室（paper），顶部中央有一圈光晕（.beam）
+ *   · 每块面板顶边一道受光细线，面向下沉入暗处（shadow-card + bg-surface-lit）
+ *   · 被光正面照亮的只有主按钮：银白实体、深色字
+ * 强调色（淡钢蓝）只用于焦点、选中、进行中，不铺大面。
  */
 @layer base {
   html,
@@ -15,24 +20,30 @@
 
   body {
     @apply bg-paper text-ink font-sans text-sm antialiased;
-    /* Status and errors remain selectable for copying into a report. */
+    color-scheme: dark;
     -webkit-user-select: text;
     user-select: text;
   }
 
-  /* 输入框里的文字要能选中复制 */
   input,
   textarea {
     -webkit-user-select: text;
     user-select: text;
   }
 
+  ::selection {
+    @apply bg-accent/30 text-ink;
+  }
+
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-thumb {
     @apply rounded-full bg-line-strong;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-dim;
   }
   ::-webkit-scrollbar-track {
     @apply bg-transparent;
@@ -44,17 +55,45 @@
 }
 
 @layer components {
-  /* ── 按钮 ───────────────────────────────────────────────
-     一个界面里只允许有一个实心主按钮（开始制作）。
-     其余都是描边或无框 —— 层级靠底色和描边拉开，不靠堆颜色。
-     所有按钮共享同一套尺寸刻度与状态机，不给单个按钮开特例。 */
+  /* ── 光束 ─────────────────────────────────────────────
+     两层：外圈很淡的大光晕铺出「这间屋子有光」，内圈一道窄而亮的光柱
+     落在主区上方。都是银白冷光，不带彩色。pointer-events 关掉，不挡操作。 */
+  .beam {
+    @apply pointer-events-none absolute inset-0 z-30 overflow-hidden;
+    mix-blend-mode: screen;
+    /* 模糊放在父层：clip-path 在自身 filter 之后生效，放子层会把柔边裁成硬边 */
+    filter: blur(22px);
+  }
+  /* 光柱：顶部窄、向下张开的梯形，越往下越淡；模糊后边缘像体积光 */
+  .beam::before {
+    content: '';
+    position: absolute;
+    top: -2%;
+    left: 56%;
+    width: min(1100px, 80vw);
+    height: 92vh;
+    transform: translateX(-50%);
+    clip-path: polygon(41% 0, 59% 0, 100% 100%, 0 100%);
+    background: linear-gradient(180deg, rgba(228, 234, 242, 0.24) 0%, rgba(228, 234, 242, 0.09) 42%, rgba(228, 234, 242, 0) 82%);
+  }
+  /* 光源：窗口顶沿正中一团冷白，加一圈很淡的散射铺满上半屏 */
+  .beam::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 16% 9% at 56% 0%, rgba(240, 244, 250, 0.45) 0%, rgba(240, 244, 250, 0) 100%),
+      radial-gradient(ellipse 60% 45% at 56% -10%, rgba(190, 202, 218, 0.08) 0%, rgba(190, 202, 218, 0) 75%);
+  }
+
+  /* ── 按钮 ─────────────────────────────────────────────── */
   .btn {
     @apply inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap
-           rounded-md text-sm font-medium transition-colors duration-150
-           disabled:cursor-not-allowed disabled:opacity-45;
+           rounded-md text-sm font-medium transition duration-200 ease-out
+           disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-md {
-    @apply h-9 px-3.5;
+    @apply h-9 px-4;
   }
   .btn-sm {
     @apply h-7 px-2.5 text-xs;
@@ -63,26 +102,26 @@
     @apply h-8 w-8 p-0;
   }
 
+  /* 主按钮：整屏唯一被光正面打亮的物体 */
   .btn-primary {
-    @apply border border-glass-edge bg-gradient-to-r from-glass-mint via-glass-milk to-glass-pink
-           text-accent-deep shadow-glass backdrop-blur-md
-           hover:from-glass-mint-hover hover:to-glass-pink-hover
-           active:shadow-glass-pressed;
+    @apply bg-silver-face font-semibold text-paper shadow-lit
+           hover:bg-silver-face-hover hover:shadow-lit-hover
+           active:translate-y-px active:shadow-pressed
+           disabled:shadow-none;
   }
   .btn-secondary {
-    @apply border border-line bg-white/70 text-ink shadow-card backdrop-blur-md hover:border-line-strong hover:bg-white/90;
+    @apply border border-line-strong bg-raised text-ink-mid shadow-card
+           hover:border-ink-dim hover:bg-lit hover:text-ink
+           active:translate-y-px;
   }
   .btn-ghost {
-    @apply text-ink-mid hover:bg-raised hover:text-ink;
+    @apply text-ink-lo hover:bg-raised hover:text-ink;
   }
   .btn-danger {
-    @apply border border-err/40 bg-surface text-err hover:border-err/20 hover:border-err/60;
+    @apply border border-err/30 bg-err/10 text-err hover:border-err/50 hover:bg-err/20;
   }
 
-  /* ── 输入 ───────────────────────────────────────────────
-     标签 12/500，控件 36 高，内容 13。
-     聚焦时描边变主色 + 一圈 25% 透明度的同色晕，
-     键盘用户能看见，光标用户也能看见。 */
+  /* ── 输入 ─────────────────────────────────────────────── */
   .field {
     @apply mb-4 last:mb-0;
   }
@@ -90,7 +129,7 @@
     @apply mb-1.5 block text-xs font-medium text-ink-mid;
   }
   .label-hint {
-    @apply ml-1 font-normal text-ink-dim;
+    @apply ml-1 font-normal text-ink-lo;
   }
   .help {
     @apply mt-1.5 text-2xs leading-relaxed text-ink-lo;
@@ -99,12 +138,14 @@
     @apply text-err;
   }
 
+  /* 输入框是「凹进去」的：比面板更暗，内阴影朝上 */
   .input {
-    @apply w-full rounded-md border border-line bg-surface px-3 text-sm text-ink
+    @apply w-full rounded-md border border-line bg-paper px-3 text-sm text-ink
+           shadow-[inset_0_1px_2px_rgba(0,0,0,.45)]
            placeholder:text-ink-dim
            hover:border-line-strong
-           focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/25
-           disabled:cursor-not-allowed disabled:bg-raised disabled:text-ink-dim;
+           focus:border-accent/60 focus:outline-none focus:ring-1 focus:ring-accent/30
+           disabled:cursor-not-allowed disabled:opacity-50;
   }
   .input-md {
     @apply h-9;
@@ -115,20 +156,17 @@
   textarea.input {
     @apply resize-y py-2 leading-7;
   }
+  input[type='checkbox'] {
+    @apply h-3.5 w-3.5 accent-silver;
+  }
 
-  /* ── 下拉 ───────────────────────────────────────────────
-     不用原生 <select>：原生下拉由操作系统渲染，
-     半透明、圆角、字号全不听我们的，跟整屏纸面调性直接打架。
-
-     这里自绘一个 listbox：
-       触发器与输入框同规格（同高、同描边、同聚焦环），
-       菜单用面板白 + 圆角 10 + 一层浮起阴影，
-       选中项用主色 + 左侧一个方块标记，键盘 ↑↓ Enter Esc 全支持。 */
+  /* ── 下拉（自绘 listbox，与输入框同规格） ───────────────── */
   .select {
     @apply relative inline-flex h-9 w-full cursor-pointer items-center justify-between gap-2
-           rounded-md border border-line bg-surface px-3 text-sm text-ink
+           rounded-md border border-line bg-paper px-3 text-sm text-ink
+           shadow-[inset_0_1px_2px_rgba(0,0,0,.45)]
            hover:border-line-strong
-           focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/25;
+           focus-within:border-accent/60 focus-within:ring-1 focus-within:ring-accent/30;
   }
   .select-value {
     @apply truncate;
@@ -142,20 +180,19 @@
   .select[aria-expanded='true'] .select-arrow {
     @apply rotate-180;
   }
-
   .select-menu {
     @apply absolute left-0 top-[calc(100%+4px)] z-50 max-h-60 min-w-full
-           overflow-auto rounded-lg border border-line bg-surface py-1 shadow-pop;
+           overflow-auto rounded-lg border border-line-strong bg-raised py-1 shadow-pop;
   }
   .select-option {
     @apply flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-sm text-ink-mid;
   }
   .select-option:hover,
   .select-option.is-active {
-    @apply bg-raised text-ink;
+    @apply bg-lit text-ink;
   }
   .select-option[aria-selected='true'] {
-    @apply font-medium text-accent;
+    @apply font-medium text-ink;
   }
   .select-tick {
     @apply h-1.5 w-1.5 shrink-0 rounded-full bg-accent opacity-0;
@@ -164,12 +201,12 @@
     @apply opacity-100;
   }
 
-  /* ── 面板 ─────────────────────────────────────────────── */
+  /* ── 面板：顶边受光，向下沉入暗处 ─────────────────────── */
   .panel {
-    @apply rounded-lg border border-line bg-surface shadow-card;
+    @apply rounded-lg border border-line bg-surface bg-surface-lit shadow-card;
   }
   .panel-head {
-    @apply flex h-11 items-center justify-between border-b border-line px-4;
+    @apply flex h-11 items-center justify-between border-b border-line/70 px-4;
   }
   .panel-title {
     @apply text-sm font-semibold tracking-tight text-ink;
@@ -178,24 +215,33 @@
     @apply p-4;
   }
 
-  /* ── 徽章 ─────────────────────────────────────────────── */
-  .badge {
-    @apply inline-flex items-center rounded-sm bg-raised px-1.5 py-0.5 text-2xs font-medium text-ink-lo;
+  /* ── 对话框：浮在暗室上方，背景压暗并轻微虚化 ─────────── */
+  dialog {
+    @apply text-ink;
   }
-  .badge-accent {
-    @apply bg-accent-soft text-accent;
+  dialog::backdrop {
+    background: rgba(5, 6, 7, 0.72);
+    backdrop-filter: blur(3px);
   }
 
-  /* ── 侧栏项目项 ───────────────────────────────────────── */
+  /* ── 徽章 ─────────────────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center rounded-sm border border-line bg-raised px-1.5 py-0.5 text-2xs font-medium text-ink-lo;
+  }
+  .badge-accent {
+    @apply border-accent/25 bg-accent-soft text-accent;
+  }
+
+  /* ── 侧栏项目项：当前项被光圈住 ───────────────────────── */
   .project-item {
-    @apply flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-ink-mid
+    @apply flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-ink-lo
            transition-colors hover:bg-raised hover:text-ink;
   }
   .project-item.is-active {
-    @apply bg-surface text-ink shadow-card;
+    @apply bg-lit text-ink shadow-card;
   }
   .project-item.is-active .project-dot {
-    @apply bg-accent opacity-100;
+    @apply bg-silver opacity-100 shadow-[0_0_8px_rgba(230,235,242,.7)];
   }
   .project-dot {
     @apply h-1.5 w-1.5 shrink-0 rounded-full bg-line-strong opacity-0;
@@ -204,27 +250,24 @@
   /* ── 素材格 ───────────────────────────────────────────── */
   .asset-cell {
     @apply relative aspect-square cursor-pointer overflow-hidden rounded-md border border-line
-           bg-raised transition-colors hover:border-line-strong;
+           bg-raised transition hover:border-line-strong;
   }
   .asset-cell img {
     @apply h-full w-full object-cover;
   }
   .asset-cell.is-selected {
-    @apply border-accent ring-1 ring-accent/40;
+    @apply border-accent/60 shadow-halo;
   }
   .asset-cell-badge {
-    @apply absolute right-1 top-1 rounded-sm bg-black/55 px-1 text-[10px] text-white;
+    @apply absolute right-1 top-1 rounded-sm bg-black/70 px-1 text-[10px] text-ink;
   }
 
-  /* ── 角色卡 ─────────────────────────────────────────────
-     角色卡要一眼看出「五视图齐没齐」—— 五个格子按正面到背面排，
-     缺的格子画虚线占位并标出缺哪一个。
-     状态用文字说明，不用纯色块：色盲用户分不出薄荷绿和淡粉的区别。 */
+  /* ── 角色卡：一眼看出五视图齐没齐；状态用文字，不靠颜色 ── */
   .character-card {
-    @apply rounded-md border border-line bg-raised p-3;
+    @apply rounded-md border border-line bg-raised bg-surface-lit p-3 transition-colors hover:border-line-strong;
   }
   .character-card.is-complete {
-    @apply border-ok/35 bg-ok/5;
+    @apply border-ok/25;
   }
   .character-head {
     @apply flex items-start justify-between gap-2;
@@ -236,16 +279,16 @@
     @apply mt-2.5 grid grid-cols-5 gap-1.5;
   }
   .character-view {
-    @apply relative aspect-[3/4] overflow-hidden rounded-sm border border-line bg-surface;
+    @apply relative aspect-[3/4] overflow-hidden rounded-sm border border-line bg-paper;
   }
   .character-view img {
     @apply h-full w-full object-cover;
   }
   .character-view.is-missing {
-    @apply border-dashed border-line-strong bg-surface;
+    @apply border-dashed border-line-strong;
   }
   .character-view-label {
-    @apply absolute inset-x-0 bottom-0 bg-black/55 px-1 py-0.5 text-center text-[9px] text-white;
+    @apply absolute inset-x-0 bottom-0 bg-black/65 px-1 py-0.5 text-center text-[9px] text-ink;
   }
   .character-view.is-missing .character-view-label {
     @apply bg-transparent text-ink-dim;
@@ -259,16 +302,16 @@
     @apply flex flex-wrap items-center gap-2.5 rounded-md border border-line bg-raised px-3 py-2;
   }
   .step-row.is-running {
-    @apply border-accent/40 bg-accent-soft;
+    @apply border-accent/35 bg-accent-soft;
   }
   .step-row.is-failed {
-    @apply border-err/40 bg-err/10;
+    @apply border-err/35 bg-err/10;
   }
   .step-mark {
     @apply flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold;
   }
   .step-mark.is-done {
-    @apply bg-ok/10 text-ok;
+    @apply bg-ok/15 text-ok;
   }
   .step-mark.is-running {
     @apply bg-accent/20 text-accent;
@@ -287,13 +330,9 @@
   }
 
   /* ── 画面台 ─────────────────────────────────────────────
-     画面台内部按成片尺寸 1080×1920 / 1920×1080 排版，
-     再用 transform 缩放到面板宽度 —— 比例和成片完全一致，
-     用户在面板里看到的位置关系就是成片里的位置关系。
-
-     这里的 CSS 规则与 templates/product-presenter.html、
-     templates/landscape-product.html 一一对应。
-     改了模板记得同步这里，否则面板和成片会对不上。 */
+     下面 .mp / .ml 规则与 templates/product-presenter.html、
+     templates/landscape-product.html 一一对应，**不跟界面主题走**：
+     它们画的是成片本身，界面换肤不能让预览和成片对不上。 */
   .stage {
     @apply relative overflow-hidden rounded-lg bg-stage shadow-stage;
   }

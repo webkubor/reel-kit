@@ -1,5 +1,5 @@
 /**
- * Reel Studio 本地控制台。
+ * muse-tv 本地控制台。
  *
  * 业务操作通过 Go 绑定（window.go.main.Engine / .App），无本地 HTTP 业务服务。
  * 本地媒体由 Wails AssetServer 提供；显式 AI 请求由 Go 连接用户配置的服务。
@@ -73,7 +73,7 @@
     if (!window.go || !window.go.main || !window.go.main.Engine) {
       document.body.innerHTML =
         '<div style="padding:40px;font:14px sans-serif;color:#868d95">' +
-        '这个页面需要通过 Reel Studio 桌面应用打开。</div>'
+        '这个页面需要通过 muse-tv 桌面应用打开。</div>'
       throw new Error('no engine binding')
     }
     return window.go.main.Engine
@@ -946,7 +946,7 @@
         '<h3 class="mp-title">' + escapeHTML(title) + '</h3>' +
         '</div>' +
         '<div class="mp-caption"><p>' + escapeHTML(caption) + '</p></div>' +
-        '<div class="mp-foot">Reel Studio</div>'
+        '<div class="mp-foot"></div>'
     } else {
       canvas.className = 'stage-canvas ml'
       canvas.innerHTML =
@@ -957,7 +957,7 @@
         '<div class="ml-title">' + escapeHTML(title) + '</div>' +
         '<div class="ml-subtitle">' + escapeHTML(subtitle) + '</div>' +
         '<div class="ml-caption">' + escapeHTML(caption) + '</div>' +
-        '<div class="ml-foot">Reel Studio</div>' +
+        '<div class="ml-foot"></div>' +
         '</div>'
     }
     layoutStage()

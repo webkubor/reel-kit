@@ -42,7 +42,7 @@ scripts/package.sh          # darwin/arm64
 scripts/package.sh --dmg    # 再压一个 DMG
 ```
 
-产物在 `build/bin/Reel Studio.app`（`--dmg` 再出一个 dmg）。
+产物在 `build/bin/muse-tv.app`（`--dmg` 再出一个 dmg）。
 `scripts/package.sh` 会自动把工作台要用的 Node / ffmpeg / Chrome headless / 后端代码
 打进应用包。用户拖进「应用程序」双击即可。
 

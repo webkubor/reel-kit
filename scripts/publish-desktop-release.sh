@@ -12,7 +12,7 @@ repo_root=$(cd "$(dirname "$0")/.." && pwd)
 version=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["info"]["productVersion"])' "$repo_root/apps/reel-studio-wails/wails.json")
 [[ "$tag" == "app-v$version" ]] || { printf 'Tag must be app-v%s\n' "$version" >&2; exit 2; }
 [[ -f "$notes" && -f "$package/build-info.json" ]] || { printf 'Missing release notes or build provenance.\n' >&2; exit 1; }
-archive="reel-studio-${version}-darwin-arm64.zip"
+archive="muse-tv-${version}-darwin-arm64.zip"
 [[ -f "$package/$archive" && -f "$package/SHA256SUMS" ]] || { printf 'Missing archive or checksums.\n' >&2; exit 1; }
 (cd "$package" && shasum -a 256 -c SHA256SUMS)
 commit=$(python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["version"]==sys.argv[2]; assert d["platform"]=="darwin-arm64"; print(d["commit"])' "$package/build-info.json" "$version")
@@ -26,5 +26,5 @@ if [[ ${4:-} == --dry-run ]]; then
   exit 0
 fi
 gh release create "$tag" --repo webkubor/reel-kit --verify-tag \
-  --title "Reel Studio $version" --notes-file "$notes" \
+  --title "muse-tv $version" --notes-file "$notes" \
   "$package/$archive" "$package/SHA256SUMS" "$package/build-info.json"

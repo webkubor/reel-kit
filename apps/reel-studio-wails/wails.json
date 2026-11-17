@@ -1,7 +1,7 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "Reel Studio",
-  "outputfilename": "Reel Studio",
+  "name": "muse-tv",
+  "outputfilename": "muse-tv",
   "frontend:install": "",
   "frontend:build": "",
   "frontend:dev:watcher": "",
@@ -12,9 +12,9 @@
   },
   "info": {
     "companyName": "webkubor",
-    "productName": "Reel Studio",
+    "productName": "muse-tv",
     "productVersion": "1.8.1",
     "copyright": "Copyright © 2026 webkubor",
-    "comments": "本地视频工作台：素材与项目留在这台机器上。"
+    "comments": "muse-tv：给 agent 用、给人看的本地视频工作台。"
   }
 }

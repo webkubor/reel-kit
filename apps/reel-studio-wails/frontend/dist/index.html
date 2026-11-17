@@ -3,19 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light" />
-    <title>Reel Studio</title>
+    <meta name="color-scheme" content="dark" />
+    <title>muse-tv</title>
     <link rel="stylesheet" href="./app.css" />
   </head>
   <body>
-    <div id="app" class="flex h-full">
+    <div id="app" class="relative flex h-full">
+      <!-- 光束：一束银白冷光从窗口顶部打下来（样式见 input.css .beam） -->
+      <div class="beam" aria-hidden="true"></div>
       <!-- 侧栏：品牌、项目、状态 -->
-      <aside class="flex w-[210px] shrink-0 flex-col border-r border-line bg-gradient-to-b from-accent-soft to-blush">
+      <aside class="relative z-10 flex w-[210px] shrink-0 flex-col border-r border-line bg-paper">
         <div class="flex items-center gap-2.5 px-5 pb-3 pt-5">
-          <svg class="h-8 w-8 shrink-0" viewBox="-3 -3 44 44" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="19" cy="19" r="19" fill="none" stroke="#cc584d" stroke-width="2.5" />
-            <circle cx="19" cy="19" r="10" fill="none" stroke="#cc584d" stroke-width="2" />
-            <g fill="#cc584d">
+          <svg class="h-8 w-8 shrink-0 text-silver drop-shadow-[0_0_6px_rgba(230,235,242,.35)]" viewBox="-3 -3 44 44" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="19" cy="19" r="19" fill="none" stroke="currentColor" stroke-width="2.5" />
+            <circle cx="19" cy="19" r="10" fill="none" stroke="currentColor" stroke-width="2" />
+            <g fill="currentColor">
               <circle cx="19" cy="19" r="3.5" />
               <circle cx="19" cy="4" r="1.8" />
               <circle cx="19" cy="34" r="1.8" />
@@ -24,7 +26,7 @@
             </g>
           </svg>
           <span class="leading-tight">
-            <span class="block text-base font-semibold tracking-tight text-ink">reel<span class="font-normal text-ink-mid">studio</span></span>
+            <span class="block text-base font-semibold tracking-tight text-ink">muse<span class="font-normal text-ink-lo">·tv</span></span>
             <span class="mt-0.5 block text-[9px] font-medium uppercase tracking-[0.18em] text-ink-dim">本地视频工作台</span>
           </span>
         </div>
@@ -63,7 +65,7 @@
           <!-- 左：写什么 -->
           <section class="flex min-w-0 flex-1 flex-col overflow-y-auto border-r border-line p-5">
             <div class="mb-4 shrink-0">
-              <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">REEL STUDIO</p>
+              <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-lo">MUSE · TV</p>
               <h1 class="mt-1.5 text-2xl font-semibold tracking-tight text-ink">做一支产品介绍短片</h1>
               <p class="mt-1 text-xs leading-relaxed text-ink-lo">
                 写几句介绍词，使用本机离线中文语音，按画幅生成成片。
@@ -186,7 +188,7 @@
               </div>
               <div class="panel-body">
                 <div class="flex justify-center">
-                  <div id="stage-wrap" class="relative overflow-hidden rounded-lg bg-raised shadow-stage" style="width: 236px; height: 420px">
+                  <div id="stage-wrap" class="relative overflow-hidden rounded-lg bg-stage shadow-stage" style="width: 236px; height: 420px">
                     <div id="stage-canvas" class="stage-canvas mp"></div>
                     <img id="stage-image" class="stage-video hidden" alt="选中的原始图片" />
                     <video id="stage-video" class="stage-video hidden" controls></video>
@@ -223,7 +225,7 @@
       </div>
     </div>
 
-    <dialog id="ai-dialog" aria-labelledby="ai-dialog-title" class="w-[460px] max-w-[90vw] rounded-lg border border-line bg-surface p-5 shadow-pop backdrop:bg-ink/20">
+    <dialog id="ai-dialog" aria-labelledby="ai-dialog-title" class="w-[460px] max-w-[90vw] rounded-lg border border-line bg-surface p-5 shadow-pop">
       <form id="ai-settings-form">
         <h2 id="ai-dialog-title" class="text-base font-semibold text-ink">AI 模型设置</h2>
         <p class="help">用于生成可编辑的分镜 JSON；服务会收到你的生成要求，可能收费。视频渲染和中文配音仍在本机。</p>
@@ -244,7 +246,7 @@
       </form>
     </dialog>
 
-    <dialog id="project-dialog" aria-labelledby="project-dialog-title" class="w-[380px] rounded-lg border border-line bg-surface p-5 shadow-pop backdrop:bg-ink/20">
+    <dialog id="project-dialog" aria-labelledby="project-dialog-title" class="w-[380px] rounded-lg border border-line bg-surface p-5 shadow-pop">
       <form id="project-form" method="dialog">
         <h2 id="project-dialog-title" class="text-base font-semibold tracking-tight text-ink">新建项目</h2>
         <p class="mt-1 text-2xs leading-relaxed text-ink-lo">素材、生成记录与成片都按项目保存。</p>
@@ -257,7 +259,7 @@
       </form>
     </dialog>
 
-    <dialog id="character-dialog" aria-labelledby="character-dialog-title" class="w-[520px] max-w-[92vw] rounded-lg border border-line bg-surface p-5 shadow-pop backdrop:bg-ink/20">
+    <dialog id="character-dialog" aria-labelledby="character-dialog-title" class="w-[520px] max-w-[92vw] rounded-lg border border-line bg-surface p-5 shadow-pop">
       <form id="character-form">
         <h2 id="character-dialog-title" class="text-base font-semibold tracking-tight text-ink">新建角色</h2>
         <p class="mt-1 text-2xs leading-relaxed text-ink-lo">
@@ -308,7 +310,7 @@
       </form>
     </dialog>
 
-    <dialog id="shoot-dialog" aria-labelledby="shoot-dialog-title" class="w-[460px] max-w-[92vw] rounded-lg border border-line bg-surface p-5 shadow-pop backdrop:bg-ink/20">
+    <dialog id="shoot-dialog" aria-labelledby="shoot-dialog-title" class="w-[460px] max-w-[92vw] rounded-lg border border-line bg-surface p-5 shadow-pop">
       <form id="shoot-form">
         <h2 id="shoot-dialog-title" class="text-base font-semibold tracking-tight text-ink">让角色出镜</h2>
         <p class="mt-1 text-2xs leading-relaxed text-ink-lo">
@@ -335,7 +337,7 @@
       </form>
     </dialog>
 
-    <dialog id="episode-dialog" aria-labelledby="episode-dialog-title" class="w-[480px] max-w-[92vw] rounded-lg border border-line bg-surface p-5 shadow-pop backdrop:bg-ink/20">
+    <dialog id="episode-dialog" aria-labelledby="episode-dialog-title" class="w-[480px] max-w-[92vw] rounded-lg border border-line bg-surface p-5 shadow-pop">
       <form id="episode-form">
         <h2 id="episode-dialog-title" class="text-base font-semibold tracking-tight text-ink">做成片</h2>
         <p class="mt-1 text-2xs leading-relaxed text-ink-lo">

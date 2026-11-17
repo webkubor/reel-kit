@@ -10,7 +10,7 @@ fi
 output=$1
 resources=$2
 here=$(cd "$(dirname "$0")" && pwd)
-source_app="$here/build/bin/Reel Studio.app"
+source_app="$here/build/bin/muse-tv.app"
 if [[ -e "$output" ]]; then
   printf '输出目录已存在，拒绝覆盖：%s\n' "$output" >&2
   exit 1
@@ -22,7 +22,7 @@ for item in "$source_app" "$resources/sherpa" "$resources/chrome/chrome-headless
   fi
 done
 mkdir -p "$output"
-app="$output/Reel Studio.app"
+app="$output/muse-tv.app"
 ditto "$source_app" "$app"
 mkdir -p "$app/Contents/Resources/bin"
 ditto "$resources/sherpa" "$app/Contents/Resources/sherpa"

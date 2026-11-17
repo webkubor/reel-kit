@@ -1,4 +1,4 @@
-// Reel Studio 桌面壳（Wails v2）。
+// muse-tv 桌面壳（Wails v2）。
 //
 // 零 HTTP：不再起 Node 工作台、不占端口、不常驻进程。所有逻辑通过
 // Go 绑定（window.go.App / window.go.engine）直接调用本地引擎。界面由 frontend/dist
@@ -22,7 +22,7 @@ var assets embed.FS
 func main() {
 	app := NewApp()
 	err := wails.Run(&options.App{
-		Title:     "Reel Studio",
+		Title:     "muse-tv",
 		Width:     1280,
 		Height:    840,
 		MinWidth:  1024,
@@ -40,14 +40,14 @@ func main() {
 		SingleInstanceLock: &options.SingleInstanceLock{UniqueId: "online.webkubor.reelstudio"},
 		Mac: &mac.Options{
 			About: &mac.AboutInfo{
-				Title: "Reel Studio",
+				Title: "muse-tv",
 				Message: "本地视频工作台。\n" +
 					"素材与项目留在这台机器上；语音与出图用在线服务时会联网，费用按各自渠道计。",
 			},
 		},
 	})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Reel Studio 启动失败：", err)
+		fmt.Fprintln(os.Stderr, "muse-tv 启动失败：", err)
 		os.Exit(1)
 	}
 }
