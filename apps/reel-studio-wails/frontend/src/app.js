@@ -666,7 +666,7 @@
       var where = shot.sceneId ? (subjectName(shot.sceneId) || '场景已不在中台') : '未指定场景'
       card.appendChild(el('p', 'mt-1.5 text-2xs text-ink-mid', who + (shot.look ? ' · ' + shot.look : '') + ' · ' + where))
       var actions = el('div', 'mt-2.5 flex flex-wrap items-center gap-1.5')
-      var busy = shot.status === 'shooting' || state.shotBusy === shot.id
+      var busy = shot.status === 'shooting' || shot.status === 'interrupted' || state.shotBusy === shot.id
       var shoot = el('button', 'btn btn-secondary btn-sm', shot.clipAssetId ? '重新出镜' : '出镜')
       shoot.type = 'button'
       shoot.disabled = busy || !shot.characterId || !shot.action
@@ -684,6 +684,15 @@
         watch.type = 'button'
         watch.addEventListener('click', function () { loadAssets().then(function () { showVideo(watchID) }) })
         actions.appendChild(watch)
+      }
+      if (shot.status === 'interrupted') {
+        card.appendChild(el('p', 'mt-2 text-2xs leading-relaxed text-warn', '上次出镜没有正常结束，中台可能已经收单。请先在中台核对任务，避免重复扣额度。'))
+        var resolve = el('button', 'btn btn-secondary btn-sm', '已核对，放回可操作')
+        resolve.type = 'button'
+        resolve.addEventListener('click', function () {
+          app().ResolveInterruptedShot(shot.id).then(refreshShots).catch(fail)
+        })
+        actions.appendChild(resolve)
       }
       card.appendChild(actions)
       if (state.shotBusy === shot.id && state.shotNote) {
@@ -865,6 +874,7 @@
     if (status === 'done') return '已成片'
     if (status === 'shot') return '已出镜'
     if (status === 'shooting') return '出镜中'
+    if (status === 'interrupted') return '待核对'
     return '待拍'
   }
 

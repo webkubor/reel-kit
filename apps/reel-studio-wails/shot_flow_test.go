@@ -60,8 +60,18 @@ func TestShootShotGuards(t *testing.T) {
 	if _, err := e.ShootShot(context.Background(), sh.ID, nil, nil); err == nil {
 		t.Fatal("应报上游错误")
 	}
-	if cur, _ := s.EpisodeShot(sh.ID); cur.Status != "planned" {
-		t.Fatalf("失败应退回待拍：%s", cur.Status)
+	// 上游失败不等于没收单：标「待核对」，不能被再次提交
+	if cur, _ := s.EpisodeShot(sh.ID); cur.Status != "interrupted" {
+		t.Fatalf("上游失败应标待核对：%s", cur.Status)
+	}
+	if _, err := e.ShootShot(context.Background(), sh.ID, nil, nil); err == nil {
+		t.Fatal("待核对的镜头不应能直接重新出镜")
+	}
+	if cur, err := e.ResolveInterruptedShot(sh.ID); err != nil || cur.Status != "planned" {
+		t.Fatalf("核对后应回到待拍：%+v %v", cur, err)
+	}
+	if _, err := e.ResolveInterruptedShot(sh.ID); err == nil {
+		t.Fatal("非待核对状态不应能核对")
 	}
 	if _, err := e.SetShotCast(ShotCast{ID: sh.ID, Action: "x", CharacterID: ""}); err != nil {
 		t.Fatal(err)
@@ -131,5 +141,33 @@ func TestFinishShotBackfills(t *testing.T) {
 	}
 	if out.Status != "done" || out.AssetID == "" || out.AssetID == clip.ID {
 		t.Fatalf("成片没回填：%+v", out)
+	}
+}
+
+// 提交前的校验失败（场景不属于本项目等）可安全恢复，不该卡在待核对。
+func TestShootShotPreSubmitFailureRestores(t *testing.T) {
+	e, s, sh := boundShot(t)
+	e.sceneOverride = func(context.Context, string, string) (string, error) {
+		return "", errors.New("场景不属于本项目")
+	}
+	e.shootOverride = func(context.Context, CharacterVideoInput) (*Asset, error) { t.Fatal("不应提交"); return nil, nil }
+	if _, err := e.ShootShot(context.Background(), sh.ID, nil, nil); err == nil {
+		t.Fatal("应报场景错误")
+	}
+	if cur, _ := s.EpisodeShot(sh.ID); cur.Status != "planned" {
+		t.Fatalf("提交前失败应恢复：%s", cur.Status)
+	}
+}
+
+// 重启时仍在出镜的镜头标为待核对。
+func TestShootingShotInterruptedOnRestart(t *testing.T) {
+	_, s, sh := boundShot(t)
+	_, _ = s.UpdateShot(sh.ID, func(x *EpisodeShot) { x.Status = "shooting" })
+	reopened, err := NewStudioStoreRoot(s.Root())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cur, _ := reopened.EpisodeShot(sh.ID); cur.Status != "interrupted" {
+		t.Fatalf("重启后应待核对：%s", cur.Status)
 	}
 }

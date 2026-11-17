@@ -293,6 +293,12 @@ func NewStudioStoreRoot(root string) (*StudioStore, error) {
 	if state.Shots == nil {
 		state.Shots = []*EpisodeShot{}
 	}
+	// 重启前还在出镜的镜头：上游可能已收单，不能当成没发生过。
+	for _, sh := range state.Shots {
+		if sh.Status == "shooting" {
+			sh.Status = "interrupted"
+		}
+	}
 	s := &StudioStore{root: root, state: state}
 	// 本地账本（素材去重 + 任务恢复）。打不开就退化为无账本模式：
 	// 导入照常、只是不去重 —— 本地功能不该被一个数据库文件卡死。

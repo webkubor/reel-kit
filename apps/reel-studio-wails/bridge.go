@@ -143,6 +143,11 @@ func (a *App) emitter(event string) ProgressFunc {
 	}
 }
 
+// ResolveInterruptedShot 用户核对中台后，把中断的镜头放回可操作状态。
+func (a *App) ResolveInterruptedShot(shotID string) (*EpisodeShot, error) {
+	return a.engine.ResolveInterruptedShot(shotID)
+}
+
 // ListWorkspaces 列可绑定的中台项目。
 func (a *App) ListWorkspaces() ([]WorkspaceOption, error) {
 	return a.engine.ListWorkspaces()

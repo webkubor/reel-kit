@@ -73,8 +73,8 @@ func (s *StudioStore) claimShot(id string) (*EpisodeShot, error) {
 		if sh.ID != id {
 			continue
 		}
-		if sh.Status == "shooting" {
-			return nil, errors.New("这个镜头正在出镜")
+		if sh.Status == "shooting" || sh.Status == "interrupted" {
+			return nil, errors.New("镜头正在出镜或上次任务状态待核对，请先核对中台任务")
 		}
 		before := sh.Status
 		sh.Status = "shooting"
@@ -95,28 +95,39 @@ func (e *Engine) ShootShot(ctx context.Context, shotID string, progress Progress
 	if e.store == nil {
 		return nil, errNoStore
 	}
-	shot, err := e.store.EpisodeShot(shotID)
+	shot, err := e.store.claimShot(shotID)
 	if err != nil {
 		return nil, err
 	}
+	// 出镜参数只能从已锁定的快照读取；提交前的失败可安全恢复原状态。
+	restore := func() {
+		_, _ = e.store.UpdateShot(shotID, func(s *EpisodeShot) {
+			if s.ClipAssetID != "" {
+				s.Status = "shot"
+			} else {
+				s.Status = "planned"
+			}
+		})
+	}
 	if shot.CharacterID == "" {
+		restore()
 		return nil, errors.New("镜头还没选角色")
 	}
 	if strings.TrimSpace(shot.Action) == "" {
+		restore()
 		return nil, errors.New("镜头还没写动作")
 	}
 	ws, err := e.projectWorkspace(shot.ProjectID)
 	if err != nil {
+		restore()
 		return nil, err
 	}
 	scene := ""
 	if shot.SceneID != "" {
 		if scene, err = e.sceneDescription(ctx, ws, shot.SceneID); err != nil {
+			restore()
 			return nil, err
 		}
-	}
-	if _, err := e.store.claimShot(shotID); err != nil {
-		return nil, err
 	}
 	input := CharacterVideoInput{
 		ProjectID: shot.ProjectID, SubjectID: shot.CharacterID, Action: shot.Action,
@@ -129,19 +140,40 @@ func (e *Engine) ShootShot(ctx context.Context, shotID string, progress Progress
 		clip, err = e.MakeCharacterVideo(ctx, input, progress, report)
 	}
 	if err != nil {
-		// 失败退回「待拍」，原来的素材保持不动
-		_, _ = e.store.UpdateShot(shotID, func(s *EpisodeShot) {
-			if s.ClipAssetID != "" {
-				s.Status = "shot"
-			} else {
-				s.Status = "planned"
-			}
-		})
-		return nil, err
+		// 上游可能已接收请求或已生成，不能自动恢复成可重复提交的状态。
+		_, _ = e.store.UpdateShot(shotID, func(s *EpisodeShot) { s.Status = "interrupted" })
+		return nil, fmt.Errorf("出镜未完成，请先在中台核对任务后再重试：%w", err)
 	}
 	return e.store.UpdateShot(shotID, func(s *EpisodeShot) {
 		s.ClipAssetID, s.AssetID, s.Status = clip.ID, "", "shot"
 	})
+}
+
+// ResolveInterruptedShot 用户已在中台核对过中断的出镜：放回可操作状态。
+// 只接受 interrupted；已有素材的回到「已出镜」，没有的回到「待拍」。
+func (e *Engine) ResolveInterruptedShot(shotID string) (*EpisodeShot, error) {
+	if e.store == nil {
+		return nil, errNoStore
+	}
+	var wrong bool
+	shot, err := e.store.UpdateShot(shotID, func(s *EpisodeShot) {
+		if s.Status != "interrupted" {
+			wrong = true
+			return
+		}
+		if s.ClipAssetID != "" {
+			s.Status = "shot"
+		} else {
+			s.Status = "planned"
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	if wrong {
+		return nil, errors.New("这个镜头不在待核对状态")
+	}
+	return shot, nil
 }
 
 // sceneDescription 读场景主体的画面描述，并核对它属于项目绑定的工作区。
