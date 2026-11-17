@@ -32,6 +32,20 @@ func (e *Engine) runPipeline(ctx context.Context, job *Job, progress func(text s
 			return "", err
 		}
 		return asset.ID, nil
+	case "character-video":
+		asset, err := e.MakeCharacterVideo(ctx, CharacterVideoInput{
+			ProjectID: job.ProjectID,
+			SubjectID: strOr(job.Input["subjectId"], ""),
+			Action:    strOr(job.Input["action"], ""),
+			Ratio:     strOr(job.Input["ratio"], ""),
+			Duration:  intFromAny(job.Input["duration"]),
+		}, func(text string) {
+			progress(text, nil)
+		}, report)
+		if err != nil {
+			return "", err
+		}
+		return asset.ID, nil
 	case "":
 		return "", fmt.Errorf("任务缺少类型")
 	default:

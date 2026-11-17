@@ -78,6 +78,17 @@ func (a *App) CreateCharacter(input CharacterCreateInput) (*CharacterResult, err
 	})
 }
 
+// MakeCharacterVideo 让角色出镜：选一个角色 → 中台出一段 ta 的镜头。
+//
+// 联网且计费（中台出视频），所以调用方必须明确触发。
+func (a *App) MakeCharacterVideo(input CharacterVideoInput) (*Asset, error) {
+	return a.engine.MakeCharacterVideo(context.Background(), input, func(text string) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "character:progress", text)
+		}
+	}, nil)
+}
+
 // Status 给界面问引擎状态用（Go 绑定，前端调 window.go…Status()）。
 func (a *App) Status() Status {
 	return a.engine.Status()

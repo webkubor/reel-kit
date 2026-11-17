@@ -272,6 +272,37 @@ func (m *MuseavClient) GenerateImage(ctx context.Context, prompt, ratio, referen
 	return url, nil
 }
 
+// GenerateVideo 用中台出一段视频（同步等待），返回成片直链。
+//
+// referenceURLs 是角色定妆图直链（--reference-image，最多 9 张）：
+// 走「参考图」而不是「首帧」，因为定妆稿是三视图设计稿，拿它当首帧
+// 视频就会从一张白底设定图开场。提交即计费，调用方只能在用户明确
+// 触发后调用。
+func (m *MuseavClient) GenerateVideo(ctx context.Context, prompt, ratio string, duration int, referenceURLs []string) (string, error) {
+	args := []string{"gen", "--video", "--prompt", prompt}
+	if ratio != "" {
+		args = append(args, "--ratio", ratio)
+	}
+	if duration > 0 {
+		args = append(args, "--duration", fmt.Sprint(duration))
+	}
+	for _, u := range referenceURLs {
+		args = append(args, "--reference-image", u)
+	}
+	if m.Workspace != "" {
+		args = append(args, "--project", m.Workspace)
+	}
+	out, err := m.run(ctx, args...)
+	if err != nil {
+		return "", err
+	}
+	url := museavOutputURL(out)
+	if url == "" {
+		return "", errors.New("中台视频任务已提交但没读到成片地址；请先在中台任务列表核对，避免重复付费提交")
+	}
+	return url, nil
+}
+
 // museavOutputURL 从命令输出里取结果地址。
 func museavOutputURL(out string) string {
 	for _, line := range strings.Split(out, "\n") {
@@ -312,21 +343,33 @@ func extractJSONObject(out string) []byte {
 // 媒体目录、给界面一个 /media/<id> 的本地 URL、并记下来源直链。
 // 自己另写一套落盘逻辑等于造第二份素材账本。
 func (m *MuseavClient) DownloadImage(ctx context.Context, url string) ([]byte, string, error) {
+	return downloadMedia(ctx, url, 32<<20, "角色图")
+}
+
+// DownloadVideo 下载中台成片。视频比图大得多，单独给 512MB 上限。
+func (m *MuseavClient) DownloadVideo(ctx context.Context, url string) ([]byte, string, error) {
+	return downloadMedia(ctx, url, 512<<20, "视频")
+}
+
+func downloadMedia(ctx context.Context, url string, limit int64, label string) ([]byte, string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, "", err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, "", fmt.Errorf("下载角色图失败: %w", err)
+		return nil, "", fmt.Errorf("下载%s失败: %w", label, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("下载角色图失败：HTTP %d", resp.StatusCode)
+		return nil, "", fmt.Errorf("下载%s失败：HTTP %d", label, resp.StatusCode)
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return nil, "", err
+	}
+	if int64(len(data)) > limit {
+		return nil, "", fmt.Errorf("%s超过 %d MB，未保存", label, limit>>20)
 	}
 	return data, http.DetectContentType(data), nil
 }

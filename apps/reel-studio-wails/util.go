@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // 这几个小工具在好几个模块里都要用，放一处免得各写各的。
 
@@ -51,4 +54,21 @@ func derefStr(p *string) string {
 		return ""
 	}
 	return *p
+}
+
+// intFromAny 从任务入参里取整数。JSON 数字解出来是 float64，
+// 字符串是 UI 直接塞的 —— 两种都要认。
+func intFromAny(v any) int {
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	case string:
+		var out int
+		if _, err := fmt.Sscanf(n, "%d", &out); err == nil {
+			return out
+		}
+	}
+	return 0
 }
