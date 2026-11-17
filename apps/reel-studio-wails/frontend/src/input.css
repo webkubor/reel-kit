@@ -275,6 +275,36 @@
   .character-name {
     @apply truncate text-sm font-medium text-ink;
   }
+  /* ── 标签页 ───────────────────────────────────────────── */
+  .tab {
+    @apply rounded-md px-3 py-1.5 text-xs font-medium text-ink-lo
+           transition-colors hover:bg-raised hover:text-ink;
+  }
+  .tab.is-active {
+    @apply bg-raised text-ink shadow-card;
+  }
+
+  /* ── 镜头卡 ───────────────────────────────────────────── */
+  .shot-card {
+    @apply rounded-md border border-line bg-raised bg-surface-lit p-3 transition-colors hover:border-line-strong;
+  }
+  .shot-card.is-done {
+    @apply border-ok/25;
+  }
+
+  .character-sheets {
+    @apply mt-3 grid grid-cols-2 gap-2;
+  }
+  .character-sheet {
+    @apply min-w-0 overflow-hidden rounded-md border border-line bg-paper;
+  }
+  .character-sheet img {
+    @apply block w-full object-contain;
+    height: 8rem;
+  }
+  .character-sheet-label {
+    @apply px-2.5 py-1.5 text-2xs text-ink-lo;
+  }
   .character-views {
     @apply mt-2.5 grid grid-cols-5 gap-1.5;
   }

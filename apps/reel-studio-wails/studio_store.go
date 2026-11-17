@@ -34,7 +34,11 @@ type StudioState struct {
 	Assets   []*Asset   `json:"assets"`
 	Jobs     []*Job     `json:"jobs"`
 	Voices   []*Voice   `json:"voices"`
-	Version  int        `json:"version,omitempty"`
+	// Episodes 剧集、Shots 镜头：一部短剧的层级结构。
+	// 老数据没有这两项，反序列化出来是 nil —— 界面按空列表处理，老项目不受影响。
+	Episodes []*Episode     `json:"episodes,omitempty"`
+	Shots    []*EpisodeShot `json:"shots,omitempty"`
+	Version  int            `json:"version,omitempty"`
 }
 
 // Project 一个视频项目。
@@ -280,6 +284,12 @@ func NewStudioStoreRoot(root string) (*StudioStore, error) {
 	if state.Voices == nil {
 		state.Voices = []*Voice{}
 	}
+	if state.Episodes == nil {
+		state.Episodes = []*Episode{}
+	}
+	if state.Shots == nil {
+		state.Shots = []*EpisodeShot{}
+	}
 	s := &StudioStore{root: root, state: state}
 	// 本地账本（素材去重 + 任务恢复）。打不开就退化为无账本模式：
 	// 导入照常、只是不去重 —— 本地功能不该被一个数据库文件卡死。
@@ -331,7 +341,8 @@ func (s *StudioStore) saveLocked() error {
 func (s *StudioStore) State() *StudioState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := &StudioState{Version: s.state.Version, Projects: []*Project{}, Assets: []*Asset{}, Jobs: []*Job{}, Voices: []*Voice{}}
+	out := &StudioState{Version: s.state.Version, Projects: []*Project{}, Assets: []*Asset{}, Jobs: []*Job{}, Voices: []*Voice{},
+		Episodes: []*Episode{}, Shots: []*EpisodeShot{}}
 	for _, p := range s.state.Projects {
 		copy := *p
 		out.Projects = append(out.Projects, &copy)
@@ -346,6 +357,16 @@ func (s *StudioStore) State() *StudioState {
 		copy := *v
 		copy.Hints = append([]string(nil), v.Hints...)
 		out.Voices = append(out.Voices, &copy)
+	}
+	for _, e := range s.state.Episodes {
+		copy := *e
+		copy.CharacterIDs = append([]string(nil), e.CharacterIDs...)
+		out.Episodes = append(out.Episodes, &copy)
+	}
+	for _, sh := range s.state.Shots {
+		copy := *sh
+		copy.Lines = append([]string(nil), sh.Lines...)
+		out.Shots = append(out.Shots, &copy)
 	}
 	return out
 }

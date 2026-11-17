@@ -100,6 +100,36 @@ func (a *App) MakeEpisode(input EpisodeInput) (*Asset, error) {
 	}, nil)
 }
 
+// ListEpisodes 列剧集。
+func (a *App) ListEpisodes(projectID string) []*Episode {
+	return a.engine.ListEpisodes(projectID)
+}
+
+// CreateEpisode 新建一集。
+func (a *App) CreateEpisode(input EpisodeDraft) (*Episode, error) {
+	return a.engine.CreateEpisode(input)
+}
+
+// ListShots 列一集的镜头。
+func (a *App) ListShots(episodeID string) []*EpisodeShot {
+	return a.engine.ListShots(episodeID)
+}
+
+// CreateShot 新建一个镜头。
+func (a *App) CreateShot(input ShotInput) (*EpisodeShot, error) {
+	return a.engine.CreateShot(input)
+}
+
+// ListAllSubjects 列中台全部主体（人物 + 场景），界面自己按 kind 分组。
+func (a *App) ListAllSubjects(workspace string) ([]*Subject, error) {
+	return a.engine.ListAllSubjects(workspace)
+}
+
+// CreateScene 新建一个场景主体（kind=scene）。
+func (a *App) CreateScene(workspace, name, description string) (*Subject, error) {
+	return a.engine.CreateScene(workspace, name, description)
+}
+
 // Status 给界面问引擎状态用（Go 绑定，前端调 window.go…Status()）。
 func (a *App) Status() Status {
 	return a.engine.Status()

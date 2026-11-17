@@ -147,6 +147,8 @@
 
     refreshProjects()
     refreshCharacters()
+    refreshSubjects()
+    setView('make')
   }
 
   function layoutItems() {
@@ -222,6 +224,23 @@
         if (state.episodeBusy) $('episode-hint').textContent = String(text || '')
       })
     }
+    $('tab-make').addEventListener('click', function () { setView('make') })
+    $('tab-product').addEventListener('click', function () { setView('product') })
+    $('tab-cast').addEventListener('click', function () { setView('cast') })
+    $('tab-scene').addEventListener('click', function () { setView('scene') })
+    $('cast-search').addEventListener('input', function (event) {
+      state.castQuery = event.target.value || ''
+      paintCast()
+    })
+    $('btn-new-episode').addEventListener('click', openEpisodeDialog2)
+    $('new-episode-form').addEventListener('submit', submitNewEpisode)
+    $('btn-cancel-new-episode').addEventListener('click', function () { $('new-episode-dialog').close() })
+    $('new-shot-form').addEventListener('submit', submitNewShot)
+    $('btn-cancel-new-shot').addEventListener('click', function () { $('new-shot-dialog').close() })
+    $('new-scene-form').addEventListener('submit', submitNewScene)
+    $('btn-cancel-new-scene').addEventListener('click', function () { $('new-scene-dialog').close() })
+    $('btn-new-shot').addEventListener('click', openShotDialog)
+    $('btn-new-scene').addEventListener('click', openSceneDialog)
     $('shoot-form').addEventListener('submit', submitShoot)
     $('btn-cancel-shoot').addEventListener('click', function () { $('shoot-dialog').close() })
     $('btn-run').addEventListener('click', submit)
@@ -374,6 +393,25 @@
     head.appendChild(el('span', 'badge' + (character.complete ? ' badge-accent' : ''), character.complete ? '已建好' : '未建好'))
     card.appendChild(head)
 
+    // 定妆组合稿是独立的参考素材，不冒充已经完成的五视图。
+    var sheets = (character.references || []).filter(function (asset) {
+      return asset.url && /三视图|定妆|turnaround/i.test(asset.name || '')
+    })
+    if (sheets.length) {
+      var gallery = el('div', 'character-sheets')
+      sheets.forEach(function (asset) {
+        var figure = el('figure', 'character-sheet')
+        var image = el('img')
+        image.src = asset.url
+        image.alt = (character.name || '角色') + '：' + (asset.name || '定妆参考')
+        image.loading = 'lazy'
+        figure.appendChild(image)
+        figure.appendChild(el('figcaption', 'character-sheet-label', asset.name || '定妆参考'))
+        gallery.appendChild(figure)
+      })
+      card.appendChild(gallery)
+    }
+
     // 五视图格子。
     var views = el('div', 'character-views')
     var byView = {}
@@ -483,6 +521,321 @@
       })
   }
 
+  // 三个工作区：制作 / 角色库 / 场景库。
+  // 角色和场景有几十个，塞在制作表单里根本没法用 —— 各给一个整屏。
+  function setView(view) {
+    state.view = view
+    var map = {
+      make: ['tab-make', 'view-make'],
+      product: ['tab-product', 'view-product'],
+      cast: ['tab-cast', 'view-cast'],
+      scene: ['tab-scene', 'view-scene'],
+    }
+    Object.keys(map).forEach(function (key) {
+      var tab = $(map[key][0])
+      var panel = $(map[key][1])
+      var on = key === view
+      tab.setAttribute('aria-selected', on ? 'true' : 'false')
+      tab.classList.toggle('is-active', on)
+      panel.classList.toggle('hidden', !on)
+      // 制作视图内部是左右两栏，用 contents 让两个 section 并排；
+      // 其余视图是单栏，正常流式。
+      if (key === 'make') panel.classList.toggle('contents', on)
+      else panel.classList.remove('contents')
+    })
+  }
+
+  function refreshEpisodes() {
+    if (!state.projectId) {
+      state.episodes = []
+      state.shots = []
+      state.episodeId = ''
+      paintEpisodes()
+      return Promise.resolve()
+    }
+    var projectID = state.projectId
+    return engine()
+      .ListEpisodes(projectID)
+      .then(function (episodes) {
+        if (projectID !== state.projectId) return
+        state.episodes = episodes || []
+        // 选中的剧集还在就留着，不在就选第一集
+        var stillThere = state.episodes.some(function (e) { return e.id === state.episodeId })
+        if (!stillThere) state.episodeId = state.episodes.length ? state.episodes[0].id : ''
+        paintEpisodes()
+        return state.episodeId ? refreshShots() : null
+      })
+      .catch(function (err) {
+        state.episodes = []
+        paintEpisodes()
+      })
+  }
+
+  function refreshShots() {
+    if (!state.episodeId) {
+      state.shots = []
+      paintShots()
+      return Promise.resolve()
+    }
+    var episodeID = state.episodeId
+    return engine()
+      .ListShots(episodeID)
+      .then(function (shots) {
+        if (episodeID !== state.episodeId) return
+        state.shots = shots || []
+        paintShots()
+      })
+      .catch(function () {
+        state.shots = []
+        paintShots()
+      })
+  }
+
+  function paintEpisodes() {
+    var list = $('episode-list')
+    clear(list)
+    if (!state.projectId) {
+      list.appendChild(el('p', 'px-2.5 py-2 text-2xs leading-relaxed text-ink-lo', '先选一个项目'))
+      return
+    }
+    if (!state.episodes.length) {
+      list.appendChild(el('p', 'px-2.5 py-2 text-2xs leading-relaxed text-ink-lo', '还没有剧集。点右上角 ＋ 建第一集。'))
+      return
+    }
+    state.episodes.forEach(function (episode) {
+      var button = el('button', 'project-item' + (episode.id === state.episodeId ? ' is-active' : ''))
+      button.type = 'button'
+      var row = el('span', 'flex min-w-0 flex-1 items-baseline gap-2')
+      row.appendChild(el('span', 'text-[10px] font-semibold tabular-nums text-ink-dim', String(episode.number).padStart(2, '0')))
+      row.appendChild(el('span', 'truncate', episode.title || '未命名剧集'))
+      button.appendChild(el('span', 'project-dot'))
+      button.appendChild(row)
+      button.addEventListener('click', function () {
+        state.episodeId = episode.id
+        paintEpisodes()
+        refreshShots()
+      })
+      list.appendChild(button)
+    })
+  }
+
+  function paintShots() {
+    var box = $('shot-list')
+    if (!box) return
+    clear(box)
+    var episode = state.episodes.filter(function (e) { return e.id === state.episodeId })[0]
+    $('shot-episode-title').textContent = episode ? episode.title : '本集镜头'
+    if (!state.shots.length) {
+      box.appendChild(el('p', 'text-2xs leading-relaxed text-ink-lo', '这一集还没有镜头。点「＋ 镜头」加一个。'))
+      return
+    }
+    state.shots.forEach(function (shot) {
+      var card = el('div', 'shot-card' + (shot.status === 'done' ? ' is-done' : ''))
+      var head = el('div', 'flex items-center justify-between gap-2')
+      var title = el('div', 'min-w-0')
+      title.appendChild(el('div', 'flex items-baseline gap-2'))
+      title.appendChild(el('span', 'text-[10px] font-semibold tabular-nums text-ink-dim', String(shot.number).padStart(2, '0')))
+      title.appendChild(el('span', 'truncate text-sm font-medium text-ink', shot.title || '未命名镜头'))
+      head.appendChild(title)
+      head.appendChild(el('span', 'badge', shotStatusLabel(shot.status)))
+      card.appendChild(head)
+      if (shot.action) {
+        card.appendChild(el('p', 'mt-1.5 text-2xs leading-relaxed text-ink-lo', shot.action))
+      }
+      if (shot.lines && shot.lines.length) {
+        card.appendChild(el('p', 'mt-1 text-2xs leading-relaxed text-ink-dim', '旁白：' + shot.lines.join(' / ')))
+      }
+      var actions = el('div', 'mt-2 flex items-center gap-1.5')
+      var shoot = el('button', 'btn btn-secondary btn-sm', '出镜')
+      shoot.type = 'button'
+      shoot.addEventListener('click', function () { openShootDialog({ id: shot.characterId, name: shot.title, looks: shot.look ? [shot.look] : [] }) })
+      actions.appendChild(shoot)
+      var finish = el('button', 'btn btn-ghost btn-sm', '做成片')
+      finish.type = 'button'
+      finish.addEventListener('click', function () { openEpisodeDialog({ id: shot.assetId, name: shot.title }) })
+      actions.appendChild(finish)
+      card.appendChild(actions)
+      box.appendChild(card)
+    })
+  }
+
+  function openEpisodeDialog2() {
+    if (!state.projectId) {
+      fail(new Error('先选一个项目'))
+      return
+    }
+    $('new-episode-form').reset()
+    var dialog = $('new-episode-dialog')
+    if (dialog.showModal) dialog.showModal()
+    else dialog.setAttribute('open', 'open')
+    $('ep-title').focus()
+  }
+
+  function openShotDialog() {
+    if (!state.episodeId) {
+      fail(new Error('先选一集'))
+      return
+    }
+    $('new-shot-form').reset()
+    var dialog = $('new-shot-dialog')
+    if (dialog.showModal) dialog.showModal()
+    else dialog.setAttribute('open', 'open')
+    $('shot-title').focus()
+  }
+
+  function openSceneDialog() {
+    $('new-scene-form').reset()
+    var dialog = $('new-scene-dialog')
+    if (dialog.showModal) dialog.showModal()
+    else dialog.setAttribute('open', 'open')
+    $('scene-name').focus()
+  }
+
+  function submitNewEpisode(event) {
+    event.preventDefault()
+    engine()
+      .CreateEpisode({
+        ProjectID: state.projectId || '',
+        Number: 0,
+        Title: $('ep-title').value || '',
+        Summary: $('ep-summary').value || '',
+      })
+      .then(function (episode) {
+        $('new-episode-dialog').close()
+        state.episodeId = episode.id
+        return refreshEpisodes()
+      })
+      .catch(fail)
+  }
+
+  function submitNewShot(event) {
+    event.preventDefault()
+    var lines = ($('shot-lines').value || '').split('\n').map(function (l) { return l.trim() }).filter(Boolean)
+    engine()
+      .CreateShot({
+        ProjectID: state.projectId || '',
+        EpisodeID: state.episodeId || '',
+        Title: $('shot-title').value || '',
+        Action: $('shot-action').value || '',
+        Lines: lines,
+      })
+      .then(function () {
+        $('new-shot-dialog').close()
+        return refreshShots()
+      })
+      .catch(fail)
+  }
+
+  function submitNewScene(event) {
+    event.preventDefault()
+    engine()
+      .CreateScene('', $('scene-name').value || '', $('scene-desc').value || '')
+      .then(function () {
+        $('new-scene-dialog').close()
+        return refreshSubjects()
+      })
+      .catch(fail)
+  }
+
+  function shotStatusLabel(status) {
+    if (status === 'done') return '已成片'
+    if (status === 'shot') return '已出镜'
+    if (status === 'shooting') return '出镜中'
+    return '待拍'
+  }
+
+  // ── 角色库 / 场景库 ─────────────────────────────────────
+  //
+  // 30 个角色、十几个场景，网格 + 搜索才找得动；列表一页放不下几个。
+  // 角色卡和场景卡都从同一份主体表来，只按 kind 分开。
+  function refreshSubjects() {
+    return engine()
+      .ListAllSubjects('')
+      .then(function (subjects) {
+        state.subjects = subjects || []
+        paintCast()
+        paintScenes()
+      })
+      .catch(function (err) {
+        state.subjects = []
+        paintCast()
+        paintScenes()
+      })
+  }
+
+  function people() {
+    return state.subjects.filter(function (s) { return s.kind === 'person' })
+  }
+
+  function scenes() {
+    return state.subjects.filter(function (s) { return s.kind === 'scene' })
+  }
+
+  function paintCast() {
+    var grid = $('cast-grid')
+    var empty = $('cast-empty')
+    clear(grid)
+    var query = (state.castQuery || '').trim().toLowerCase()
+    var list = people().filter(function (s) {
+      if (!query) return true
+      var hay = (s.name || '') + ' ' + JSON.stringify(s.traits || {})
+      return hay.toLowerCase().indexOf(query) >= 0
+    })
+    $('cast-count').textContent = list.length + ' 个'
+    if (!state.subjects.length) {
+      empty.textContent = '读不到中台角色：检查 museav 登录态。'
+      return
+    }
+    if (!list.length) {
+      empty.textContent = query ? '没有匹配「' + query + '」的角色。' : '还没有角色。'
+      return
+    }
+    empty.textContent = ''
+    list.forEach(function (subject) {
+      var card = el('div', 'character-card')
+      var head = el('div', 'character-head')
+      var left = el('div', 'min-w-0')
+      left.appendChild(el('div', 'character-name', subject.name || '未命名角色'))
+      left.appendChild(el('div', 'text-2xs text-ink-lo', (subject.traits || {})['武器'] || (subject.traits || {})['身份'] || ''))
+      head.appendChild(left)
+      head.appendChild(el('span', 'badge', (subject.asset_count || 0) + ' 图'))
+      card.appendChild(head)
+      var traits = []
+      Object.keys(subject.traits || {}).forEach(function (key) {
+        if (key === '武器') return
+        traits.push(key + '：' + subject.traits[key])
+      })
+      if (traits.length) {
+        card.appendChild(el('p', 'character-missing', traits.join('；')))
+      }
+      grid.appendChild(card)
+    })
+  }
+
+  function paintScenes() {
+    var grid = $('scene-grid')
+    var empty = $('scene-empty')
+    clear(grid)
+    var list = scenes()
+    $('scene-count').textContent = list.length + ' 个'
+    if (!list.length) {
+      empty.textContent = '还没有场景。新建一个场景主体（kind=scene），给参考图和画面描述。'
+      return
+    }
+    empty.textContent = ''
+    list.forEach(function (subject) {
+      var card = el('div', 'character-card')
+      var head = el('div', 'character-head')
+      var left = el('div', 'min-w-0')
+      left.appendChild(el('div', 'character-name', subject.name || '未命名场景'))
+      left.appendChild(el('div', 'text-2xs text-ink-lo', (subject.traits || {})['画面描述'] || ''))
+      head.appendChild(left)
+      head.appendChild(el('span', 'badge', (subject.asset_count || 0) + ' 图'))
+      card.appendChild(head)
+      grid.appendChild(card)
+    })
+  }
+
   function refreshCharacters() {
     // 走 App 层而不是 Engine 层：App 层是给界面用的薄封装，
     // Engine 层的方法签名会随内部实现变（带 ctx 之类），界面不该依赖它。
@@ -495,6 +848,12 @@
       .catch(function (err) {
         // 中台没登录或不可用不该让整个界面报错 —— 只在角色区说清楚。
         state.characters = []
+    state.subjects = []
+    state.episodes = []
+    state.shots = []
+    state.episodeId = ''
+    state.view = 'make'
+    state.castQuery = ''
         paintCharacters()
         var empty = $('character-empty')
         empty.classList.remove('hidden')
@@ -752,6 +1111,10 @@
     renderSteps()
     paintStage()
     loadAssets()
+    // 换项目要把剧集/镜头/角色库一起换掉 —— 上一部戏的集数留在侧栏是错的
+    state.episodeId = ''
+    refreshEpisodes()
+    refreshSubjects()
     restoreProjectJob(projectID)
   }
 
