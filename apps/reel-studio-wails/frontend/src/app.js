@@ -420,6 +420,18 @@
     $('shoot-dialog-title').textContent = '让「' + (character.name || '未命名角色') + '」出镜'
     $('shoot-hint').textContent = ''
     $('shoot-action').value = ''
+    var looks = character.looks || []
+    state.shootLook = looks[0] || ''
+    var lookRoot = $('select-shoot-look')
+    clear(lookRoot)
+    $('shoot-look-field').classList.toggle('hidden', looks.length < 2)
+    if (looks.length >= 2) {
+      window.ReelSelect.create(lookRoot, {
+        items: looks.map(function (l) { return { value: l, label: l } }),
+        value: state.shootLook,
+        onChange: function (value) { state.shootLook = value },
+      })
+    }
     var dialog = $('shoot-dialog')
     if (dialog.showModal) dialog.showModal()
     else dialog.setAttribute('open', 'open')
@@ -444,6 +456,7 @@
         projectId: state.projectId || '',
         subjectId: state.shootCharacter.id,
         action: action,
+        look: state.shootLook || '',
       })
       .then(function (asset) {
         state.characterBusy = false

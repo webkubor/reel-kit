@@ -130,6 +130,8 @@ type Character struct {
 	// 三视图（role=raw），归不了位，但恰恰是最稳的定妆源 —— 不能因为它
 	// 不进五视图就让角色出不了镜。
 	References []CharacterAsset `json:"references"`
+	// Looks 名下的几套装扮（来自定妆稿名），出镜时选一套。
+	Looks []string `json:"looks"`
 	// Complete 是否创建完成。
 	Complete bool `json:"complete"`
 	// Missing 缺件清单（可读中文），Complete 为 false 时告诉用户还差什么。
@@ -375,6 +377,7 @@ func subjectToCharacter(detail SubjectDetail, projectID, sourceBatch string) *Ch
 			c.Assets = append(c.Assets, item)
 		}
 	}
+	c.Looks = characterLooks(c)
 	c.Complete, c.Missing, c.Warnings = EvaluateCharacter(c)
 	return c
 }

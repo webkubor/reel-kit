@@ -312,8 +312,14 @@
       <form id="shoot-form">
         <h2 id="shoot-dialog-title" class="text-base font-semibold tracking-tight text-ink">让角色出镜</h2>
         <p class="mt-1 text-2xs leading-relaxed text-ink-lo">
-          以定妆稿为参考，中台出一段无声素材。联网且计费，配音与合成在这之后做。
+          以定妆稿为参考，用 MiniMax H3 出一段镜头（时长与画幅按项目出片规格，最长 15 秒）。占用套餐额度，失败也算一次。
         </p>
+
+        <div id="shoot-look-field" class="field mt-4 hidden">
+          <span id="shoot-look-label" class="label">这场戏穿哪一套</span>
+          <div id="select-shoot-look" aria-labelledby="shoot-look-label"></div>
+          <p class="help">只送这一套的定妆稿，别的装扮不送，免得两套衣服被糅成一套。</p>
+        </div>
 
         <div class="field mt-4">
           <label class="label" for="shoot-action">角色在镜头里做什么</label>

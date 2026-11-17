@@ -278,8 +278,14 @@ func (m *MuseavClient) GenerateImage(ctx context.Context, prompt, ratio, referen
 // 走「参考图」而不是「首帧」，因为定妆稿是三视图设计稿，拿它当首帧
 // 视频就会从一张白底设定图开场。提交即计费，调用方只能在用户明确
 // 触发后调用。
-func (m *MuseavClient) GenerateVideo(ctx context.Context, prompt, ratio string, duration int, referenceURLs []string) (string, error) {
+//
+// model 用中台对外名（museav models --video 列出的那个，如「MiniMax H3」）。
+// 点名后中台不会在失败时换别家上游 —— 换了就不是同一个画风了。
+func (m *MuseavClient) GenerateVideo(ctx context.Context, model, prompt, ratio string, duration int, referenceURLs []string) (string, error) {
 	args := []string{"gen", "--video", "--prompt", prompt}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
 	if ratio != "" {
 		args = append(args, "--ratio", ratio)
 	}

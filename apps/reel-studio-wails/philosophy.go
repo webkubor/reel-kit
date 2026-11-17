@@ -277,18 +277,6 @@ func (e *Engine) philosophyText(ctx context.Context, workspace string) string {
 	return ws.Philosophy.Compile().Text
 }
 
-// shotPhilosophyText 读指定工作区的哲学，按单镜头口径编译。
-func (e *Engine) shotPhilosophyText(ctx context.Context, workspace, weapon string) string {
-	if strings.TrimSpace(workspace) == "" {
-		return ""
-	}
-	ws, err := (&MuseavClient{}).GetWorkspacePhilosophy(ctx, workspace)
-	if err != nil || ws == nil {
-		return ""
-	}
-	return ws.Philosophy.CompileShot(weapon)
-}
-
 // systemInstruction 组装分镜生成的系统提示词。
 //
 // 工作区取自任务入参 workspace；没给就只用裸指令，不猜项目。

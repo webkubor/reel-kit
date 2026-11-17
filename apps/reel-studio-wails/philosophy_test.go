@@ -88,7 +88,7 @@ func TestPickWorkspacePhilosophyNoFallback(t *testing.T) {
 // 出镜提示词不能混进分镜的「只返回 JSON」指令。
 func TestCharacterVideoPromptNoStoryboardInstruction(t *testing.T) {
 	e := &Engine{}
-	p := characterVideoPrompt(&Character{Name: "慕北歌"}, "雪巅枯坐", e.philosophyText(context.Background(), ""))
+	p := h3ShotPrompt(&Character{Name: "慕北歌"}, "", "雪巅枯坐", shotSpec{Ratio: "16:9", Duration: 5}, nil, e.philosophyText(context.Background(), ""))
 	if strings.Contains(p, "JSON") || strings.Contains(p, "分镜编辑") {
 		t.Fatalf("出镜提示词混进了分镜指令：%s", p)
 	}

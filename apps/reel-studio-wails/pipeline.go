@@ -39,6 +39,7 @@ func (e *Engine) runPipeline(ctx context.Context, job *Job, progress func(text s
 			Action:    strOr(job.Input["action"], ""),
 			Ratio:     strOr(job.Input["ratio"], ""),
 			Duration:  intFromAny(job.Input["duration"]),
+			Look:      strOr(job.Input["look"], ""),
 		}, func(text string) {
 			progress(text, nil)
 		}, report)

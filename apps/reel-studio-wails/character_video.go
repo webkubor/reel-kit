@@ -24,6 +24,8 @@ type CharacterVideoInput struct {
 	Ratio string
 	// Duration 时长（秒），0 = 交给中台按模型定。
 	Duration int
+	// Look 这场戏穿哪一套（定妆稿名里的装扮名），空 = 第一套。
+	Look string
 }
 
 // characterVideoTimeout 视频比图慢得多（中台通常 1-5 分钟），给 15 分钟。
@@ -70,24 +72,32 @@ func (e *Engine) MakeCharacterVideo(ctx context.Context, input CharacterVideoInp
 	// 口径、记在沸腾之雪名下。不能用「账号下第一个项目」去猜。
 	client.Workspace = character.Workspace
 
-	// 参考图：五视图优先（模型能拼出转面），没有就退而求其次用名下任意图。
-	refs := characterReferenceURLs(character)
+	look := resolveLook(character, input.Look)
+	refs := characterReferences(character, look)
 	if len(refs) == 0 {
 		return nil, fmt.Errorf("角色「%s」名下还没有图，请先补定妆稿", character.Name)
 	}
-	if len(refs) > 9 {
-		refs = refs[:9] // 中台上限 9 张
+
+	// 项目哲学：画面口径 + 出片规格（画幅、时长）都从角色所属工作区来。
+	var philosophy Philosophy
+	if ws, err := client.GetWorkspacePhilosophy(ctx, character.Workspace); err == nil && ws != nil {
+		philosophy = ws.Philosophy
+	}
+	spec := h3Profile.resolve(input.Ratio, input.Duration, philosophy)
+	prompt := h3ShotPrompt(character, look, input.Action, spec, refs, philosophy.CompileShot(characterTrait(character, "武器")))
+	urls := make([]string, 0, len(refs))
+	for _, r := range refs {
+		urls = append(urls, r.URL)
 	}
 
-	report(Step{ID: "video", Label: "角色出镜", Status: "running", Origin: "cloud-paid", Engine: "museav 视频出片"})
-	progress(fmt.Sprintf("正在提交视频任务（计费 %d 张参考图）", len(refs)))
-	prompt := characterVideoPrompt(character, input.Action, e.shotPhilosophyText(ctx, character.Workspace, characterTrait(character, "武器")))
-	url, err := client.GenerateVideo(ctx, prompt, input.Ratio, input.Duration, refs)
+	report(Step{ID: "video", Label: "角色出镜", Status: "running", Origin: "cloud-paid", Engine: h3Profile.Model})
+	progress(fmt.Sprintf("正在提交 %s 任务（%d 秒 · %s · %d 张参考图，占用套餐额度）", h3Profile.Model, spec.Duration, spec.Ratio, len(urls)))
+	url, err := client.GenerateVideo(ctx, h3Profile.Model, prompt, spec.Ratio, spec.Duration, urls)
 	if err != nil {
 		report(Step{ID: "video", Label: "角色出镜", Status: "failed", Origin: "cloud-paid", Detail: err.Error()})
 		return nil, err
 	}
-	report(Step{ID: "video", Label: "角色出镜", Status: "done", Origin: "cloud-paid", Engine: "museav 视频出片"})
+	report(Step{ID: "video", Label: "角色出镜", Status: "done", Origin: "cloud-paid", Engine: h3Profile.Model})
 
 	progress("正在下载成片")
 	data, mime, err := client.DownloadVideo(ctx, url)
@@ -97,11 +107,15 @@ func (e *Engine) MakeCharacterVideo(ctx context.Context, input CharacterVideoInp
 	asset, err := e.store.AddAsset(input.ProjectID, character.Name+"-出镜.mp4", mimeOrVideo(mime), data, map[string]any{
 		"source":       "museav",
 		"origin":       "cloud",
-		"engine":       "museav 视频出片",
+		"engine":       "museav · " + h3Profile.Model,
+		"model":        h3Profile.Model,
+		"duration":     spec.Duration,
+		"prompt":       prompt,
 		"sourceUrl":    url,
 		"sourceTaskId": input.SubjectID,
 		"script":       input.Action,
-		"ratio":        input.Ratio,
+		"ratio":        spec.Ratio,
+		"look":         look,
 	})
 	if err != nil {
 		return nil, err
@@ -110,25 +124,159 @@ func (e *Engine) MakeCharacterVideo(ctx context.Context, input CharacterVideoInp
 	return asset, nil
 }
 
-// characterReferenceURLs 挑参考图，按「锁脸价值」排序：
-//  1. 归位的五视图（按正→左45→侧→右45→背）
-//  2. 名字带「三视图 / 定妆 / 设定」的组合稿 —— 设计师定稿，最稳
-//  3. 其余（兵器、面具等道具图）—— 有助于道具一致，但不锁脸
+// 角色 = 不变的本体 × 可换的装扮 × 独立的兵器。
 //
-// 同一 URL 只出现一次，上限 9 张（中台限制）。
-func characterReferenceURLs(c *Character) []string {
+// 出镜时一次只能穿一套衣服、拿自己的兵器：把「三视图」和「王服三视图」
+// 一起送给模型，它会把两套衣服糅成一套；把别人的剑图一起送，它会把
+// 别人的剑画进这个人手里。所以参考图必须按装扮、按兵器过滤。
+
+// DefaultLook 名字里没写装扮的定妆稿（如「夜惊鸿-三视图」）归这一套。
+const DefaultLook = "默认"
+
+var sheetKeywords = []string{"三视图", "定妆", "设定", "turnaround"}
+
+// weaponHints 素材名里出现这些字就当兵器图（面具、发饰等不算）。
+var weaponHints = []string{"剑", "枪", "弓", "刀", "笛", "鞭", "锤", "匕", "枷", "刃", "刺", "箭"}
+
+func isDesignSheet(name string) bool {
+	n := strings.ToLower(name)
+	for _, k := range sheetKeywords {
+		if strings.Contains(n, k) {
+			return true
+		}
+	}
+	return false
+}
+
+func isWeaponImage(name string) bool {
+	if isDesignSheet(name) {
+		return false
+	}
+	for _, k := range weaponHints {
+		if strings.Contains(name, k) {
+			return true
+		}
+	}
+	return false
+}
+
+// lookOf 从定妆稿名字里取装扮名：「夜惊鸿-王服三视图」→「王服」，
+// 「夜惊鸿-三视图」→「默认」。
+func lookOf(characterName, assetName string) string {
+	n := strings.TrimSpace(assetName)
+	if characterName != "" {
+		n = strings.TrimPrefix(n, characterName)
+	}
+	n = strings.TrimLeft(n, "-_ ·")
+	for _, k := range sheetKeywords {
+		if i := strings.Index(strings.ToLower(n), k); i >= 0 {
+			n = n[:i]
+			break
+		}
+	}
+	n = strings.Trim(n, "-_ ·")
+	if n == "" {
+		return DefaultLook
+	}
+	return n
+}
+
+// characterLooks 列出角色名下的几套装扮，「默认」排第一。
+func characterLooks(c *Character) []string {
 	out := []string{}
 	seen := map[string]bool{}
+	pool := c.References
+	if len(pool) == 0 {
+		pool = c.Assets
+	}
+	for _, a := range pool {
+		if a.View != "" || !isDesignSheet(a.Name) {
+			continue
+		}
+		l := lookOf(c.Name, a.Name)
+		if !seen[l] {
+			seen[l] = true
+			out = append(out, l)
+		}
+	}
+	for i, l := range out {
+		if l == DefaultLook && i > 0 {
+			out[0], out[i] = out[i], out[0]
+		}
+	}
+	return out
+}
+
+// resolveLook 用户没选或选了不存在的装扮时，落到第一套。
+func resolveLook(c *Character, look string) string {
+	looks := characterLooks(c)
+	for _, l := range looks {
+		if l == look {
+			return l
+		}
+	}
+	if len(looks) > 0 {
+		return looks[0]
+	}
+	return ""
+}
+
+// weaponNames 从角色卡「武器」里取【】内的兵器名。
+func weaponNames(weapon string) []string {
+	out := []string{}
+	for {
+		i := strings.Index(weapon, "【")
+		if i < 0 {
+			return out
+		}
+		rest := weapon[i+len("【"):]
+		j := strings.Index(rest, "】")
+		if j < 0 {
+			return out
+		}
+		if name := strings.TrimSpace(rest[:j]); name != "" {
+			out = append(out, name)
+		}
+		weapon = rest[j+len("】"):]
+	}
+}
+
+// characterReferenceURLs 挑出镜参考图：
+//  1. 归位的五视图（同一批生成，同一套装扮）
+//  2. 选定装扮的定妆稿 —— 只这一套，别的装扮一张不送
+//  3. 本命兵器图 —— 名字对上角色卡【兵器名】的；对不上且只有一张兵器图时用它
+//  4. 其余道具（面具等）
+//
+// 同一 URL 只出现一次，上限 9 张（中台限制）。
+func characterReferenceURLs(c *Character, look string) []string {
+	out := []string{}
+	for _, r := range characterReferences(c, look) {
+		out = append(out, r.URL)
+	}
+	return out
+}
+
+// shotRef 一张出镜参考图 + 它在提示词里的分工（H3 按「图1、图2…」认图）。
+type shotRef struct {
+	URL   string
+	Label string
+}
+
+func characterReferences(c *Character, look string) []shotRef {
+	out := []shotRef{}
+	seen := map[string]bool{}
+	label := ""
 	add := func(u string) {
 		if u == "" || seen[u] || len(out) >= 9 {
 			return
 		}
 		seen[u] = true
-		out = append(out, u)
+		out = append(out, shotRef{URL: u, Label: label})
 	}
 	for _, view := range CharacterViews {
 		for _, a := range c.Assets {
 			if a.View == view {
+				label = c.Name + "的" + CharacterViewLabels[view] + "定妆，锁定五官、发型、肤色、体型与服装"
 				add(a.URL)
 				break
 			}
@@ -138,43 +286,42 @@ func characterReferenceURLs(c *Character) []string {
 	if len(pool) == 0 {
 		pool = c.Assets
 	}
+	look = resolveLook(c, look)
 	for _, a := range pool {
-		if isDesignSheet(a.Name) {
+		if a.View == "" && isDesignSheet(a.Name) && lookOf(c.Name, a.Name) == look {
+			label = c.Name + "的定妆三视图（" + look + "装扮），锁定五官、发型、肤色、体型与这一套服装"
 			add(a.URL)
 		}
 	}
+	names := weaponNames(characterTrait(c, "武器"))
+	weapons := []CharacterAsset{}
+	matched := []CharacterAsset{}
 	for _, a := range pool {
-		add(a.URL)
-	}
-	return out
-}
-
-func isDesignSheet(name string) bool {
-	for _, k := range []string{"三视图", "定妆", "设定", "turnaround"} {
-		if strings.Contains(strings.ToLower(name), k) {
-			return true
+		if a.View != "" || !isWeaponImage(a.Name) {
+			continue
+		}
+		weapons = append(weapons, a)
+		for _, n := range names {
+			if strings.Contains(a.Name, n) {
+				matched = append(matched, a)
+				break
+			}
 		}
 	}
-	return false
-}
-
-// characterVideoPrompt 组装出镜提示词：角色卡管「这个人长什么样」，
-// 动作管「这场戏演什么」，哲学管「这类画面长什么样」。
-func characterVideoPrompt(c *Character, action, philosophy string) string {
-	parts := []string{action}
-	traits := []string{}
-	for _, t := range c.Traits {
-		traits = append(traits, t.Key+"："+t.Value)
+	if len(matched) == 0 && len(weapons) == 1 {
+		matched = weapons
 	}
-	if len(traits) > 0 {
-		parts = append(parts, "人物设定："+strings.Join(traits, "；")+"。参考图锁定五官、发型、肤色与服装，不得改变。")
-	} else {
-		parts = append(parts, "人物外貌以参考图为准，不得改变。")
+	for _, a := range matched {
+		label = c.Name + "的本命兵器（" + strings.TrimLeft(strings.TrimPrefix(a.Name, c.Name), "-_ ·") + "），锁定兵器形制与材质"
+		add(a.URL)
 	}
-	if strings.TrimSpace(philosophy) != "" {
-		parts = append(parts, philosophy)
+	for _, a := range pool {
+		if a.View == "" && !isDesignSheet(a.Name) && !isWeaponImage(a.Name) {
+			label = c.Name + "的随身道具（" + strings.TrimLeft(strings.TrimPrefix(a.Name, c.Name), "-_ ·") + "）"
+			add(a.URL)
+		}
 	}
-	return strings.Join(parts, "\n")
+	return out
 }
 
 // mimeOrVideo 下载回来的 mime 可能是二进制流嗅探结果，
