@@ -238,18 +238,19 @@ func characterViewPrompt(subject *Subject, input CharacterCreateInput, view Char
 	for _, t := range traits {
 		traitText = append(traitText, t.Key+"："+t.Value)
 	}
+	// 方向一律按画面描述：「向左/向右转」不说清是谁的左，实测两个 45° 会朝同一边。
 	angle := map[CharacterView]string{
-		ViewFront:   "正对镜头的正面全身站姿",
-		ViewLeft45:  "向左转 45 度的全身站姿",
-		ViewSide:    "正侧面（90 度）全身站姿",
-		ViewRight45: "向右转 45 度的全身站姿",
-		ViewBack:    "背对镜头的背面全身站姿",
+		ViewFront:   "正面全身站姿，身体与脸正对镜头",
+		ViewLeft45:  "四分之三侧身全身站姿，身体与脸转向画面左侧约 45 度，仍能看到两只眼睛",
+		ViewSide:    "正侧面全身站姿，身体与脸朝向画面左侧 90 度，只看到一侧脸",
+		ViewRight45: "四分之三侧身全身站姿，身体与脸转向画面右侧约 45 度，仍能看到两只眼睛",
+		ViewBack:    "背面全身站姿，背对镜头，看不到脸",
 	}[view]
 
 	parts := []string{
 		"生成一张写实摄影风格的人物角色设定视图。",
 		"参考图是同一个人的脸部、骨骼结构、肤质与发型，五官必须高度匹配参考图，保持年龄、种族、性别特征一致。",
-		"机位与姿态：" + angle + "。",
+		"机位与姿态：" + angle + "；头部端正，视线平视，不仰头不低头，双手自然下垂或交握于身前。",
 		"纯白背景，柔光棚拍，光线均匀，无投影干扰。",
 		"全身入镜，从头顶到脚完整可见，不裁切。",
 		"人物体貌：" + strings.Join(traitText, "，") + "。",
@@ -302,7 +303,7 @@ func (e *Engine) ListCharacters(workspace string) ([]*Character, error) {
 			// 让用户知道有这个角色、只是没读出来。
 			out = append(out, &Character{
 				ID: s.ID, Name: s.Name, Kind: s.Kind,
-				Persona: strings.TrimSpace(strOr(s.PersonaSource, "")),
+				Persona: strings.TrimSpace(derefStr(s.PersonaSource)),
 				Traits:  subjectTraits(s.Traits),
 				Missing: []string{"读取中台详情失败：" + err.Error()},
 			})

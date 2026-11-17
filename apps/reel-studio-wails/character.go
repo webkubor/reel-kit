@@ -347,7 +347,7 @@ func subjectToCharacter(detail SubjectDetail, projectID, sourceBatch string) *Ch
 		Workspace:   detail.Subject.WorkspaceID,
 		Name:        detail.Subject.Name,
 		Kind:        detail.Subject.Kind,
-		Persona:     strings.TrimSpace(strOr(detail.Subject.PersonaSource, "")),
+		Persona:     strings.TrimSpace(derefStr(detail.Subject.PersonaSource)),
 		Traits:      subjectTraits(detail.Subject.Traits),
 		Assets:      []CharacterAsset{},
 		SourceBatch: sourceBatch,

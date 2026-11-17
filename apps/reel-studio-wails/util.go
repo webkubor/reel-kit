@@ -43,3 +43,12 @@ func floatOr(v any, fallback float64) float64 {
 	}
 	return fallback
 }
+
+// derefStr 取可空字符串字段的值；nil 视为空。
+// 不能用 strOr：它按 string 断言，*string 会永远落到兜底值。
+func derefStr(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
