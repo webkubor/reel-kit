@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,11 +32,28 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.engine.Start()
+	// 规整存量素材名：早期导入带 .png 后缀，会干扰分类判断
+	if a.engine.store != nil {
+		if n, err := a.engine.store.NormalizeAssetNames(); err == nil && n > 0 {
+			fmt.Printf("已规整 %d 个素材名\n", n)
+		}
+	}
 }
 
 // shutdown 是退出时做的事：停掉 worker。
 func (a *App) shutdown(_ context.Context) {
 	a.engine.Stop()
+}
+
+// nativeDialogReady 检查原生对话框能不能用。
+//
+// runtime 的对话框走 Wails 前端：上下文缺失或前端还没起来时，
+// 直接调用会 panic。界面要拿到一句能看懂的话，而不是整个应用崩掉。
+func (a *App) nativeDialogReady() error {
+	if a.ctx == nil {
+		return errors.New("原生对话框还没准备好：请在 muse-tv 桌面应用里操作")
+	}
+	return nil
 }
 
 // PickFaceImage 选一张人脸照片，只返回磁盘路径。
@@ -44,8 +62,8 @@ func (a *App) shutdown(_ context.Context) {
 // 先存一份进素材库再从素材库读回来只是多绕一圈，还会让素材列表
 // 混进一堆不是成片素材的人脸图。
 func (a *App) PickFaceImage() (string, error) {
-	if a.ctx == nil {
-		return "", errNoStore
+	if err := a.nativeDialogReady(); err != nil {
+		return "", err
 	}
 	paths, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "选择人脸照片",
@@ -281,8 +299,8 @@ func (a *App) Status() Status {
 // 桌面上用户习惯在访达里翻目录，浏览器文件框既不像本地应用，
 // 也拿不到真实的磁盘路径（拿不到路径就没法把素材存进工作台）。
 func (a *App) PickImages(projectID string) ([]*Asset, error) {
-	if a.ctx == nil {
-		return nil, errNoStore
+	if err := a.nativeDialogReady(); err != nil {
+		return nil, err
 	}
 	paths, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "选择图片",
@@ -293,6 +311,13 @@ func (a *App) PickImages(projectID string) ([]*Asset, error) {
 	if err != nil {
 		return nil, err
 	}
+	return a.importImages(projectID, paths)
+}
+
+// importImages 把磁盘上的图片登记进素材库。
+//
+// 与原生对话框分开：选文件要真窗口，登记入库是纯逻辑，可以离线验证。
+func (a *App) importImages(projectID string, paths []string) ([]*Asset, error) {
 	out := []*Asset{}
 	for _, path := range paths {
 		data, err := os.ReadFile(path)
@@ -330,6 +355,9 @@ func (a *App) ExportVideo(projectID, assetID string) (string, error) {
 	}
 	if asset.MIME != "video/mp4" {
 		return "", fmt.Errorf("只能导出 MP4 成片")
+	}
+	if err := a.nativeDialogReady(); err != nil {
+		return "", err
 	}
 	destination, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title: "导出成片", DefaultFilename: "muse-tv.mp4",
@@ -379,11 +407,19 @@ func mimeForImage(path string) string {
 }
 
 // fileBaseName 取文件名（不含目录）。
+// fileBaseName 取文件名（去掉目录与扩展名）。
+//
+// 素材名要能当分类依据（见 docs/asset-classification.md），
+// 带 .png 后缀会让「三视图-xxx.png」这类名字判不准。
 func fileBaseName(path string) string {
-	if i := strings.LastIndex(path, "/"); i >= 0 {
-		return path[i+1:]
+	name := path
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		name = name[i+1:]
 	}
-	return path
+	if i := strings.LastIndex(name, "."); i > 0 {
+		name = name[:i]
+	}
+	return name
 }
 
 // mediaHandler 给界面提供本机素材。

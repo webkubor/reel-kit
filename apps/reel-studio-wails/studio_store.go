@@ -641,3 +641,31 @@ func filterShots(in []*EpisodeShot, projectID string) []*EpisodeShot {
 	}
 	return out
 }
+
+// NormalizeAssetNames 把素材名里的文件扩展名去掉。
+//
+// 早期导入用完整文件名登记（"顾栖月-三视图-xxx.png"），后缀会干扰
+// 分类判断（见 docs/asset-classification.md）。这条迁移只改显示用的名字，
+// 不动磁盘上的文件。
+func (s *StudioStore) NormalizeAssetNames() (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	changed := 0
+	for _, a := range s.state.Assets {
+		name := a.Name
+		if i := strings.LastIndex(name, "."); i > 0 {
+			ext := strings.ToLower(name[i+1:])
+			switch ext {
+			case "png", "jpg", "jpeg", "webp", "gif", "mp4", "wav", "mp3", "m4a", "ogg":
+				a.Name = name[:i]
+				changed++
+			}
+		}
+	}
+	if changed > 0 {
+		if err := s.saveLocked(); err != nil {
+			return changed, err
+		}
+	}
+	return changed, nil
+}
