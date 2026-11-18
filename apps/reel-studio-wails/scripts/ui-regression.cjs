@@ -43,5 +43,21 @@ const ok=(c,m)=>console.log((c?'✓':'✗')+' '+m)
  ok(await ev(`document.getElementById('episode-head').classList.contains('hidden')`),'短视频项目隐藏剧集区')
  ok(await ev(`!!document.getElementById('product-asset-grid')`),'短视频有素材面板')
 
+ // 端到端：短视频出成片，成片进素材库
+ await ev(`document.getElementById('btn-new-project-icon').click()`);await wait(900)
+ await ev(`document.getElementById('project-kind-clip').click()`);await wait(400)
+ await ev(`(()=>{const i=document.getElementById('new-name');i.value='素材来源';[...document.querySelectorAll('#project-form button')].find(x=>x.type==='submit').click()})()`);await wait(4000)
+ await ev(`(()=>{const set=(id,v)=>{const e=document.getElementById(id);if(e){e.value=v;e.dispatchEvent(new Event('input'))}};set('f-title','回归素材');set('f-lines','第一句。\\n第二句。')})()`)
+ await ev(`document.getElementById('btn-run').click()`)
+ let made = false
+ for (let i = 0; i < 16; i++) {
+   await wait(7000)
+   const hint = await ev(`document.getElementById('run-hint').textContent.trim()`)
+   if (!/正在/.test(hint)) { made = true; break }
+ }
+ ok(made, '短视频能做出成片')
+ const videos = await ev(`(async()=>{const ps=await window.go.main.Engine.ListProjects();const p=ps.find(x=>x.name==='素材来源');if(!p)return 0;const a=await window.go.main.Engine.ListAssets(p.id);return a.filter(x=>(x.mime||'').startsWith('video/')).length})()`)
+ ok(videos > 0, '成片进了素材库')
+
  console.log('页面错误:',JSON.stringify(errs.filter(e=>!e.includes("'nodes'"))))
  ws.close()}catch(e){console.error(e);process.exitCode=1}finally{proc.kill()}})()
