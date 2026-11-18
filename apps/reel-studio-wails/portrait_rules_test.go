@@ -74,3 +74,36 @@ func TestHairReferenceIsRealFace(t *testing.T) {
 		t.Fatal("发型参考应算真人参考")
 	}
 }
+
+// 角色改名后，素材名要跟着改成当前名。
+//
+// 「顾七玥-玉尘笛」挂在「顾栖月」名下 —— 按新名搜不到这把笛子，
+// 分类也容易落到错的角色上。
+func TestRenameMirrorAssetsToCurrentName(t *testing.T) {
+	m := &CharacterMirror{Name: "顾栖月", Assets: []MirrorAsset{
+		{Name: "顾七玥-三视图-旧版"},
+		{Name: "顾七玥-定妆-旧版"},
+		{Name: "顾七玥-玉尘笛"},
+		{Name: "顾栖月-三视图-顾栖月_v1_玉笛"},
+		{Name: "顾栖月-头像"},
+		{Name: "雨夜长街-场景参考-v1"},
+	}}
+	n := renameMirrorAssetsToCurrentName(m, "顾栖月")
+	// 旧名的三视图与定妆要改；当前名的不动；场景参考不动
+	if n != 3 {
+		t.Fatalf("应改 3 个：%d", n)
+	}
+	want := []string{
+		"顾栖月-三视图-旧版",
+		"顾栖月-定妆-旧版",
+		"顾栖月-玉尘笛",
+		"顾栖月-三视图-顾栖月_v1_玉笛",
+		"顾栖月-头像",
+		"雨夜长街-场景参考-v1",
+	}
+	for i, w := range want {
+		if m.Assets[i].Name != w {
+			t.Fatalf("第 %d 个素材：%s，应为 %s", i, m.Assets[i].Name, w)
+		}
+	}
+}

@@ -116,6 +116,39 @@ func sanitizeFileName(name string) string {
 }
 
 // SaveCharacterMirror 存角色的本地镜像。
+// RenameMirrorAssetsToCurrentName 把镜像里不属于当前角色名的素材改挂到当前名。
+//
+// 角色改名后素材名常留着旧名（「顾七玥-玉尘笛」挂在「顾栖月」名下）：
+// 按新名搜不到这把笛子，分类也容易落到错的角色上。
+// 这里只改「角色名-类别-描述」这种结构的前缀；纯描述名（如「玉尘笛」）不动 ——
+// 猜不出它原本是谁的，硬改会张冠李戴。
+func renameMirrorAssetsToCurrentName(mirror *CharacterMirror, currentName string) int {
+	if mirror == nil || currentName == "" {
+		return 0
+	}
+	changed := 0
+	for i := range mirror.Assets {
+		n := mirror.Assets[i].Name
+		if n == "" || strings.HasPrefix(n, currentName+"-") {
+			continue
+		}
+		sep := strings.Index(n, "-")
+		if sep <= 0 {
+			continue
+		}
+		// 镜像里的素材本来就属于这个角色，改前缀就行；
+		// 唯一要排除的是场景参考 —— 那不是角色物料。
+		rest := n[sep+1:]
+		if strings.Contains(rest, "场景") || strings.Contains(rest, "画面") {
+			continue
+		}
+		mirror.Assets[i].Name = currentName + n[sep:]
+		changed++
+	}
+	return changed
+}
+
+// SaveCharacterMirror 缓存一份角色详情到本机。
 func (e *Engine) SaveCharacterMirror(character *Character) error {
 	if e.store == nil {
 		return errNoStore
@@ -223,6 +256,47 @@ func (e *Engine) mirrorBySubjectID(subjectID string) (*CharacterMirror, bool) {
 		}
 	}
 	return nil, false
+}
+
+// FixMirrorAssetNames 按角色当前名修正「这个角色自己」的镜像素材名。
+//
+// 角色改名后素材名常留着旧名（「顾七玥-玉尘笛」挂在「顾栖月」名下）：
+// 按新名搜不到，分类也容易落到错的角色上。
+//
+// 只动这一个角色的镜像 —— 拿当前名去改别人的素材会把整个素材库搞乱。
+func (e *Engine) FixMirrorAssetNames(subjectID, currentName string) (int, error) {
+	if e.store == nil || currentName == "" {
+		return 0, errNoStore
+	}
+	m, ok := e.mirrorBySubjectID(subjectID)
+	if !ok {
+		return 0, nil
+	}
+	n := renameMirrorAssetsToCurrentName(m, currentName)
+	if n == 0 {
+		return 0, nil
+	}
+	if err := e.saveMirror(m); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
+// saveMirror 把镜像写回本机。
+func (e *Engine) saveMirror(m *CharacterMirror) error {
+	if e.store == nil || m == nil {
+		return errNoStore
+	}
+	dir := e.characterMirrorDir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	m.UpdatedAt = nowISO()
+	data, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, sanitizeFileName(m.Name)+".json"), data, 0o600)
 }
 
 // CharacterDetailCache 角色详情的本地缓存目录。
