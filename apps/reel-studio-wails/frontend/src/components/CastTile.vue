@@ -31,8 +31,10 @@ const countLabel = computed(() => {
   const p = props.portrait
   if (!p) return '—'
   const parts = []
-  if (p.referenceCount > 0) parts.push(`定妆 ${p.referenceCount}`)
+  // 分项计数：定妆与三视图是角色形象本身；真人参考只是建模参考，要单独标出来
+  if (p.designCount > 0) parts.push(`定妆 ${p.designCount}`)
   if (p.weaponCount > 0) parts.push(`兵器 ${p.weaponCount}`)
+  if (p.realFaceCount > 0) parts.push(`真人参考 ${p.realFaceCount}`)
   return parts.length ? parts.join(' · ') : '—'
 })
 </script>

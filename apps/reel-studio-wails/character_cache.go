@@ -33,8 +33,12 @@ type CharacterPortrait struct {
 	AvatarURL      string `json:"avatarUrl,omitempty"` // /media/<id>（本地）或中台直链
 	ReferenceCount int    `json:"referenceCount"`
 	WeaponCount    int    `json:"weaponCount"`
-	MirrorLocal    bool   `json:"mirrorLocal"` // 素材是否已缓存到本地
-	Workspace      string `json:"workspace,omitempty"`
+	// DesignCount 定妆/三视图张数（角色形象本身）。
+	DesignCount int `json:"designCount"`
+	// RealFaceCount 真人参考张数（非角色形象，只是建模参考）。
+	RealFaceCount int    `json:"realFaceCount"`
+	MirrorLocal   bool   `json:"mirrorLocal"` // 素材是否已缓存到本地
+	Workspace     string `json:"workspace,omitempty"`
 }
 
 // CharacterMirror 角色的本地镜像。
@@ -517,9 +521,15 @@ func (e *Engine) ListCharacterPortraits(projectID string) ([]CharacterPortrait, 
 		if mirror, ok := e.mirrorBySubjectID(sub.ID); ok {
 			p.MirrorLocal = true
 			for _, a := range mirror.Assets {
-				if isWeaponAsset(a.Name) || isWeaponByTraits(a.Name, sub.Traits) {
+				real := e.assetName(a.AssetID, a.Name)
+				switch {
+				case isWeaponAsset(real) || isWeaponByTraits(real, sub.Traits):
 					p.WeaponCount++
-				} else {
+				case isRealFaceAsset(real):
+					p.RealFaceCount++
+					p.ReferenceCount++
+				default:
+					p.DesignCount++
 					p.ReferenceCount++
 				}
 			}
