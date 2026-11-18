@@ -283,6 +283,12 @@ func NewStudioStoreRoot(root string) (*StudioStore, error) {
 	state := &StudioState{Projects: []*Project{}, Assets: []*Asset{}, Jobs: []*Job{}, Voices: []*Voice{}}
 	if data, err := os.ReadFile(file); err == nil {
 		if err := json.Unmarshal(data, state); err != nil {
+			// 账本坏了先留底：素材文件还在 media/ 里，
+			// 覆盖掉原文件就再也拼不回来了。
+			backup := file + ".corrupt-" + nowISO()
+			if os.Rename(file, backup) == nil {
+				return nil, fmt.Errorf("工作台状态损坏，已把原文件留到 %s；素材文件仍在 media/ 目录，可据此恢复: %w", backup, err)
+			}
 			return nil, fmt.Errorf("工作台状态损坏: %w", err)
 		}
 	} else if !os.IsNotExist(err) {
