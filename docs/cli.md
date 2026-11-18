@@ -9,13 +9,13 @@
 一次性执行（从 Git 仓库直接跑，不经过 npm 仓库）：
 
 ```bash
-npx github:webkubor/reel-kit make --template sticker-promo ...
+npx github:museav-ai/muse-tv make --template sticker-promo ...
 ```
 
 要改模板、跑 `examples/` 里的 demo、或者改引擎源码，就 clone 下来：
 
 ```bash
-git clone git@github.com:webkubor/reel-kit
+git clone git@github.com:museav-ai/muse-tv
 cd reel-kit && pnpm install && npm link   # npm link 只是把本仓库挂成全局命令 reel
 ```
 
@@ -257,7 +257,7 @@ go tool mygo build    # 打包成 .app
 
 ## 官网
 
-`docs/index.html` 是 reel-kit 的官方单页网站，部署到 GitHub Pages 后可在 <https://webkubor.github.io/reel-kit/> 访问。启用方法：仓库 **Settings → Pages → Source 选 `Deploy from a branch` → Branch 选 `main`、Folder 选 `/docs`**。
+`docs/index.html` 是 reel-kit 的官方单页网站，部署到 GitHub Pages 后可在 <https://museav-ai.github.io/muse-tv/> 访问。启用方法：仓库 **Settings → Pages → Source 选 `Deploy from a branch` → Branch 选 `main`、Folder 选 `/docs`**。
 
 ## License
 

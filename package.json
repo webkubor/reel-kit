@@ -32,7 +32,7 @@
     "check": "node --check bin/reel.mjs && node --check src/render.mjs && node --check src/compose.mjs && node --check src/voice.mjs && node --check src/audio-mix.mjs && node --check src/settings.mjs && node --check src/bgm-library.mjs && node --check src/voxcraft-locate.mjs && node --check src/voxcraft-server.mjs && node --check src/knowledge-styles.mjs && node scripts/check-studio-syntax.mjs && node scripts/check-bundle-freshness.mjs",
     "lint": "node scripts/lint.mjs",
     "test": "pnpm check && pnpm lint && node bin/reel.mjs templates >/dev/null && node bin/reel.mjs styles >/dev/null && echo 'ok: 语法 + lint + 模板/风格枚举'",
-    "audit": "npx --yes github:webkubor/scorecard scorecard webkubor/reel-kit --min 5 || true"
+    "audit": "npx --yes github:webkubor/scorecard scorecard museav-ai/muse-tv --min 5 || true"
   },
   "dependencies": {
     "playwright-core": "^1.62.1"
@@ -40,9 +40,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/webkubor/reel-kit.git"
+    "url": "https://github.com/museav-ai/muse-tv.git"
   },
-  "homepage": "https://github.com/webkubor/reel-kit#readme",
+  "homepage": "https://github.com/museav-ai/muse-tv#readme",
   "keywords": [
     "video",
     "ffmpeg",

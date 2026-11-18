@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/license/webkubor/reel-kit?style=flat-square&color=92a8b3" alt="License" />
-  <img src="https://img.shields.io/github/stars/webkubor/reel-kit?style=flat-square&color=cc584d" alt="Stars" />
+  <img src="https://img.shields.io/github/license/museav-ai/muse-tv?style=flat-square&color=92a8b3" alt="License" />
+  <img src="https://img.shields.io/github/stars/museav-ai/muse-tv?style=flat-square&color=cc584d" alt="Stars" />
   <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-cc584d?style=flat-square" alt="macOS" />
   <img src="https://img.shields.io/badge/Windows-x64-cc584d?style=flat-square" alt="Windows" />
   <img src="https://img.shields.io/badge/voice-free%20online%20%C2%B7%20offline-ready-cc584d?style=flat-square" alt="free voice, offline ready" />
@@ -47,13 +47,13 @@
 
 ## Download
 
-macOS current version **v1.5.0** (released 2026-11-10). [Releases & checksums](https://github.com/webkubor/reel-kit/releases/tag/app-v1.5.0) · [Website](https://webkubor.github.io/reel-kit/)
+macOS current version **v1.5.0** (released 2026-11-10). [Releases & checksums](https://github.com/museav-ai/muse-tv/releases/tag/app-v1.5.0) · [Website](https://museav-ai.github.io/muse-tv/)
 
 | Platform | Download | Size | Where it lands |
 |---|---|---|---|
-| **macOS** (Apple Silicon) | [reel-studio-1.5.0-arm64.dmg](https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/reel-studio-1.5.0-arm64.dmg) | 237 MB | Drag into Applications |
-| **macOS** (Apple Silicon) | [reel-studio-1.5.0-darwin-arm64.tar.gz](https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/reel-studio-1.5.0-darwin-arm64.tar.gz) | 289 MB | Unpack, then drag `Reel Studio.app` into Applications |
-| **Windows** (x64) | [reel-studio-1.4.0-windows-amd64.tar.gz](https://github.com/webkubor/reel-kit/releases/download/app-v1.4.0/reel-studio-1.4.0-windows-amd64.tar.gz) | 347 MB | Unpack, then run `Reel Studio.exe` (Windows stays on 1.4.0 this round) |
+| **macOS** (Apple Silicon) | [reel-studio-1.5.0-arm64.dmg](https://github.com/museav-ai/muse-tv/releases/download/app-v1.5.0/reel-studio-1.5.0-arm64.dmg) | 237 MB | Drag into Applications |
+| **macOS** (Apple Silicon) | [reel-studio-1.5.0-darwin-arm64.tar.gz](https://github.com/museav-ai/muse-tv/releases/download/app-v1.5.0/reel-studio-1.5.0-darwin-arm64.tar.gz) | 289 MB | Unpack, then drag `Reel Studio.app` into Applications |
+| **Windows** (x64) | [reel-studio-1.4.0-windows-amd64.tar.gz](https://github.com/museav-ai/muse-tv/releases/download/app-v1.4.0/reel-studio-1.4.0-windows-amd64.tar.gz) | 347 MB | Unpack, then run `Reel Studio.exe` (Windows stays on 1.4.0 this round) |
 
 **Keep the folder layout on Windows**: `Reel Studio.exe` and the folders `backend/`, `bin/`, `chrome/`, `museav/`, `sherpa/` must sit side by side — the app won't start if one is missing.
 
@@ -62,7 +62,7 @@ The first launch is blocked by macOS Gatekeeper or Windows SmartScreen, because 
 macOS can also install from the command line:
 
 ```bash
-curl -fsSL https://github.com/webkubor/reel-kit/releases/download/app-v1.5.0/install.sh | sh
+curl -fsSL https://github.com/museav-ai/muse-tv/releases/download/app-v1.5.0/install.sh | sh
 ```
 
 Linux users, or anyone who prefers the terminal: see [For developers](#for-developers).
@@ -144,7 +144,7 @@ xattr -dr com.apple.quarantine "/Applications/Reel Studio.app"
 
 1. Open "Settings & Feedback" → "Runtime logs" → "Export diagnostic report" to get a `reel-studio-diagnostics-*.txt`.
 2. It contains the version and OS, channel readiness, **the error text of failed tasks and the step they stopped at**, plus recent backend and UI log lines. Common keys and tokens are masked automatically.
-3. Check it for anything private, then attach it to a [new issue](https://github.com/webkubor/reel-kit/issues/new/choose).
+3. Check it for anything private, then attach it to a [new issue](https://github.com/museav-ai/muse-tv/issues/new/choose).
 
 There's also "copy diagnostics and recent logs", which puts the same text on your clipboard for pasting straight into an issue. The backend log itself lives at `%TEMP%\reel-studio-backend.log`; "Open backend log" opens it for you.
 
@@ -168,7 +168,7 @@ The same engine is available from the terminal, and the app is a thin native she
 
 ```bash
 # no install needed
-npx github:webkubor/reel-kit make \
+npx github:museav-ai/muse-tv make \
   --template sticker-promo \
   --title "reel-kit" \
   --assets ./shots \
@@ -181,7 +181,7 @@ That runs straight from the Git repository — **nothing is published to the npm
 The repo ships full assets and captions, so a clone reproduces the demo clip:
 
 ```bash
-git clone git@github.com:webkubor/reel-kit
+git clone git@github.com:museav-ai/muse-tv
 cd reel-kit && pnpm install && npm link
 
 reel make --template sticker-promo \
@@ -376,7 +376,7 @@ In an agent workflow, you can also call via [cs-mcp](https://github.com/webkubor
 
 ## 🌐 GitHub Pages site
 
-`docs/index.html` is the official single-page site for reel-kit; once deployed to GitHub Pages it's accessible at `https://webkubor.github.io/reel-kit/`.
+`docs/index.html` is the official single-page site for reel-kit; once deployed to GitHub Pages it's accessible at `https://museav-ai.github.io/muse-tv/`.
 
 **Enable in 30 seconds:**
 
@@ -387,11 +387,11 @@ In an agent workflow, you can also call via [cs-mcp](https://github.com/webkubor
 
 ## Star History
 
-<a href="https://www.star-history.com/#webkubor/reel-kit&Date">
+<a href="https://www.star-history.com/#museav-ai/muse-tv&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=webkubor/reel-kit&amp;type=Date&amp;theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=webkubor/reel-kit&amp;type=Date" />
-    <img alt="Star History Chart for webkubor/reel-kit" src="https://api.star-history.com/svg?repos=webkubor/reel-kit&amp;type=Date" width="100%" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=museav-ai/muse-tv&amp;type=Date&amp;theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=museav-ai/muse-tv&amp;type=Date" />
+    <img alt="Star History Chart for museav-ai/muse-tv" src="https://api.star-history.com/svg?repos=museav-ai/muse-tv&amp;type=Date" width="100%" />
   </picture>
 </a>
 

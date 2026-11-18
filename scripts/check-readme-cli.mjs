@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 // 只有调用本 CLI 的 shell 示例才定义了对外承诺的选项。
 // CSS 自定义属性和其他程序的参数各有各的契约，不在这里校验。
 //
-// `npx github:webkubor/reel-kit` 也是官方推荐的一次性用法，
+// `npx github:museav-ai/muse-tv` 也是官方推荐的一次性用法，
 // 不收进正则的话这些示例里的参数就等于没被校验过。
 const CLI_COMMAND =
   /^\s*(?:reel\b|npx\s+(?:@kubor\/reel-kit|reel|github:webkubor\/reel-kit)\b|node\s+(?:\.\/)?bin\/reel\.mjs\b)/

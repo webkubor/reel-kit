@@ -83,7 +83,7 @@
 ```bash
 node --check bin/reel.mjs src/*.mjs        # 语法
 pnpm test                                  # check + lint + 模板枚举（CI 跑的就是这条）
-scorecard webkubor/reel-kit --min 5        # 仓库质检闸门
+scorecard museav-ai/muse-tv --min 5        # 仓库质检闸门
 ```
 
 改了合成逻辑后，**验证数据必须来自被验证的那次运行** ——

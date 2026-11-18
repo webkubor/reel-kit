@@ -40,7 +40,7 @@ type feedbackState struct {
 
 // 反馈仓库地址。
 const (
-	feedbackRepo  = "webkubor/reel-kit"
+	feedbackRepo  = "museav-ai/muse-tv"
 	feedbackLabel = "app-feedback"
 )
 

@@ -18,7 +18,7 @@ set -euo pipefail
 TAG="${1:-}"
 RUN="${2:-}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO="${REEL_REPO:-webkubor/reel-kit}"
+REPO="${REEL_REPO:-museav-ai/muse-tv}"
 WORK="${WORK:-/tmp/reel-update-verify}"
 MODCACHE="$(GOTOOLCHAIN=go1.27.3 go env GOMODCACHE)"
 MODULE="$(grep 'github.com/egoist/mygo ' "$ROOT/apps/reel-studio/go.mod" | awk '{print $NF}')"

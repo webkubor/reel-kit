@@ -4,7 +4,7 @@
 
 Reel Studio 是本地桌面视频工作台，适合制作人物介绍、商品介绍和简单的图文讲解短片。写文案、选画幅、配图片，在同一个窗口里制作、播放并导出 MP4。
 
-[下载 macOS Apple Silicon 版](https://github.com/webkubor/reel-kit/releases/download/app-v1.8.1/reel-studio-1.8.1-darwin-arm64.zip) · [发布说明](https://github.com/webkubor/reel-kit/releases/tag/app-v1.8.1) · [官网](https://webkubor.github.io/reel-kit/)
+[下载 macOS Apple Silicon 版](https://github.com/museav-ai/muse-tv/releases/download/app-v1.8.1/reel-studio-1.8.1-darwin-arm64.zip) · [发布说明](https://github.com/museav-ai/muse-tv/releases/tag/app-v1.8.1) · [官网](https://museav-ai.github.io/muse-tv/)
 
 ## 界面一览
 
@@ -65,11 +65,11 @@ AI 负责生成文案与分镜数据，视频画面、配音和合成使用本�
 
 | 平台 | 当前发布状态 |
 |---|---|
-| macOS Apple Silicon（M 系列芯片） | [下载 1.8.1 ZIP](https://github.com/webkubor/reel-kit/releases/download/app-v1.8.1/reel-studio-1.8.1-darwin-arm64.zip)，需要 macOS 13 或更新 |
+| macOS Apple Silicon（M 系列芯片） | [下载 1.8.1 ZIP](https://github.com/museav-ai/muse-tv/releases/download/app-v1.8.1/reel-studio-1.8.1-darwin-arm64.zip)，需要 macOS 13 或更新 |
 | Windows | 尚未发布本版安装包 |
 | macOS Intel | 尚未发布本版安装包 |
 
-解压后将 `Reel Studio.app` 放入应用程序目录。当前包为 **ad-hoc 签名、未 Apple 公证**，macOS 可能拦截首次启动。[发布页](https://github.com/webkubor/reel-kit/releases/tag/app-v1.8.1)提供 SHA256SUMS 与构建信息。
+解压后将 `Reel Studio.app` 放入应用程序目录。当前包为 **ad-hoc 签名、未 Apple 公证**，macOS 可能拦截首次启动。[发布页](https://github.com/museav-ai/muse-tv/releases/tag/app-v1.8.1)提供 SHA256SUMS 与构建信息。
 
 采用手动下载安装，暂不支持自动升级和旧项目自动迁移；旧项目数据不会被删除。
 
@@ -80,7 +80,7 @@ AI 负责生成文案与分镜数据，视频画面、配音和合成使用本�
 - **当前适合简单介绍短片**：没有通用时间线剪辑、云 TTS、声音克隆或 AI 图片/视频素材生成入口。
 - **任务不会悄悄重跑**：重启后未完成的任务标为中断，不自动重新提交。
 
-制作失败时先查看「制作过程」中的错误。反馈时提供应用版本、系统和复现操作，移除错误文本中的私人路径后提交 [Issue](https://github.com/webkubor/reel-kit/issues/new/choose)。
+制作失败时先查看「制作过程」中的错误。反馈时提供应用版本、系统和复现操作，移除错误文本中的私人路径后提交 [Issue](https://github.com/museav-ai/muse-tv/issues/new/choose)。
 
 ## 开发者入口
 

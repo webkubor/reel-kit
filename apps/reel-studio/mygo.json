@@ -16,7 +16,7 @@
   },
   "updates": {
     "publicKey": "Wl/RioKt0yPxHQPc2qeekeDLTfqxpm60B3xhzxvvFLo=",
-    "github": "webkubor/reel-kit",
+    "github": "museav-ai/muse-tv",
     "tagPrefix": "app-v",
     "deltas": 3,
     "changelog": "../../CHANGELOG.md"

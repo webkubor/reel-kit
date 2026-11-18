@@ -25,6 +25,6 @@ if [[ ${4:-} == --dry-run ]]; then
   printf 'Verified %s at %s; no release created.\n' "$archive" "$commit"
   exit 0
 fi
-gh release create "$tag" --repo webkubor/reel-kit --verify-tag \
+gh release create "$tag" --repo museav-ai/muse-tv --verify-tag \
   --title "muse-tv $version" --notes-file "$notes" \
   "$package/$archive" "$package/SHA256SUMS" "$package/build-info.json"
