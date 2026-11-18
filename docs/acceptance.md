@@ -39,6 +39,14 @@ bash apps/reel-studio-wails/scripts/preflight.sh <包目录>
 | 换绑工作区 | 换绑后核对素材归属 | 旧工作区素材与镜像清掉，同工作区与手动导入的不受影响 |
 | 旁白边界 | 6 句 60 字配 15 秒素材 | 明确报「请删减旁白」；不留半成品 |
 
+## 发布状态
+
+- 最新包：`dist/pkg-20261119-004740/`（1.9.0，commit `3ab5369`）
+- tag `app-v1.9.0` 已指向该 commit；发布 dry-run 通过
+- **1.9.0 尚未创建 GitHub release** —— 发布是对外可见的动作，等人确认再执行。
+  命令：`bash scripts/publish-desktop-release.sh app-v1.9.0 dist/pkg-20261119-004740 docs/releases/app-v1.9.0.md`
+- 上一个已发布的版本是 1.8.1（2026-11-17），比这批改动早得多。
+
 ## 未验（如实记录）
 
 - **真实桌面窗口**：验收全程屏幕锁定（`IOConsoleLocked = true`），截不到窗口、点不了原生控件。
