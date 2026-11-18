@@ -195,9 +195,9 @@
             <section class="flex min-w-0 flex-1 flex-col overflow-y-auto border-r border-line p-5">
             <div class="mb-4 shrink-0">
               <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-lo">MUSE · TV</p>
-              <h1 class="mt-1.5 text-2xl font-semibold tracking-tight text-ink">做一支产品介绍短片</h1>
+              <h1 class="mt-1.5 text-2xl font-semibold tracking-tight text-ink">做一条短视频</h1>
               <p class="mt-1 text-xs leading-relaxed text-ink-lo">
-                写几句介绍词，使用本机离线中文语音，按画幅生成成片。
+                写几句文案（或让 AI 出分镜），用本机离线中文语音，按画幅生成成片。
               </p>
             </div>
 
@@ -210,7 +210,21 @@
                 <button id="btn-generate-plan" class="btn btn-secondary btn-md mt-3" type="button">生成分镜</button>
               </div>
             </div>
+
             <div class="panel mb-4 shrink-0">
+              <div class="panel-head">
+                <h2 class="panel-title">素材</h2>
+                <button id="btn-pick-images-2" class="btn btn-ghost btn-sm" type="button">＋ 导入图片</button>
+              </div>
+              <div class="panel-body">
+                <div id="product-asset-grid" class="grid grid-cols-3 gap-2"></div>
+                <p id="product-asset-empty" class="text-2xs leading-relaxed text-ink-lo">
+                  还没有素材。导入图片后，制作时逐句配图；也可以先不传，用深色占位图出片。
+                </p>
+              </div>
+            </div>
+            <!-- 角色属于短剧项目（角色 标签页）；短视频不展示，保留节点供旧逻辑挂载 -->
+            <div class="panel mb-4 hidden shrink-0" aria-hidden="true">
               <div class="panel-head">
                 <h2 class="panel-title">角色素材库</h2>
                 <button id="btn-new-character" class="btn btn-secondary btn-sm" type="button">＋ 新建角色</button>

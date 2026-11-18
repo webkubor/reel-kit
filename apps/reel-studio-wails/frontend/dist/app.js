@@ -263,6 +263,7 @@
     $('mode-code').addEventListener('click', function () { setMode('code') })
     $('btn-view-image').addEventListener('click', showImage)
     $('btn-pick-images').addEventListener('click', pickImages)
+    $('btn-pick-images-2').addEventListener('click', pickImages)
     $('btn-export').addEventListener('click', function () {
       if (!state.projectId || !state.videoId) return
       app().ExportVideo(state.projectId, state.videoId).then(function (path) {
@@ -662,7 +663,7 @@
       panel.classList.toggle('hidden', !on)
       // 制作视图内部是左右两栏，用 contents 让两个 section 并排；
       // 其余视图是单栏，正常流式。
-      if (w.panel === 'view-make') panel.classList.toggle('contents', on)
+      if (w.panel === 'view-make' || w.panel === 'view-product') panel.classList.toggle('contents', on)
       else panel.classList.remove('contents')
     })
     // 不属于当前项目类型的视图整体收起，避免跨类型内容露出来
@@ -1790,12 +1791,17 @@
     var grid = $('asset-grid')
     var empty = $('asset-empty')
     clear(grid)
+    var pgrid = $('product-asset-grid')
+    var pempty = $('product-asset-empty')
+    if (pgrid) clear(pgrid)
     if (!state.assets.length) {
       empty.classList.remove('hidden')
+      if (pempty) pempty.classList.remove('hidden')
       $('asset-selected').textContent = '未选择'
       $('btn-view-image').classList.add('hidden')
       return
     }
+    if (pempty) pempty.classList.add('hidden')
     empty.classList.add('hidden')
     state.assets.forEach(function (asset) {
       var cell = el('button', 'asset-cell')
@@ -1815,6 +1821,16 @@
         paintStage()
       })
       grid.appendChild(cell)
+      // 短视频视图的素材面板用同一份格子
+      if (pgrid) {
+        var clone = cell.cloneNode(true)
+        clone.addEventListener('click', function () {
+          state.selectedAsset = asset.id === state.selectedAsset ? '' : asset.id
+          renderAssets()
+          paintStage()
+        })
+        pgrid.appendChild(clone)
+      }
     })
     var selected = findAsset(state.selectedAsset)
     $('btn-view-image').classList.toggle('hidden', !selected)
