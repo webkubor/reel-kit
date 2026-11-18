@@ -231,9 +231,8 @@
     $('btn-scene-template').addEventListener('click', function () { openTemplateDialog('scene') })
     $('setup-skip').addEventListener('click', function () { showSetup(false) })
     $('setup-new-project').addEventListener('click', function () {
-      state.projectKind = 'series'
-      updateProjectKindButtons()
-      openProjectDialog()
+      if (!state.projectKind) state.projectKind = 'series'
+      openProjectDialog(true)
     })
     $('setup-kind-series').addEventListener('click', function () {
       state.projectKind = 'series'
@@ -431,8 +430,9 @@
     }).catch(function (err) { if (projectID === state.projectId) { setRunning(false); fail(err) } })
   }
 
-  function openProjectDialog() {
-    state.projectKind = 'series'
+  // keepKind：从引导页进来时保留用户在引导页上选的类型
+  function openProjectDialog(keepKind) {
+    if (keepKind !== true) state.projectKind = 'series'
     updateProjectKindButtons()
     var dialog = $('project-dialog')
     if (dialog.showModal) dialog.showModal()
@@ -625,6 +625,12 @@
   }
 
   function renderWorkspaceTabs() {
+    // 剧集只属于短剧：短视频项目的侧栏不出现「剧集」区
+    var series = projectKind() === 'series'
+    ;['episode-head', 'episode-list'].forEach(function (id) {
+      var node = $(id)
+      if (node) node.classList.toggle('hidden', !series)
+    })
     var box = $('workspace-tabs')
     clear(box)
     var list = workspaces()
@@ -1085,8 +1091,11 @@
 
   function updateProjectKindButtons() {
     ;['series', 'clip'].forEach(function (kind) {
-      var btn = $('project-kind-' + kind)
-      if (btn) btn.setAttribute('aria-checked', kind === state.projectKind ? 'true' : 'false')
+      // 新建对话框与引导页的两组类型按钮保持同一个选择
+      ;['project-kind-', 'setup-kind-'].forEach(function (prefix) {
+        var btn = $(prefix + kind)
+        if (btn) btn.setAttribute('aria-checked', kind === state.projectKind ? 'true' : 'false')
+      })
     })
   }
 
@@ -1593,6 +1602,8 @@
   }
 
   function switchProject(projectID) {
+    // 有项目可进了，引导页让位给工作台
+    if (projectID) showSetup(false)
     if (state.projectId === projectID) return
     if (state.projectId) {
       state.drafts[state.projectId] = {
