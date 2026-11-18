@@ -107,3 +107,56 @@ func TestRenameMirrorAssetsToCurrentName(t *testing.T) {
 		}
 	}
 }
+
+// 素材库里的旧名也要跟着改 —— 镜像改了、素材库没改，按角色名过滤会漏。
+func TestRenameAssetOwner(t *testing.T) {
+	s := newTestStore(t)
+	p, _ := s.AddProject("改名", "series")
+	for _, n := range []string{"顾七玥-三视图", "顾七玥-玉尘笛", "顾栖月-头像", "雨夜长街-场景参考-v1"} {
+		if _, err := s.AddAsset(p.ID, n, "image/png", []byte("x-"+n), map[string]any{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	n, err := s.RenameAssetOwner(map[string]bool{"顾七玥": true}, "顾栖月")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Fatalf("应改 2 个：%d", n)
+	}
+	got := map[string]bool{}
+	for _, a := range s.State().Assets {
+		got[a.Name] = true
+	}
+	if !got["顾栖月-三视图"] || !got["顾栖月-玉尘笛"] {
+		t.Fatal("旧名素材没改")
+	}
+	if !got["顾栖月-头像"] || !got["雨夜长街-场景参考-v1"] {
+		t.Fatal("别的素材不该被改")
+	}
+}
+
+// 镜像与素材库的名字要一致 —— 按 assetId 精确同步，不靠名字猜。
+func TestSyncAssetNames(t *testing.T) {
+	s := newTestStore(t)
+	p, _ := s.AddProject("同步", "series")
+	a1, _ := s.AddAsset(p.ID, "旧名-三视图", "image/png", []byte("x1"), map[string]any{})
+	a2, _ := s.AddAsset(p.ID, "别人的图", "image/png", []byte("x2"), map[string]any{})
+	n, err := s.SyncAssetNames(map[string]string{
+		a1.ID: "新名-三视图",
+		a2.ID: "别人的图",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("应改 1 个：%d", n)
+	}
+	got := map[string]bool{}
+	for _, a := range s.State().Assets {
+		got[a.Name] = true
+	}
+	if !got["新名-三视图"] || !got["别人的图"] {
+		t.Fatalf("同步结果不对：%v", got)
+	}
+}

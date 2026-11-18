@@ -272,12 +272,35 @@ func (e *Engine) FixMirrorAssetNames(subjectID, currentName string) (int, error)
 	if !ok {
 		return 0, nil
 	}
-	n := renameMirrorAssetsToCurrentName(m, currentName)
-	if n == 0 {
-		return 0, nil
+	// 先记下旧名，改完镜像才知道素材库那边该改哪些
+	oldOwners := map[string]bool{}
+	for _, a := range m.Assets {
+		sep := strings.Index(a.Name, "-")
+		if sep > 0 && a.Name[:sep] != currentName {
+			oldOwners[a.Name[:sep]] = true
+		}
 	}
-	if err := e.saveMirror(m); err != nil {
-		return 0, err
+	n := renameMirrorAssetsToCurrentName(m, currentName)
+	if n > 0 {
+		if err := e.saveMirror(m); err != nil {
+			return 0, err
+		}
+	}
+	// 素材库里的同名素材也要改，否则按角色名过滤会漏。
+	// 用 assetId 精确对应 —— 两边名字本来就不一致，靠名字猜不准。
+	names := map[string]string{}
+	for _, a := range m.Assets {
+		if a.AssetID != "" {
+			names[a.AssetID] = a.Name
+		}
+	}
+	if _, err := e.store.SyncAssetNames(names); err != nil {
+		return n, err
+	}
+	if len(oldOwners) > 0 {
+		if _, err := e.store.RenameAssetOwner(oldOwners, currentName); err != nil {
+			return n, err
+		}
 	}
 	return n, nil
 }

@@ -642,6 +642,64 @@ func filterShots(in []*EpisodeShot, projectID string) []*EpisodeShot {
 	return out
 }
 
+// SyncAssetNames 按 assetId 把素材库里的名字改成给定的名字。
+//
+// 镜像记的 assetId 精确指向素材库条目，不管两边名字是否一致 ——
+// 角色改名后镜像改了、素材库没改时，按名字找会对不上，按 id 找就准。
+func (s *StudioStore) SyncAssetNames(names map[string]string) (int, error) {
+	if len(names) == 0 {
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	changed := 0
+	for _, a := range s.state.Assets {
+		if want, ok := names[a.ID]; ok && want != "" && a.Name != want {
+			a.Name = want
+			changed++
+		}
+	}
+	if changed > 0 {
+		if err := s.saveLocked(); err != nil {
+			return changed, err
+		}
+	}
+	return changed, nil
+}
+
+// RenameAssetOwner 把属于某个角色的素材改挂到新名字下。
+//
+// 角色改名后素材名常留着旧名（「顾七玥-三视图」在素材库，镜像里已改成
+// 「顾栖月-三视图」）。两边不一致，按角色名过滤素材就会漏。
+//
+// oldOwners 是这个角色的旧名集合；只改前缀正好命中这些名字的素材。
+func (s *StudioStore) RenameAssetOwner(oldOwners map[string]bool, currentName string) (int, error) {
+	if currentName == "" || len(oldOwners) == 0 {
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	changed := 0
+	for _, a := range s.state.Assets {
+		sep := strings.Index(a.Name, "-")
+		if sep <= 0 {
+			continue
+		}
+		owner := a.Name[:sep]
+		if !oldOwners[owner] || owner == currentName {
+			continue
+		}
+		a.Name = currentName + a.Name[sep:]
+		changed++
+	}
+	if changed > 0 {
+		if err := s.saveLocked(); err != nil {
+			return changed, err
+		}
+	}
+	return changed, nil
+}
+
 // NormalizeAssetNames 把素材名里的文件扩展名去掉。
 //
 // 早期导入用完整文件名登记（"顾栖月-三视图-xxx.png"），后缀会干扰
