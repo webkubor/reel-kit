@@ -23,6 +23,27 @@ type ShotCast struct {
 	SceneID     string
 }
 
+// resolveMention 动作里的「@角色名」→ 角色主体 id。
+//
+// 这是「提示词里 @ 角色就能直接用」的接线点：出镜前把 @名 换成
+// 角色 id，MakeCharacterVideo 会带上该角色名下的头像/定妆/三视图参考。
+func (e *Engine) resolveMention(action, projectID string, subjects []*Subject) (string, string, error) {
+	action = strings.TrimSpace(action)
+	if !strings.Contains(action, "@") || len(subjects) == 0 {
+		return "", action, nil
+	}
+	lower := strings.ToLower(action)
+	for _, s := range subjects {
+		if s.Kind != "person" || s.Name == "" {
+			continue
+		}
+		if strings.Contains(lower, "@"+strings.ToLower(s.Name)) {
+			return s.ID, strings.TrimSpace(strings.ReplaceAll(action, "@"+s.Name, "")), nil
+		}
+	}
+	return "", action, nil
+}
+
 // SetShotCast 更新镜头的内容与选角。出镜中的镜头不让改，免得结果对不上参数。
 func (e *Engine) SetShotCast(in ShotCast) (*EpisodeShot, error) {
 	if e.store == nil {

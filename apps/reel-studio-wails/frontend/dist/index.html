@@ -273,21 +273,7 @@
                 角色档案存在中台，跨项目共享。出镜时按定妆稿锁定长相与装扮。
               </p>
             </div>
-            <div class="panel mb-4 shrink-0">
-              <div class="panel-head">
-                <h2 class="panel-title">角色</h2>
-                <div class="flex items-center gap-2">
-                  <span id="cast-count" class="badge">—</span>
-                  <button id="btn-new-cast-character" class="btn btn-secondary btn-sm" type="button">＋ 新建角色</button>
-                </div>
-              </div>
-              <div class="panel-body">
-                <label class="label" for="cast-search">搜索</label>
-                <input id="cast-search" class="input input-md" placeholder="按名字或武器查" />
-                <div id="cast-grid" class="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-3"></div>
-                <p id="cast-empty" class="text-2xs leading-relaxed text-ink-lo"></p>
-              </div>
-            </div>
+            <div id="cast-root" class="min-w-0"></div>
           </section>
 
           <!-- 视图三：场景库 -->
@@ -542,6 +528,7 @@
         <div class="mt-4 flex justify-end gap-2"><button id="bind-workspace-cancel" type="button" class="btn btn-ghost btn-sm">取消</button><button type="submit" class="btn btn-primary btn-sm">绑定</button></div>
       </form>
     </dialog>
+    <script src="./cast.js"></script>
     <script src="./select.js"></script>
     <script src="./app.js"></script>
   </body>

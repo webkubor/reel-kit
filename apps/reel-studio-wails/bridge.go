@@ -67,6 +67,11 @@ func (a *App) ListCharacters(workspace string) ([]*Character, error) {
 	return a.engine.ListCharacters(workspace)
 }
 
+// GetCharacter 取单个角色的全部物料，给角色详情用。
+func (a *App) GetCharacter(subjectID string) (*Character, error) {
+	return a.engine.GetCharacter(subjectID)
+}
+
 // CreateCharacter 走完 0→1 建角色：一张脸 → 名称 + 体貌 + 五视图齐全的角色。
 //
 // 联网且可能计费（中台出图），所以调用方必须明确触发。

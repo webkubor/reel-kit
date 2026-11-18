@@ -9,7 +9,7 @@
  *   强调色只用一点淡钢蓝，做焦点、选中、进行中，不铺大面。
  */
 module.exports = {
-  content: ['./src/**/*.{html,js}'],
+  content: ['./src/**/*.{html,js,vue}'],
   theme: {
     extend: {
       colors: {

@@ -20,6 +20,7 @@ npx --yes tailwindcss@3.4.17 \
   -o "$DIST/app.css" \
   --minify
 
+pnpm exec vite build
 cp "$SRC/index.html" "$DIST/index.html"
 cp "$SRC/app.js" "$DIST/app.js"
 cp "$SRC/select.js" "$DIST/select.js"

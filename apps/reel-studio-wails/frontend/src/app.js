@@ -89,7 +89,30 @@
   }
 
   // ── 启动 ──────────────────────────────────────────────
+  function mountCast() {
+    if (!window.ReelCast || !window.ReelCast.mount) return false
+    window.ReelCast.mount($('cast-root'), { onCreate: openCharacterDialog })
+    return true
+  }
+
+  function paintCast() {
+    // 角色库是 Vue 岛；旧的手写 DOM 网格只留作兜底，正常路径不显示。
+    if (window.ReelCast && window.ReelCast.setData) {
+      window.ReelCast.setData({
+        subjects: state.subjects || [],
+        error: state.subjectsError || '',
+        projectId: state.projectId || '',
+      })
+      return
+    }
+    var grid = $('cast-grid')
+    if (!grid) return
+    var empty = $('cast-empty')
+    clear(grid)
+  }
+
   function boot() {
+    mountCast()
     wire()
     selects.motion = window.ReelSelect.create($('select-motion'), {
       items: [{ value: 'none', label: '静态画面' }, { value: 'gentle', label: '轻柔运镜' }],
@@ -177,7 +200,6 @@
     $('btn-new-project').addEventListener('click', openProjectDialog)
     $('btn-new-project-icon').addEventListener('click', openProjectDialog)
     $('btn-new-character').addEventListener('click', openCharacterDialog)
-    $('btn-new-cast-character').addEventListener('click', openCharacterDialog)
     $('btn-pick-face').addEventListener('click', pickFace)
     $('btn-cancel-character').addEventListener('click', closeCharacterDialog)
     $('character-form').addEventListener('submit', createCharacter)
@@ -245,14 +267,11 @@
     $('tab-product').addEventListener('click', function () { setView('product') })
     $('tab-cast').addEventListener('click', function () { setView('cast') })
     $('tab-scene').addEventListener('click', function () { setView('scene') })
-    $('cast-search').addEventListener('input', function (event) {
-      state.castQuery = event.target.value || ''
-      paintCast()
-    })
     $('btn-new-episode').addEventListener('click', openEpisodeDialog2)
     $('new-episode-form').addEventListener('submit', submitNewEpisode)
     $('btn-cancel-new-episode').addEventListener('click', function () { $('new-episode-dialog').close() })
     $('new-shot-form').addEventListener('submit', submitNewShot)
+    $('shot-action').addEventListener('input', applyShotMention)
     $('shot-character').addEventListener('change', function (event) { loadLooksFor(event.target.value) })
     $('btn-cancel-new-shot').addEventListener('click', function () { $('new-shot-dialog').close() })
     $('new-scene-form').addEventListener('submit', submitNewScene)
@@ -714,6 +733,21 @@
     $('ep-title').focus()
   }
 
+  function applyShotMention() {
+    // 动作里的「@角色名」自动选角：@夜惊鸿 → 角色下拉选中夜惊鸿，动作里去掉 @名。
+    var action = ($('shot-action').value || '').trim()
+    var m = action.match(/@([^@\s]+)/)
+    if (!m) return
+    var name = m[1]
+    var subject = state.subjects.filter(function (s) { return s.kind === 'person' && s.name === name })[0]
+    if (!subject) return
+    $('shot-character').value = subject.id
+    $('shot-action').value = action.replace('@' + name, '').trim()
+    loadLooksFor(subject.id)
+    var hint = $('new-shot-error')
+    if (hint) hint.textContent = '已按 @' + name + ' 选角：' + subject.name + '；@名已从动作中移除'
+  }
+
   function openShotDialog() {
     if (!state.episodeId) {
       fail(new Error('先选一集'))
@@ -860,7 +894,7 @@
     fillLooks([])
     if (!characterID) return
     state.looksFor = characterID
-    $('shot-look').firstChild.textContent = '读取定妆稿…'
+    if ($('shot-look').firstChild) $('shot-look').firstChild.textContent = '读取定妆稿…'
     engine().GetCharacter(characterID).then(function (c) {
       if (state.looksFor !== characterID) return
       var looks = (c && c.looks) || []
@@ -970,47 +1004,6 @@
 
   function scenes() {
     return state.subjects.filter(function (s) { return s.kind === 'scene' })
-  }
-
-  function paintCast() {
-    var grid = $('cast-grid')
-    var empty = $('cast-empty')
-    clear(grid)
-    var query = (state.castQuery || '').trim().toLowerCase()
-    var list = people().filter(function (s) {
-      if (!query) return true
-      var hay = (s.name || '') + ' ' + JSON.stringify(s.traits || {})
-      return hay.toLowerCase().indexOf(query) >= 0
-    })
-    $('cast-count').textContent = list.length + ' 个'
-    if (state.subjectsError) {
-      empty.textContent = state.subjectsError
-      return
-    }
-    if (!list.length) {
-      empty.textContent = query ? '没有匹配「' + query + '」的角色。' : '还没有角色。'
-      return
-    }
-    empty.textContent = ''
-    list.forEach(function (subject) {
-      var card = el('div', 'character-card')
-      var head = el('div', 'character-head')
-      var left = el('div', 'min-w-0')
-      left.appendChild(el('div', 'character-name', subject.name || '未命名角色'))
-      left.appendChild(el('div', 'text-2xs text-ink-lo', (subject.traits || {})['武器'] || (subject.traits || {})['身份'] || ''))
-      head.appendChild(left)
-      head.appendChild(el('span', 'badge', (subject.asset_count || 0) + ' 图'))
-      card.appendChild(head)
-      var traits = []
-      Object.keys(subject.traits || {}).forEach(function (key) {
-        if (key === '武器') return
-        traits.push(key + '：' + subject.traits[key])
-      })
-      if (traits.length) {
-        card.appendChild(el('p', 'character-missing', traits.join('；')))
-      }
-      grid.appendChild(card)
-    })
   }
 
   function paintScenes() {
@@ -1154,7 +1147,7 @@
             : '（未知原因）'
           characterHint('角色还差：' + gap, true)
         }
-        return refreshCharacters()
+        return Promise.all([refreshCharacters(), refreshSubjects()])
       })
       .catch(function (err) {
         state.characterBusy = false
