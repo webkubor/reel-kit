@@ -169,6 +169,12 @@ func (a *App) SceneReferenceURL(projectID, sceneID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// 本机快照里有就直接用本地图：断网可看，也不必每次问中台
+	if a.engine.store != nil {
+		if _, err := snapshotSceneImage(a.engine.store.Root(), ws, sceneID); err == nil {
+			return "/scene/" + ws + "/" + sceneID, nil
+		}
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), characterRequestTimeout)
 	defer cancel()
 	detail, err := (&MuseavClient{Workspace: ws}).ShowSubject(ctx, sceneID)
@@ -387,6 +393,10 @@ func fileBaseName(path string) string {
 // 界面里用 <img src="/media/<素材 id>"> 就能显示本机素材。
 func (a *App) mediaHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/scene/") {
+			a.serveSnapshotScene(w, r)
+			return
+		}
 		if !strings.HasPrefix(r.URL.Path, "/media/") {
 			http.NotFound(w, r)
 			return
@@ -409,4 +419,20 @@ func (a *App) mediaHandler() http.Handler {
 		w.Header().Set("Cache-Control", "no-cache")
 		http.ServeFile(w, r, a.engine.store.Path(asset))
 	})
+}
+
+// serveSnapshotScene 从本机快照出场景参考图：/scene/<工作区>/<场景 id>。
+func (a *App) serveSnapshotScene(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/scene/"), "/")
+	if len(parts) != 2 || a.engine.store == nil {
+		http.NotFound(w, r)
+		return
+	}
+	path, err := snapshotSceneImage(a.engine.store.Root(), parts[0], parts[1])
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeFile(w, r, path)
 }

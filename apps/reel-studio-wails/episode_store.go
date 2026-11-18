@@ -382,15 +382,25 @@ func (e *Engine) ListAllSubjects(workspace string) ([]*Subject, error) {
 	defer cancel()
 	client := &MuseavClient{Workspace: strings.TrimSpace(workspace)}
 	if err := client.Available(ctx); err != nil {
+		if list, offErr := e.offlineSubjects(client.Workspace); offErr == nil {
+			return list, nil
+		}
 		return nil, err
 	}
 	subjects, err := client.ListSubjects(ctx, client.Workspace)
 	if err != nil {
+		// 断网或中台不可达：退回上次联网的缓存，再退回导入快照
+		if list, offErr := e.offlineSubjects(client.Workspace); offErr == nil {
+			return list, nil
+		}
 		return nil, err
 	}
 	out := make([]*Subject, 0, len(subjects))
 	for i := range subjects {
 		out = append(out, &subjects[i])
+	}
+	if e.store != nil {
+		writeSubjectsCache(e.store.Root(), client.Workspace, out)
 	}
 	return out, nil
 }
