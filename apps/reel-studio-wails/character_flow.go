@@ -349,6 +349,8 @@ func (e *Engine) characterFromMirror(m *CharacterMirror) *Character {
 	for _, a := range m.Assets {
 		c.References = append(c.References, CharacterAsset{Name: a.Name, URL: "/media/" + a.AssetID, Role: a.Role})
 	}
+	// 装扮名从参考素材的定妆稿名里取（与联网时同一套规则）
+	c.Looks = characterLooks(c)
 	for view, url := range m.Views {
 		c.Assets = append(c.Assets, CharacterAsset{View: CharacterView(view), URL: url})
 	}

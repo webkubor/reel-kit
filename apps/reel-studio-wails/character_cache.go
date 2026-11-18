@@ -140,6 +140,16 @@ func (e *Engine) SaveCharacterMirror(character *Character) error {
 		}
 		mirror.Views[string(a.View)] = local
 	}
+	// 参考素材也要记下：装扮名（「默认」以外的几套）来自定妆稿的名字，
+	// 只存视图的话离线就列不出装扮。
+	for _, a := range character.References {
+		if a.View != "" || a.Name == "" {
+			continue
+		}
+		mirror.Assets = append(mirror.Assets, MirrorAsset{
+			AssetID: a.ID, Role: a.Role, Name: a.Name, URL: a.URL,
+		})
+	}
 	data, err := json.MarshalIndent(mirror, "", "  ")
 	if err != nil {
 		return err

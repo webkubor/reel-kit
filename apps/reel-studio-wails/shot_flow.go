@@ -204,6 +204,10 @@ func (e *Engine) sceneDescription(ctx context.Context, workspace, sceneID string
 	}
 	detail, err := (&MuseavClient{}).ShowSubject(ctx, sceneID)
 	if err != nil {
+		// 断网时从本机快照读场景描述，别让出镜因为取不到描述就整个卡住
+		if desc, snapErr := e.sceneDescriptionFromSnapshot(workspace, sceneID); snapErr == nil {
+			return desc, nil
+		}
 		return "", err
 	}
 	if detail.Subject.Kind != "scene" {

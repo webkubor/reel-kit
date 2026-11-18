@@ -185,14 +185,54 @@ func isWeaponImage(name string) bool {
 	return false
 }
 
-// lookOf 从定妆稿名字里取装扮名：「夜惊鸿-王服三视图」→「王服」，
-// 「夜惊鸿-三视图」→「默认」。
+// lookOf 从定妆稿名字里取装扮名。
+//
+// 素材命名有三种形态，都要认：
+//
+//	「夜惊鸿-王服三视图」   → 王服      （装扮名在类别词前面）
+//	「夜惊鸿-三视图-王服」   → 王服      （分类规则产出的形态：角色-类别-描述）
+//	「夜惊鸿-三视图」       → 默认      （没写装扮）
+//	「夜惊鸿-定妆-夜惊鸿-定妆.png」→ 夜惊鸿-定妆（第三段是完整装扮名）
 func lookOf(characterName, assetName string) string {
 	n := strings.TrimSpace(assetName)
+	// 文件后缀不算名字的一部分
+	if i := strings.LastIndex(n, "."); i > 0 {
+		if ext := n[i:]; len(ext) <= 5 && !strings.ContainsAny(ext, "/\\") {
+			n = n[:i]
+		}
+	}
 	if characterName != "" {
 		n = strings.TrimPrefix(n, characterName)
 	}
 	n = strings.TrimLeft(n, "-_ ·")
+	if n == "" {
+		return DefaultLook
+	}
+	// 形态二：角色-类别-描述 → 描述段就是装扮名
+	parts := strings.Split(n, "-")
+	categoryAt := -1
+	for i, part := range parts {
+		if isCategoryWord(part) {
+			categoryAt = i
+			break
+		}
+	}
+	if categoryAt >= 0 && categoryAt+1 < len(parts) {
+		rest := strings.Trim(strings.Join(parts[categoryAt+1:], "-"), "-_ ·")
+		// 描述段里又带角色名时，去掉重复的角色名
+		if characterName != "" {
+			rest = strings.TrimPrefix(rest, characterName)
+			rest = strings.TrimLeft(rest, "-_ ·")
+		}
+		if rest == "" {
+			return DefaultLook
+		}
+		return rest
+	}
+	if categoryAt >= 0 {
+		return DefaultLook
+	}
+	// 形态一：装扮名在类别词之前
 	for _, k := range sheetKeywords {
 		if i := strings.Index(strings.ToLower(n), k); i >= 0 {
 			n = n[:i]
@@ -204,6 +244,15 @@ func lookOf(characterName, assetName string) string {
 		return DefaultLook
 	}
 	return n
+}
+
+// isCategoryWord 素材名里的类别段：定妆 / 三视图 / 画面 / 武器 / 头像。
+func isCategoryWord(s string) bool {
+	switch s {
+	case "定妆", "三视图", "五视图", "画面", "武器", "兵器", "道具", "头像", "真人参考", "脸部参考":
+		return true
+	}
+	return false
 }
 
 // characterLooks 列出角色名下的几套装扮，「默认」排第一。

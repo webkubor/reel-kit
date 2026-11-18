@@ -189,3 +189,28 @@ func (e *Engine) offlineSubjects(workspace string) ([]*Subject, error) {
 	}
 	return snapshotSubjects(e.store.Root(), workspace)
 }
+
+// sceneDescriptionFromSnapshot 从本机快照读场景的画面描述。
+//
+// 场景描述在出镜提示词里是硬要求；断网时从快照取，行为与联网一致。
+func (e *Engine) sceneDescriptionFromSnapshot(workspace, sceneID string) (string, error) {
+	if e.store == nil {
+		return "", errNoStore
+	}
+	dir := latestSnapshotDir(e.store.Root(), workspace)
+	if dir == "" {
+		return "", errors.New("本机没有这个中台项目的快照")
+	}
+	f, err := readSnapshotSubject(dir, sceneID)
+	if err != nil {
+		return "", errors.New("快照里没有这个场景")
+	}
+	if f.Subject.Kind != "scene" {
+		return "", errors.New("选的不是场景")
+	}
+	desc := traitText(f.Subject.Traits["画面描述"])
+	if desc == "" {
+		return "", errors.New("快照里这个场景没有画面描述")
+	}
+	return desc, nil
+}
