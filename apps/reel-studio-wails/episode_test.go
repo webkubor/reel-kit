@@ -131,3 +131,16 @@ func TestEpisodeLinesLimits(t *testing.T) {
 		t.Fatal("旁白时长算错")
 	}
 }
+
+// 单句旁白过长要拦下来 —— 一句念不完的旁白会毁掉整集的节奏。
+func TestEpisodeSingleLineTooLong(t *testing.T) {
+	long := strings.Repeat("雪", episodeLineMax+1)
+	if _, err := episodeLines([]string{long}); err == nil {
+		t.Fatal("超长单句应被拦")
+	}
+	// 刚好到上限要放行
+	ok := strings.Repeat("雪", episodeLineMax)
+	if _, err := episodeLines([]string{ok}); err != nil {
+		t.Fatalf("到上限不该拦：%v", err)
+	}
+}
