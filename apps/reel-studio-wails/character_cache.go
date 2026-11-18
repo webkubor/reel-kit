@@ -312,7 +312,7 @@ func (e *Engine) cacheOneCharacter(ctx context.Context, client *MuseavClient, su
 	character := subjectToCharacter(*detail, projectID, e.sourceBatchFor(sub.ID))
 	refCount, weaponCount := 0, 0
 	for _, ref := range character.References {
-		if isWeaponAsset(ref.Name) {
+		if isWeaponAsset(ref.Name) || isWeaponByTraits(ref.Name, sub.Traits) {
 			weaponCount++
 		} else {
 			refCount++
@@ -345,7 +345,7 @@ func (e *Engine) cacheOneCharacter(ctx context.Context, client *MuseavClient, su
 	// 头像兜底：没有「-头像」命名就取第一张非兵器的参考图。
 	if !portrait.HasAvatar {
 		for _, ref := range character.References {
-			if isWeaponAsset(ref.Name) {
+			if isWeaponAsset(ref.Name) || isWeaponByTraits(ref.Name, sub.Traits) {
 				continue
 			}
 			asset := findMirrorAsset(mirrorAssets, ref.Name)
@@ -383,12 +383,83 @@ func isCostumeAsset(name string) bool {
 }
 
 func isAvatarAsset(name string) bool { return strings.Contains(name, "头像") }
-func isRealFaceAsset(name string) bool {
-	return strings.Contains(name, "真人参考") || strings.Contains(name, "脸部参考") || strings.Contains(name, "真人") || strings.Contains(name, "face")
+
+// weaponNamesFromTraits 从角色的「武器」设定里取出兵器名。
+//
+// 中台写法是「重刃【破军】，门板重刃焦黑崩口」——方括号里是兵器本名。
+// 素材名常直接用这个本名（"欧阳狂徒-破军"），靠通用关键词猜不靠谱
+// （"破军"不在任何关键词表里），但设定里有。
+func weaponNamesFromTraits(traits map[string]any) []string {
+	raw, ok := traits["武器"]
+	if !ok {
+		return nil
+	}
+	text := traitText(raw)
+	out := []string{}
+	for _, seg := range strings.FieldsFunc(text, func(r rune) bool {
+		return r == '，' || r == ',' || r == '；' || r == ';' || r == '、'
+	}) {
+		// 用 rune 切：「【」「】」是多字节字符，按字节下标切会截出乱码
+		runes := []rune(seg)
+		open := -1
+		for i, r := range runes {
+			if r == '【' {
+				open = i
+				break
+			}
+		}
+		if open >= 0 {
+			close := -1
+			for i := open + 1; i < len(runes); i++ {
+				if runes[i] == '】' {
+					close = i
+					break
+				}
+			}
+			if close > open {
+				name := strings.TrimSpace(string(runes[open+1 : close]))
+				if name != "" {
+					out = append(out, name)
+				}
+			}
+		}
+	}
+	return out
 }
 
+// isWeaponByTraits 素材名里含角色自己的兵器名。
+func isWeaponByTraits(name string, traits map[string]any) bool {
+	for _, w := range weaponNamesFromTraits(traits) {
+		if w != "" && strings.Contains(name, w) {
+			return true
+		}
+	}
+	return false
+}
+
+// isWeaponAsset 兵器与道具。
+//
+// 三视图的定妆稿里常带兵器名（「顾栖月-三视图-顾栖月_v1_玉笛」），
+// 那张图是角色三视图而不是兵器图 —— 带「三视图/定妆/设定」的先归定妆。
 func isWeaponAsset(name string) bool {
-	return strings.Contains(name, "武器") || strings.Contains(name, "面具") || strings.Contains(name, "兵器") || strings.Contains(name, "枪") || strings.Contains(name, "剑") || strings.Contains(name, "刀") || strings.Contains(name, "弓") || strings.Contains(name, "笛") || strings.Contains(name, "锤")
+	if isDesignSheet(name) {
+		return false
+	}
+	return strings.Contains(name, "武器") || strings.Contains(name, "面具") || strings.Contains(name, "兵器") ||
+		strings.Contains(name, "枪") || strings.Contains(name, "剑") || strings.Contains(name, "刀") ||
+		strings.Contains(name, "弓") || strings.Contains(name, "笛") || strings.Contains(name, "锤") ||
+		strings.Contains(name, "鞭") || strings.Contains(name, "匕") || strings.Contains(name, "枷")
+}
+
+// isRealFaceAsset 真人参考。
+//
+// 发型/妆造参考也是真人照片（陆听潮-纯黑发参考），不能漏进画面素材。
+func isRealFaceAsset(name string) bool {
+	return strings.Contains(name, "真人参考") || strings.Contains(name, "脸部参考") ||
+		strings.Contains(name, "真人") || strings.Contains(name, "脸参考") ||
+		strings.Contains(name, "发参考") || strings.Contains(name, "发型参考") ||
+		strings.Contains(name, "妆造参考") || strings.Contains(name, "妆参考") ||
+		strings.Contains(name, "face")
 }
 
 func findMirrorAsset(assets []MirrorAsset, name string) string {
@@ -446,7 +517,7 @@ func (e *Engine) ListCharacterPortraits(projectID string) ([]CharacterPortrait, 
 		if mirror, ok := e.mirrorBySubjectID(sub.ID); ok {
 			p.MirrorLocal = true
 			for _, a := range mirror.Assets {
-				if isWeaponAsset(a.Name) {
+				if isWeaponAsset(a.Name) || isWeaponByTraits(a.Name, sub.Traits) {
 					p.WeaponCount++
 				} else {
 					p.ReferenceCount++

@@ -35,3 +35,42 @@ func TestTurnaroundIsNotAvatar(t *testing.T) {
 		t.Error("三视图不是立绘")
 	}
 }
+
+// 兵器名要能从角色的「武器」设定里取出来。
+//
+// 中台写法是「重刃【破军】，门板重刃焦黑崩口」，方括号里是兵器本名；
+// 素材名常直接用它（"欧阳狂徒-破军"），通用关键词猜不出来。
+func TestWeaponNameFromTraits(t *testing.T) {
+	traits := map[string]any{"武器": "重刃【破军】，门板重刃焦黑崩口"}
+	names := weaponNamesFromTraits(traits)
+	if len(names) != 1 || names[0] != "破军" {
+		t.Fatalf("兵器名：%v", names)
+	}
+	if !isWeaponByTraits("欧阳狂徒-破军", traits) {
+		t.Fatal("应认出这是兵器")
+	}
+	if isWeaponByTraits("欧阳狂徒-三视图", traits) {
+		t.Fatal("三视图不是兵器")
+	}
+	// 没有武器设定时不该误判
+	if isWeaponByTraits("欧阳狂徒-破军", map[string]any{}) {
+		t.Fatal("没有设定就不该判成兵器")
+	}
+}
+
+// 三视图定妆稿里带兵器名时，要归定妆而不是兵器。
+func TestTurnaroundWithWeaponNameIsNotWeapon(t *testing.T) {
+	if isWeaponAsset("顾栖月-三视图-顾栖月_v1_玉笛") {
+		t.Fatal("带兵器名的三视图不该算兵器")
+	}
+	if !isDesignSheet("顾栖月-三视图-顾栖月_v1_玉笛") {
+		t.Fatal("应认作定妆图")
+	}
+}
+
+// 发型/妆造参考也是真人照片，不能漏进画面素材。
+func TestHairReferenceIsRealFace(t *testing.T) {
+	if !isRealFaceAsset("陆听潮-纯黑发参考") {
+		t.Fatal("发型参考应算真人参考")
+	}
+}

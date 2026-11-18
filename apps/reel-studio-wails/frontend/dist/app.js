@@ -1750,7 +1750,7 @@
 
   // ── 素材 ──────────────────────────────────────────────
   function isRealFaceName(name) {
-    return /真人参考|脸部参考|真人|脸参考|face|photo/i.test(name || '')
+    return /真人参考|脸部参考|真人|脸参考|发参考|发型参考|妆造参考|妆参考|face|photo/i.test(name || '')
   }
 
   // 画面素材只放「能当画面用的图」：定妆立绘、场景参考等。
@@ -1760,6 +1760,8 @@
   // （分类规则见 docs/asset-classification.md）
   function isSceneMaterial(name) {
     if (isRealFaceName(name)) return false
+    // 兵器与道具不是画面素材（它们在角色详情的兵器区）
+    if (/武器|兵器|面具|枪|剑|刀|弓|笛|锤|鞭|匕|枷/.test(name) && !/三视图|定妆|设定/.test(name)) return false
     if (/场景参考|场景|画面/.test(name)) return true
     if (/定妆|立绘/.test(name)) return true
     return false
