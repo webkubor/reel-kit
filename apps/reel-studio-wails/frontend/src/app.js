@@ -181,6 +181,10 @@
     refreshProjects()
     refreshCharacters()
     refreshSubjects()
+    // 首次进入（没有项目）先给准备清单；有项目直接进工作台
+    app().GetSetupState().then(function (state) {
+      showSetup(state.projectCount === 0)
+    }).catch(function () { showSetup(false) })
   }
 
   function layoutItems() {
@@ -225,6 +229,20 @@
 
     $('btn-ai-settings').addEventListener('click', openAISettings)
     $('btn-scene-template').addEventListener('click', function () { openTemplateDialog('scene') })
+    $('setup-skip').addEventListener('click', function () { showSetup(false) })
+    $('setup-new-project').addEventListener('click', function () {
+      state.projectKind = 'series'
+      updateProjectKindButtons()
+      openProjectDialog()
+    })
+    $('setup-kind-series').addEventListener('click', function () {
+      state.projectKind = 'series'
+      updateProjectKindButtons()
+    })
+    $('setup-kind-clip').addEventListener('click', function () {
+      state.projectKind = 'clip'
+      updateProjectKindButtons()
+    })
     $('btn-close-template').addEventListener('click', function () { $('template-dialog').close() })
     $('ai-provider-museav').addEventListener('click', function () { applyProvider('museav') })
     $('ai-provider-direct').addEventListener('click', function () { applyProvider('direct') })
@@ -880,6 +898,65 @@
   //
   // 角色/场景的物料是成套的（三视图给建模、五视图给转面、定妆给换装）。
   // 模板把常用组合固化好，一键产出，不用每次手拼提示词。
+  // ── 引导页 ───────────────────────────────────────────────
+  //
+  // 第一次进来（或条件不满足时）先给一张准备清单：MUSE 登录了吗、
+  // 直连配了吗、要不要先建项目。用户知道自己缺什么，才知道下一步做什么。
+  function showSetup(show) {
+    var view = $('setup-view')
+    if (!view) return
+    view.classList.toggle('hidden', !show)
+    // 只收起工作区内容，主区本身保持可见，否则引导页也跟着被隐藏
+    var work = $('app-work')
+    if (work) work.classList.toggle('hidden', show)
+    if (show) paintSetup()
+  }
+
+  function paintSetup() {
+    var box = $('setup-checks')
+    var summary = $('setup-summary')
+    clear(box)
+    app().GetSetupState().then(function (state) {
+      if (summary) summary.textContent = state.summary || ''
+      state.checks.forEach(function (check) {
+        var row = el('div', 'provider-option')
+        var head = el('div', 'flex items-center justify-between gap-3')
+        head.appendChild(el('span', 'text-sm font-medium text-ink', check.label))
+        head.appendChild(el('span', 'badge', check.ready ? '就绪' : '待处理'))
+        row.appendChild(head)
+        row.appendChild(el('p', 'mt-1 text-2xs leading-relaxed text-ink-lo', check.detail || ''))
+        if (!check.ready && check.action) {
+          var actions = el('div', 'mt-2 flex flex-wrap items-center gap-2')
+          if (check.key === 'museav') {
+            var login = el('button', 'btn btn-secondary btn-sm', '打开登录')
+            login.type = 'button'
+            login.addEventListener('click', function () {
+              app().OpenMuseavLogin().then(function () {
+                if (summary) summary.textContent = '已在终端启动登录，请按提示在浏览器完成授权，然后点「重新检查」'
+              }).catch(function (err) {
+                if (summary) summary.textContent = '无法自动打开：' + String(err && err.message ? err.message : err)
+              })
+            })
+            actions.appendChild(login)
+          } else {
+            var open = el('button', 'btn btn-secondary btn-sm', '去设置')
+            open.type = 'button'
+            open.addEventListener('click', function () { openAISettings() })
+            actions.appendChild(open)
+          }
+          var again = el('button', 'btn btn-ghost btn-sm', '重新检查')
+          again.type = 'button'
+          again.addEventListener('click', paintSetup)
+          actions.appendChild(again)
+          row.appendChild(actions)
+        }
+        box.appendChild(row)
+      })
+    }).catch(function (err) {
+      if (summary) summary.textContent = '检查失败：' + String(err && err.message ? err.message : err)
+    })
+  }
+
   function openTemplateDialog(kind) {
     state.templateKind = kind
     state.templateSubject = ''

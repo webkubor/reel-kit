@@ -219,6 +219,16 @@ func (a *App) GenerateTemplate(subjectID, templateKey string) ([]string, error) 
 	})
 }
 
+// GetSetupState 汇总首次进入的引导信息。
+func (a *App) GetSetupState() SetupState {
+	return a.engine.GetSetupState()
+}
+
+// OpenMuseavLogin 在系统终端里启动 museav login。
+func (a *App) OpenMuseavLogin() error {
+	return a.engine.OpenMuseavLogin()
+}
+
 // ListWorkspaces 列可绑定的中台项目。
 func (a *App) ListWorkspaces() ([]WorkspaceOption, error) {
 	return a.engine.ListWorkspaces()

@@ -59,7 +59,41 @@
       </aside>
 
       <!-- 主区 -->
-      <div class="flex min-w-0 flex-1 flex-col">
+      <div id="app-main" class="flex min-w-0 flex-1 flex-col">
+    <!-- 引导页：第一次进来先看准备情况 -->
+    <section id="setup-view" class="hidden min-w-0 flex-1 overflow-y-auto p-8">
+      <div class="mx-auto w-full max-w-[620px]">
+        <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-lo">开始之前</p>
+        <h1 class="mt-2 text-3xl font-semibold tracking-tight text-ink">先把工作台准备好</h1>
+        <p id="setup-summary" class="mt-2 text-sm leading-relaxed text-ink-lo">正在检查…</p>
+
+        <div id="setup-checks" class="mt-6 flex flex-col gap-2"></div>
+
+        <div class="mt-6 rounded-lg border border-line bg-surface p-5">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h2 class="text-base font-semibold tracking-tight text-ink">新建项目</h2>
+              <p class="mt-1 text-2xs leading-relaxed text-ink-lo">项目默认存在本机；需要角色与场景时再绑定 MUSE AV 项目。</p>
+            </div>
+            <button id="setup-new-project" class="btn btn-primary btn-sm shrink-0" type="button">＋ 新建项目</button>
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-2">
+            <button id="setup-kind-series" type="button" class="provider-option" role="radio" aria-checked="true">
+              <span class="block text-sm font-medium text-ink">短剧</span>
+              <span class="mt-0.5 block text-2xs text-ink-lo">多集、角色、场景</span>
+            </button>
+            <button id="setup-kind-clip" type="button" class="provider-option" role="radio" aria-checked="false">
+              <span class="block text-sm font-medium text-ink">短视频</span>
+              <span class="mt-0.5 block text-2xs text-ink-lo">一条片子，素材与制作</span>
+            </button>
+          </div>
+        </div>
+
+        <button id="setup-skip" class="btn btn-ghost btn-sm mt-4" type="button">先跳过，直接进入工作台</button>
+      </div>
+    </section>
+
+        <div id="app-work" class="flex min-h-0 flex-1 flex-col">
         <header class="shrink-0 border-b border-line bg-surface">
           <div class="flex h-14 items-center gap-2.5 px-5">
             <span id="label-project" class="shrink-0 text-xs text-ink-lo">当前项目</span>
@@ -301,6 +335,7 @@
               </div>
             </div>
           </section>
+        </div>
         </div>
       </div>
     </div>
