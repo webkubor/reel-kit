@@ -16,6 +16,9 @@
   body,
   #app {
     height: 100%;
+    /* 宽度必须铺满：#app 是 flex 容器，不给宽度会按内容收缩，
+       窗口再宽主区也只占内容那么宽，右侧留大片空白。 */
+    width: 100%;
   }
 
   body {
@@ -245,6 +248,20 @@
   }
   .project-dot {
     @apply h-1.5 w-1.5 shrink-0 rounded-full bg-line-strong opacity-0;
+  }
+
+  /* 提供方 / 项目类型：单选卡片，选中的一项抬高一档 */
+  .provider-option {
+    @apply flex-1 rounded-md border border-line bg-raised p-3 text-left transition-colors
+           hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60;
+  }
+  .provider-option[aria-checked='true'] {
+    @apply border-accent/60 bg-lit shadow-card;
+  }
+
+  /* 已发布标记：一个小点，不抢标题的宽度 */
+  .publish-dot {
+    @apply inline-block h-1.5 w-1.5 rounded-full bg-accent/80;
   }
 
   /* ── 素材格 ───────────────────────────────────────────── */

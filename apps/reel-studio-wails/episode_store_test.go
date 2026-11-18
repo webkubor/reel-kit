@@ -39,7 +39,7 @@ func TestStoreLoadsLegacyStateWithoutEpisodes(t *testing.T) {
 // 剧集按集数排序；镜号在本集内递增。
 func TestEpisodeAndShotNumbering(t *testing.T) {
 	s := newTestStore(t)
-	p, _ := s.AddProject("短剧")
+	p, _ := s.AddProject("短剧", "series")
 
 	ep3, err := s.AddEpisode(EpisodeDraft{ProjectID: p.ID, Number: 3, Title: "第三集"})
 	if err != nil {
@@ -76,7 +76,7 @@ func TestEpisodeAndShotNumbering(t *testing.T) {
 // 镜头状态与素材挂载要能改并落盘。
 func TestEpisodeShotUpdatePersists(t *testing.T) {
 	s := newTestStore(t)
-	p, _ := s.AddProject("短剧")
+	p, _ := s.AddProject("短剧", "series")
 	ep, _ := s.AddEpisode(EpisodeDraft{ProjectID: p.ID, Title: "第一集"})
 	sh, _ := s.AddShot(ShotInput{ProjectID: p.ID, EpisodeID: ep.ID, Title: "长街回望"})
 

@@ -12,7 +12,7 @@ import (
 // 队列进度并发；重开存储后全部记录保留。由 -race 检查共享状态访问。
 func TestQueueSnapshots(t *testing.T) {
 	s := newTestStore(t)
-	p, err := s.AddProject("snapshot")
+	p, err := s.AddProject("snapshot", "series")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestQueueSnapshots(t *testing.T) {
 
 func TestStoreConcurrentProgressAndImports(t *testing.T) {
 	s := newTestStore(t)
-	p, err := s.AddProject("concurrent")
+	p, err := s.AddProject("concurrent", "series")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestStoreConcurrentProgressAndImports(t *testing.T) {
 				t.Error(err)
 				return
 			}
-			if _, err := s.AddProject("another"); err != nil {
+			if _, err := s.AddProject("another", "series"); err != nil {
 				t.Error(err)
 				return
 			}
@@ -103,7 +103,7 @@ func TestStoreConcurrentProgressAndImports(t *testing.T) {
 // 去重必须在锁内判，否则并发下每份都以为自己是首份，照样写十份。
 func TestStoreConcurrentDedup(t *testing.T) {
 	s := newTestStore(t)
-	p, err := s.AddProject("dedup")
+	p, err := s.AddProject("dedup", "series")
 	if err != nil {
 		t.Fatal(err)
 	}

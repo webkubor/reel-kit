@@ -91,7 +91,10 @@
   // ── 启动 ──────────────────────────────────────────────
   function mountCast() {
     if (!window.ReelCast || !window.ReelCast.mount) return false
-    window.ReelCast.mount($('cast-root'), { onCreate: openCharacterDialog })
+    window.ReelCast.mount($('cast-root'), {
+      onCreate: openCharacterDialog,
+      onTemplate: function () { openTemplateDialog('person') },
+    })
     return true
   }
 
@@ -178,7 +181,6 @@
     refreshProjects()
     refreshCharacters()
     refreshSubjects()
-    setView('make')
   }
 
   function layoutItems() {
@@ -213,7 +215,7 @@
       event.preventDefault()
       $('project-dialog').close()
       engine()
-        .CreateProject(name)
+        .CreateProject(name, state.projectKind || 'series')
         .then(function (project) {
           $('new-name').value = ''
           return refreshProjects(project ? project.id : '')
@@ -222,6 +224,18 @@
     })
 
     $('btn-ai-settings').addEventListener('click', openAISettings)
+    $('btn-scene-template').addEventListener('click', function () { openTemplateDialog('scene') })
+    $('btn-close-template').addEventListener('click', function () { $('template-dialog').close() })
+    $('ai-provider-museav').addEventListener('click', function () { applyProvider('museav') })
+    $('ai-provider-direct').addEventListener('click', function () { applyProvider('direct') })
+    $('project-kind-series').addEventListener('click', function () {
+      state.projectKind = 'series'
+      updateProjectKindButtons()
+    })
+    $('project-kind-clip').addEventListener('click', function () {
+      state.projectKind = 'clip'
+      updateProjectKindButtons()
+    })
     $('ai-cancel').addEventListener('click', function () { $('ai-key').value = ''; $('ai-dialog').close() })
     $('ai-dialog').addEventListener('close', function () { $('ai-key').value = '' })
     $('ai-settings-form').addEventListener('submit', saveAISettings)
@@ -264,10 +278,7 @@
     }
     $('bind-workspace-form').addEventListener('submit', submitBind)
     $('bind-workspace-cancel').addEventListener('click', function () { $('bind-workspace-dialog').close() })
-    $('tab-make').addEventListener('click', function () { setView('make') })
-    $('tab-product').addEventListener('click', function () { setView('product') })
-    $('tab-cast').addEventListener('click', function () { setView('cast') })
-    $('tab-scene').addEventListener('click', function () { setView('scene') })
+    // 工作区标签由 renderWorkspaceTabs 按项目类型动态生成并自行绑定
     $('btn-new-episode').addEventListener('click', openEpisodeDialog2)
     $('btn-import-episode').addEventListener('click', openImportDialog)
     $('import-episode-form').addEventListener('submit', submitImportEpisodes)
@@ -300,6 +311,11 @@
   function openAISettings() {
     $('ai-settings-status').textContent = '读取设置中…'
     $('ai-dialog').showModal()
+    app().GetAIProviderStatus().then(function (status) {
+      updateProviderButtons(status.provider)
+      var hint = $('ai-provider-status')
+      if (hint) hint.textContent = status.notice || ''
+    }).catch(function () {})
     engine().GetAISettings().then(function (settings) {
       $('ai-url').value = settings.baseUrl || ''
       $('ai-model').value = settings.model || ''
@@ -398,6 +414,8 @@
   }
 
   function openProjectDialog() {
+    state.projectKind = 'series'
+    updateProjectKindButtons()
     var dialog = $('project-dialog')
     if (dialog.showModal) dialog.showModal()
     else dialog.setAttribute('open', 'open')
@@ -564,25 +582,72 @@
 
   // 三个工作区：制作 / 角色库 / 场景库。
   // 角色和场景有几十个，塞在制作表单里根本没法用 —— 各给一个整屏。
+  // 工作区标签按项目类型生成：
+  //   短剧 → 剧集 / 角色 / 场景
+  //   短视频 → 素材 / 制作
+  // 不同类型的流程不能混在一起，一个短剧项目里不该出现「产品短片」。
+  var WORKSPACES = {
+    series: [
+      { key: 'make', label: '剧集', panel: 'view-make' },
+      { key: 'cast', label: '角色', panel: 'view-cast' },
+      { key: 'scene', label: '场景', panel: 'view-scene' },
+    ],
+    clip: [
+      { key: 'product', label: '素材与制作', panel: 'view-product' },
+    ],
+  }
+
+  function projectKind() {
+    var project = currentProject()
+    return project && project.kind === 'series' ? 'series' : 'clip'
+  }
+
+  function workspaces() {
+    return WORKSPACES[projectKind()] || WORKSPACES.clip
+  }
+
+  function renderWorkspaceTabs() {
+    var box = $('workspace-tabs')
+    clear(box)
+    var list = workspaces()
+    // 当前视图不属于这个项目类型时，回到第一个
+    if (!list.some(function (w) { return w.key === state.view })) state.view = list[0].key
+    list.forEach(function (w) {
+      var tab = el('button', 'tab', w.label)
+      tab.id = 'tab-' + w.key
+      tab.setAttribute('role', 'tab')
+      tab.setAttribute('aria-controls', w.panel)
+      tab.addEventListener('click', function () { setView(w.key) })
+      box.appendChild(tab)
+    })
+    setView(state.view)
+  }
+
   function setView(view) {
     state.view = view
-    var map = {
-      make: ['tab-make', 'view-make'],
-      product: ['tab-product', 'view-product'],
-      cast: ['tab-cast', 'view-cast'],
-      scene: ['tab-scene', 'view-scene'],
-    }
-    Object.keys(map).forEach(function (key) {
-      var tab = $(map[key][0])
-      var panel = $(map[key][1])
-      var on = key === view
-      tab.setAttribute('aria-selected', on ? 'true' : 'false')
-      tab.classList.toggle('is-active', on)
+    var list = workspaces()
+    list.forEach(function (w) {
+      var tab = $('tab-' + w.key)
+      var panel = $(w.panel)
+      var on = w.key === view
+      if (tab) {
+        tab.setAttribute('aria-selected', on ? 'true' : 'false')
+        tab.classList.toggle('is-active', on)
+      }
+      if (!panel) return
       panel.classList.toggle('hidden', !on)
       // 制作视图内部是左右两栏，用 contents 让两个 section 并排；
       // 其余视图是单栏，正常流式。
-      if (key === 'make') panel.classList.toggle('contents', on)
+      if (w.panel === 'view-make') panel.classList.toggle('contents', on)
       else panel.classList.remove('contents')
+    })
+    // 不属于当前项目类型的视图整体收起，避免跨类型内容露出来
+    Object.keys(WORKSPACES).forEach(function (kind) {
+      WORKSPACES[kind].forEach(function (w) {
+        if (kind === projectKind()) return
+        var panel = $(w.panel)
+        if (panel) panel.classList.add('hidden')
+      })
     })
   }
 
@@ -651,10 +716,11 @@
       var numLabel = episode.number === 0 ? '序' : String(episode.number).padStart(2, '0')
       row.appendChild(el('span', 'text-[10px] font-semibold tabular-nums text-ink-dim', numLabel))
       row.appendChild(el('span', 'truncate', episode.title || '未命名剧集'))
-      // 已发布的集标一个平台徽章，点开能直接内嵌播放
+      // 已发布的集标一个平台小圆点：侧栏只有 210px，徽章文字会把标题挤没
       if (episode.publishPlatform) {
-        var tag = el('span', 'badge shrink-0')
-        tag.textContent = episode.publishPlatform === 'youtube' ? 'YouTube' : episode.publishPlatform
+        var tag = el('span', 'publish-dot shrink-0')
+        tag.title = '已发布到 ' + episode.publishPlatform
+        tag.setAttribute('aria-label', '已发布到 ' + episode.publishPlatform)
         row.appendChild(tag)
       }
       button.appendChild(el('span', 'project-dot'))
@@ -810,6 +876,79 @@
     })
   }
 
+  // ── 素材模板 ─────────────────────────────────────────────
+  //
+  // 角色/场景的物料是成套的（三视图给建模、五视图给转面、定妆给换装）。
+  // 模板把常用组合固化好，一键产出，不用每次手拼提示词。
+  function openTemplateDialog(kind) {
+    state.templateKind = kind
+    state.templateSubject = ''
+    var list = $('template-list')
+    clear(list)
+    $('template-status').textContent = '正在读取模板…'
+    var dialog = $('template-dialog')
+    if (dialog.showModal) dialog.showModal()
+    else dialog.setAttribute('open', 'open')
+    app().ListAssetTemplates(kind).then(function (templates) {
+      $('template-status').textContent = ''
+      if (!templates.length) {
+        list.appendChild(el('p', 'text-2xs text-ink-lo', '没有可用模板'))
+        return
+      }
+      // 选主体
+      var subjectRow = el('div', 'flex flex-col gap-2')
+      subjectRow.appendChild(el('span', 'label', kind === 'scene' ? '给哪个场景生成' : '给哪个角色生成'))
+      var people = state.subjects.filter(function (s) { return s.kind === (kind === 'scene' ? 'scene' : 'person') })
+      if (!people.length) {
+        subjectRow.appendChild(el('p', 'text-2xs text-ink-lo', '还没有' + (kind === 'scene' ? '场景' : '角色') + '主体'))
+        list.appendChild(subjectRow)
+        return
+      }
+      var select = el('select', 'input input-md')
+      people.forEach(function (subject) {
+        var opt = el('option', '', subject.name)
+        opt.value = subject.id
+        select.appendChild(opt)
+      })
+      select.addEventListener('change', function () { state.templateSubject = select.value })
+      state.templateSubject = people[0].id
+      subjectRow.appendChild(select)
+      list.appendChild(subjectRow)
+      // 模板卡片
+      templates.forEach(function (tpl) {
+        var card = el('div', 'provider-option')
+        var head = el('div', 'flex items-baseline justify-between gap-2')
+        head.appendChild(el('span', 'text-sm font-medium text-ink', tpl.label))
+        head.appendChild(el('span', 'text-2xs text-ink-lo', tpl.cost))
+        card.appendChild(head)
+        card.appendChild(el('p', 'mt-1 text-2xs leading-relaxed text-ink-lo', tpl.description))
+        var run = el('button', 'btn btn-secondary btn-sm mt-2', '生成')
+        run.type = 'button'
+        run.addEventListener('click', function () { runTemplate(state.templateSubject, tpl.key) })
+        card.appendChild(run)
+        list.appendChild(card)
+      })
+    }).catch(function (err) {
+      $('template-status').textContent = '读取模板失败：' + String(err && err.message ? err.message : err)
+    })
+  }
+
+  function runTemplate(subjectID, templateKey) {
+    if (!subjectID) {
+      $('template-status').textContent = '先选一个主体'
+      return
+    }
+    if (!window.confirm('按模板出图会联网并可能计费，确定继续？')) return
+    $('template-status').textContent = '正在生成，可能要几分钟…'
+    app().GenerateTemplate(subjectID, templateKey).then(function (names) {
+      $('template-status').textContent = '已生成 ' + names.length + ' 张：' + names.join('、')
+      return Promise.all([refreshSubjects(), refreshCharacters()])
+    }).catch(function (err) {
+      $('template-status').textContent = '生成未完成：' + String(err && err.message ? err.message : err)
+      return refreshSubjects()
+    })
+  }
+
   function openSceneDialog() {
     var project = currentProject()
     if (!project || !project.workspaceId) {
@@ -859,6 +998,36 @@
         return refreshShots()
       })
       .catch(fail)
+  }
+
+  function updateProjectKindButtons() {
+    ;['series', 'clip'].forEach(function (kind) {
+      var btn = $('project-kind-' + kind)
+      if (btn) btn.setAttribute('aria-checked', kind === state.projectKind ? 'true' : 'false')
+    })
+  }
+
+  function updateProviderButtons(provider) {
+    ;['museav', 'direct'].forEach(function (key) {
+      var btn = $('ai-provider-' + key)
+      if (btn) btn.setAttribute('aria-checked', key === provider ? 'true' : 'false')
+    })
+    var direct = $('ai-direct-fields')
+    if (direct) direct.classList.toggle('hidden', provider !== 'direct')
+  }
+
+  function applyProvider(provider) {
+    updateProviderButtons(provider)
+    app()
+      .SetAIProvider(provider)
+      .then(function (status) {
+        var hint = $('ai-provider-status')
+        if (hint) hint.textContent = status.notice || (status.ready ? '已就绪' : '尚未就绪')
+      })
+      .catch(function (err) {
+        var hint = $('ai-provider-status')
+        if (hint) hint.textContent = '切换失败：' + String(err && err.message ? err.message : err)
+      })
   }
 
   function submitNewScene(event) {
@@ -1270,6 +1439,8 @@
         state.projects = projects || []
         var targetID = selectID || state.projectId || (state.projects[0] && state.projects[0].id) || ''
         if (targetID !== state.projectId) switchProject(targetID)
+        // 标签按当前项目类型生成：等 projectId 就位后再渲染
+        renderWorkspaceTabs()
         renderProjects()
         if (!selects.project) {
           selects.project = window.ReelSelect.create($('project-select'), {
@@ -1623,9 +1794,21 @@
       cw = state.stageMedia.w
       ch = state.stageMedia.h
     }
+    // 已发布的剧集是横屏作品，按 16:9 给位，别缩成窄条。
+    var embed = $('stage-youtube')
+    if (embed && !embed.classList.contains('hidden')) {
+      cw = 1920
+      ch = 1080
+      portrait = false
+    }
 
-    var available = wrap.parentElement.clientWidth
-    var maxHeight = 460
+    // 可用宽度取「画面面板」这一栏，而不是 stage-wrap 的父容器 ——
+    // 父容器宽度由画面本身决定，拿它算会自我循环（画面永远只有 250px）。
+    var panel = wrap.closest('.panel')
+    var available = panel ? panel.clientWidth - 40 : wrap.parentElement.clientWidth
+    if (available < 160) available = wrap.parentElement.clientWidth || 320
+    // 竖版成片允许高一些；横屏（成片/已发布剧集）按宽度走，高度不额外压。
+    var maxHeight = portrait ? 460 : Math.round(available * 0.62)
     var scale = Math.min(available / cw, maxHeight / ch)
     if (!isFinite(scale) || scale <= 0) scale = 0.2
 
@@ -1828,7 +2011,9 @@
     box.innerHTML = '<iframe class="h-full w-full" src="https://www.youtube-nocookie.com/embed/' +
       encodeURIComponent(videoID) + '?rel=0" title="已发布剧集" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>'
     $('stage-note').textContent = '已发布版本 · YouTube 内嵌播放'
+    $('preview-meta').textContent = 'YouTube · 16:9'
     $('btn-export').classList.add('hidden')
+    layoutStage()
   }
 
   // 切回本地成片/素材时，收起 YouTube 播放器。
@@ -1837,6 +2022,8 @@
     if (!box) return
     box.classList.add('hidden')
     box.innerHTML = ''
+    paintLayout()
+    layoutStage()
   }
 
   function showVideo(assetID) {

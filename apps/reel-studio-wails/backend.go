@@ -156,12 +156,12 @@ func (e *Engine) DeleteProject(projectID string) error {
 	return e.store.DeleteProject(projectID)
 }
 
-// CreateProject 新建项目。
-func (e *Engine) CreateProject(name string) (*Project, error) {
+// CreateProject 新建项目。kind：series（短剧）或 clip（短视频）。
+func (e *Engine) CreateProject(name string, kind string) (*Project, error) {
 	if e.store == nil {
 		return nil, errNoStore
 	}
-	return e.store.AddProject(name)
+	return e.store.AddProject(name, kind)
 }
 
 // ListAssets 列出素材（可按项目过滤）。

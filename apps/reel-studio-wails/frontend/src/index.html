@@ -60,28 +60,25 @@
 
       <!-- 主区 -->
       <div class="flex min-w-0 flex-1 flex-col">
-        <header class="flex h-14 shrink-0 items-center gap-2.5 border-b border-line bg-surface px-5">
-          <span id="label-project" class="text-xs text-ink-lo">当前项目</span>
-          <div id="project-select" class="w-56" aria-labelledby="label-project"></div>
-          <button id="btn-new-project" class="btn btn-secondary btn-sm">＋ 新建项目</button>
-          <button id="btn-bind-workspace" class="btn btn-ghost btn-sm" type="button">绑定中台项目</button>
-          <div role="tablist" aria-label="工作区" class="ml-6 flex items-center gap-1">
-            <button id="tab-make" class="tab" role="tab" aria-selected="true" aria-controls="view-make">短剧制作</button>
-            <button id="tab-product" class="tab" role="tab" aria-selected="false" aria-controls="view-product">产品短片</button>
-            <button id="tab-cast" class="tab" role="tab" aria-selected="false" aria-controls="view-cast">角色库</button>
-            <button id="tab-scene" class="tab" role="tab" aria-selected="false" aria-controls="view-scene">场景库</button>
+        <header class="shrink-0 border-b border-line bg-surface">
+          <div class="flex h-14 items-center gap-2.5 px-5">
+            <span id="label-project" class="shrink-0 text-xs text-ink-lo">当前项目</span>
+            <div id="project-select" class="w-52 shrink-0" aria-labelledby="label-project"></div>
+            <button id="btn-new-project" class="btn btn-secondary btn-sm shrink-0">＋ 新建项目</button>
+            <button id="btn-bind-workspace" class="btn btn-ghost btn-sm shrink-0 truncate" type="button">绑定中台项目</button>
+            <div class="ml-auto flex shrink-0 items-center gap-2">
+              <button id="btn-ai-settings" class="btn btn-secondary btn-sm" type="button">AI 设置</button>
+              <button id="btn-pick-images" class="btn btn-secondary btn-sm">＋ 导入素材</button>
+            </div>
           </div>
-          <div class="ml-auto flex items-center gap-2">
-            <button id="btn-ai-settings" class="btn btn-secondary btn-sm" type="button">AI 设置</button>
-            <button id="btn-pick-images" class="btn btn-secondary btn-sm">＋ 导入素材</button>
-          </div>
+          <div id="workspace-tabs" role="tablist" aria-label="工作区" class="flex items-center gap-1 px-5 pb-2"></div>
         </header>
 
         <div class="flex min-h-0 flex-1">
           <!-- 视图一：制作（本集的镜头流） -->
           <div id="view-make" class="contents" role="tabpanel" aria-labelledby="tab-make">
           <!-- 左：本集镜头流 + 写什么 -->
-          <section class="flex min-w-0 flex-1 flex-col overflow-y-auto border-r border-line p-5">
+          <section class="flex min-w-0 basis-[46%] shrink-0 flex-col overflow-y-auto border-r border-line p-5">
             <div class="mb-4 shrink-0">
               <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-lo">短剧制作</p>
               <h1 class="mt-1.5 text-2xl font-semibold tracking-tight text-ink">本集镜头</h1>
@@ -105,7 +102,7 @@
                 <span id="asset-selected" class="badge">未选择</span>
               </div>
               <div class="panel-body">
-                <div id="asset-grid" class="grid grid-cols-4 gap-2"></div>
+                <div id="asset-grid" class="grid max-h-[46vh] grid-cols-4 gap-2 overflow-y-auto pr-1"></div>
                 <button id="btn-view-image" class="btn btn-secondary btn-sm mt-3 hidden" type="button">查看选中图片</button>
                 <p id="asset-empty" class="text-2xs leading-relaxed text-ink-lo">
                   还没有导入图片。没有素材也能出片 —— 会先用深色占位图，之后可以换真图重做。
@@ -115,7 +112,7 @@
           </section>
 
           <!-- 右：出来什么样 -->
-          <section class="flex min-w-0 flex-[1.05] flex-col overflow-y-auto p-5">
+          <section class="flex min-w-0 flex-1 flex-col overflow-y-auto p-5">
             <div class="panel mb-4 shrink-0">
               <div class="panel-head">
                 <h2 class="panel-title">画面</h2>
@@ -123,7 +120,7 @@
               </div>
               <div class="panel-body">
                 <div class="flex justify-center">
-                  <div id="stage-wrap" class="relative overflow-hidden rounded-lg bg-stage shadow-stage" style="width: 236px; height: 420px">
+                  <div id="stage-wrap" class="relative overflow-hidden rounded-lg bg-stage shadow-stage" style="width: 420px; height: 236px">
                     <div id="stage-canvas" class="stage-canvas mp"></div>
                     <img id="stage-image" class="stage-video hidden" alt="选中的原始图片" />
                     <video id="stage-video" class="stage-video hidden" controls></video>
@@ -294,6 +291,7 @@
                 <h2 class="panel-title">场景</h2>
                 <div class="flex items-center gap-2">
                   <span id="scene-count" class="badge">—</span>
+                  <button id="btn-scene-template" class="btn btn-secondary btn-sm" type="button">素材模板</button>
                   <button id="btn-new-scene" class="btn btn-secondary btn-sm" type="button">＋ 新建场景</button>
                 </div>
               </div>
@@ -309,8 +307,20 @@
 
     <dialog id="ai-dialog" aria-labelledby="ai-dialog-title" class="w-[460px] max-w-[90vw] rounded-lg border border-line bg-surface p-5 shadow-pop">
       <form id="ai-settings-form">
-        <h2 id="ai-dialog-title" class="text-base font-semibold text-ink">AI 模型设置</h2>
-        <p class="help">用于生成可编辑的分镜 JSON；服务会收到你的生成要求，可能收费。视频渲染和中文配音仍在本机。</p>
+        <h2 id="ai-dialog-title" class="text-base font-semibold text-ink">AI 提供方</h2>
+        <p class="help">MUSE AV 中台默认支持；直连则用你自己的模型服务。两者可随时切换。</p>
+        <div class="mt-3 flex gap-2" role="radiogroup" aria-label="AI 提供方">
+          <button id="ai-provider-museav" type="button" class="provider-option" role="radio" aria-checked="true">
+            <span class="block text-sm font-medium text-ink">MUSE AV 中台</span>
+            <span class="mt-0.5 block text-2xs text-ink-lo">用中台登录态；出图出视频、创作哲学都在中台</span>
+          </button>
+          <button id="ai-provider-direct" type="button" class="provider-option" role="radio" aria-checked="false">
+            <span class="block text-sm font-medium text-ink">直连模型服务</span>
+            <span class="mt-0.5 block text-2xs text-ink-lo">自己的 OpenAI 兼容服务或 MiniMax H3</span>
+          </button>
+        </div>
+        <p id="ai-provider-status" class="help" role="status" aria-live="polite"></p>
+        <div id="ai-direct-fields">
         <label class="label mt-4" for="ai-url">OpenAI 兼容 API 根地址</label>
         <input id="ai-url" class="input input-md" type="url" placeholder="https://example.com/v1" required />
         <label class="label mt-4" for="ai-model">模型 ID</label>
@@ -318,6 +328,7 @@
         <label class="label mt-4" for="ai-key">API Key</label>
         <input id="ai-key" class="input input-md" type="password" autocomplete="off" placeholder="留空以保留该地址已有密钥" />
         <p id="ai-key-status" class="help">密钥保存在系统钥匙串，不写入项目、任务或日志。</p>
+        </div>
         <p id="ai-settings-status" class="help" role="status" aria-live="polite"></p>
         <div class="mt-4 flex flex-wrap justify-end gap-2">
           <button id="ai-clear-key" class="btn btn-ghost btn-sm" type="button">移除已保存密钥</button>
@@ -331,6 +342,17 @@
     <dialog id="project-dialog" aria-labelledby="project-dialog-title" class="w-[380px] rounded-lg border border-line bg-surface p-5 shadow-pop">
       <form id="project-form" method="dialog">
         <h2 id="project-dialog-title" class="text-base font-semibold tracking-tight text-ink">新建项目</h2>
+        <p class="help">项目类型决定这个项目里有哪些工作区，之后不能改。</p>
+        <div class="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="项目类型">
+          <button id="project-kind-series" type="button" class="provider-option" role="radio" aria-checked="true">
+            <span class="block text-sm font-medium text-ink">短剧</span>
+            <span class="mt-0.5 block text-2xs text-ink-lo">多集、角色、场景</span>
+          </button>
+          <button id="project-kind-clip" type="button" class="provider-option" role="radio" aria-checked="false">
+            <span class="block text-sm font-medium text-ink">短视频</span>
+            <span class="mt-0.5 block text-2xs text-ink-lo">一条片子，素材与制作</span>
+          </button>
+        </div>
         <p class="mt-1 text-2xs leading-relaxed text-ink-lo">素材、生成记录与成片都按项目保存。</p>
         <label class="label mt-4" for="new-name">项目名称</label>
         <input id="new-name" class="input input-md" maxlength="80" required placeholder="例如：秋日短片" />
@@ -520,6 +542,18 @@
           <button type="submit" class="btn btn-primary btn-sm">创建</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="template-dialog" class="w-[620px] max-w-[94vw] rounded-lg border border-line bg-surface p-5 shadow-pop" aria-labelledby="template-dialog-title">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h2 id="template-dialog-title" class="text-base font-semibold tracking-tight text-ink">素材模板</h2>
+          <p class="mt-1 text-2xs leading-relaxed text-ink-lo">按模板批量出图，会联网并可能计费；产物自动归到对应主体名下。</p>
+        </div>
+        <button id="btn-close-template" class="btn btn-ghost btn-sm" type="button">关闭</button>
+      </div>
+      <div id="template-list" class="mt-4 flex flex-col gap-2"></div>
+      <p id="template-status" class="mt-3 text-2xs text-ink-lo" role="status" aria-live="polite"></p>
     </dialog>
 
     <dialog id="import-episode-dialog" class="w-[520px] max-w-[92vw] rounded-lg border border-line bg-surface p-5 shadow-pop" aria-labelledby="import-episode-title">

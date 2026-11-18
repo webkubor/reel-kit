@@ -39,7 +39,7 @@ func (s *testSecrets) Delete(service, account string) error {
 func TestAIStoryboard(t *testing.T) {
 	fake := &testSecrets{data: map[string]string{}}
 	s := newTestStore(t)
-	project, err := s.AddProject("test")
+	project, err := s.AddProject("test", "series")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,6 +70,10 @@ func TestAIStoryboard(t *testing.T) {
 	settings, err := e.SaveAISettings(AISettings{BaseURL: server.URL + "/v1", Model: "model-a"}, "test-secret")
 	if err != nil || !settings.HasKey {
 		t.Fatalf("save: %+v %v", settings, err)
+	}
+	// 假服务走直连：默认提供方是 MUSE AV 中台，会绕开这个假服务
+	if _, err = e.SetAIProvider(ProviderDirect); err != nil {
+		t.Fatal(err)
 	}
 	config, err := os.ReadFile(filepath.Join(s.Root(), "ai-settings.json"))
 	if err != nil {
@@ -121,7 +125,7 @@ func TestStoryboardFailures(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := newTestStore(t)
-			p, err := s.AddProject("test")
+			p, err := s.AddProject("test", "series")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -134,6 +138,9 @@ func TestStoryboardFailures(t *testing.T) {
 			}))
 			t.Cleanup(server.Close)
 			if _, err = e.SaveAISettings(AISettings{BaseURL: server.URL, Model: "requested-model"}, "test-secret"); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = e.SetAIProvider(ProviderDirect); err != nil {
 				t.Fatal(err)
 			}
 			var receipt map[string]any
@@ -163,6 +170,9 @@ func TestAISettingsFailurePaths(t *testing.T) {
 	e := &Engine{store: s, aiSecrets: &testSecrets{data: map[string]string{}}}
 	if _, _, err := e.aiRequest(context.Background(), "GET", "/models", nil); err == nil {
 		t.Fatal("unconfigured request allowed")
+	}
+	if _, err := e.SetAIProvider(ProviderDirect); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := e.SaveAISettings(AISettings{BaseURL: "http://localhost:12345/v1", Model: "m"}, "test-secret"); err != nil {
 		t.Fatal(err)

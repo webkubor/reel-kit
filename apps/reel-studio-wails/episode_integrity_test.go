@@ -7,8 +7,8 @@ import (
 
 func TestEpisodeShotProjectBoundaryAndCopies(t *testing.T) {
 	s := newTestStore(t)
-	p, _ := s.AddProject("甲")
-	other, _ := s.AddProject("乙")
+	p, _ := s.AddProject("甲", "series")
+	other, _ := s.AddProject("乙", "series")
 	ids := []string{"角色一"}
 	ep, err := s.AddEpisode(EpisodeDraft{ProjectID: p.ID, Title: "第一集", CharacterIDs: ids})
 	if err != nil {
@@ -38,7 +38,7 @@ func TestEpisodeShotProjectBoundaryAndCopies(t *testing.T) {
 
 func TestConcurrentEpisodeNumbers(t *testing.T) {
 	s := newTestStore(t)
-	p, _ := s.AddProject("短剧")
+	p, _ := s.AddProject("短剧", "series")
 	var wg sync.WaitGroup
 	for i := 0; i < 12; i++ {
 		wg.Add(1)

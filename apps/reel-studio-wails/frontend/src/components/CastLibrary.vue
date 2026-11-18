@@ -26,6 +26,7 @@ function portraitOf(s) {
       <h2 class="panel-title">角色</h2>
       <div class="flex items-center gap-2">
         <span class="badge">{{ list.length }} 个</span>
+        <button type="button" class="btn btn-secondary btn-sm" @click="store.onTemplate()">素材模板</button>
         <button type="button" class="btn btn-secondary btn-sm" @click="store.onCreate()">＋ 新建角色</button>
       </div>
     </div>

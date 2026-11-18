@@ -41,6 +41,14 @@ type StudioState struct {
 	Version  int            `json:"version,omitempty"`
 }
 
+// 项目类型。
+const (
+	// ProjectKindSeries 短剧：有多集、角色、场景。
+	ProjectKindSeries = "series"
+	// ProjectKindClip 短视频：一条片子，素材 + 制作。
+	ProjectKindClip = "clip"
+)
+
 // Project 一个视频项目。
 type Project struct {
 	ID          string `json:"id"`
@@ -49,6 +57,11 @@ type Project struct {
 	WorkspaceID string `json:"workspaceId,omitempty"`
 	// WorkspaceName 绑定时记下的中台项目名，只用于显示。
 	WorkspaceName string `json:"workspaceName,omitempty"`
+	// Kind 项目类型：series 短剧 / clip 短视频。
+	//
+	// 决定这个项目里有哪些工作区：短剧有剧集、角色、场景；
+	// 短视频只有素材与制作。两类流程不能混在一起。
+	Kind string `json:"kind,omitempty"`
 }
 
 // Asset 一份素材（图片/视频/音频）。
@@ -414,12 +427,22 @@ func (s *StudioStore) Path(a *Asset) string {
 }
 
 // AddProject 新建项目。
-func (s *StudioStore) AddProject(name string) (*Project, error) {
+//
+// kind 决定项目类型：series（短剧）或 clip（短视频）。空按短视频处理 ——
+// 短剧要显式选，因为它的结构（剧集/角色/场景）不一样。
+func (s *StudioStore) AddProject(name string, kind string) (*Project, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || len([]rune(name)) > 80 {
 		return nil, errors.New("项目名称须为 1–80 字")
 	}
-	p := &Project{ID: newID(), Name: name, CreatedAt: nowISO()}
+	kind = strings.TrimSpace(kind)
+	if kind == "" {
+		kind = ProjectKindClip
+	}
+	if kind != ProjectKindSeries && kind != ProjectKindClip {
+		return nil, errors.New("项目类型只能是短剧或短视频")
+	}
+	p := &Project{ID: newID(), Name: name, Kind: kind, CreatedAt: nowISO()}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.state.Projects = append(s.state.Projects, p)

@@ -13,7 +13,7 @@ import (
 func boundShot(t *testing.T) (*Engine, *StudioStore, *EpisodeShot) {
 	t.Helper()
 	s := newTestStore(t)
-	p, _ := s.AddProject("沸腾之雪")
+	p, _ := s.AddProject("沸腾之雪", "series")
 	if _, err := s.SetProjectWorkspace(p.ID, "ws-snow", "沸腾之雪"); err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestShootShotGuards(t *testing.T) {
 	if _, err := e.ShootShot(context.Background(), sh.ID, nil, nil); err == nil || !strings.Contains(err.Error(), "角色") {
 		t.Fatalf("没角色应拒绝：%v", err)
 	}
-	p, _ := s.AddProject("未绑定")
+	p, _ := s.AddProject("未绑定", "series")
 	ep, _ := s.AddEpisode(EpisodeDraft{ProjectID: p.ID, Title: "x"})
 	un, _ := s.AddShot(ShotInput{ProjectID: p.ID, EpisodeID: ep.ID, Action: "x", CharacterID: "c"})
 	if _, err := e.ShootShot(context.Background(), un.ID, nil, nil); !errors.Is(err, errProjectUnbound) {

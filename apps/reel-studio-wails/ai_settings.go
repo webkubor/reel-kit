@@ -23,6 +23,9 @@ type AISettings struct {
 	BaseURL string `json:"baseUrl"`
 	Model   string `json:"model"`
 	HasKey  bool   `json:"hasKey"`
+	// ModelFamily 模型族：chat（OpenAI 兼容对话）/ h3（MiniMax 视频）。
+	// H3 的提示词与参数形状和对话模型不同，要分别适配。
+	ModelFamily string `json:"modelFamily,omitempty"`
 }
 type secretStore interface {
 	Get(string, string) (string, error)
@@ -102,6 +105,9 @@ func (e *Engine) SaveAISettings(c AISettings, apiKey string) (AISettings, error)
 	c, err := validateAISettings(c)
 	if err != nil {
 		return c, err
+	}
+	if strings.TrimSpace(c.ModelFamily) == "" {
+		c.ModelFamily = detectModelFamily(c.Model)
 	}
 	// Do not overwrite a corrupt settings file silently.
 	if _, err = e.readAISettingsLocked(); err != nil {
@@ -210,7 +216,7 @@ func (e *Engine) aiRequest(ctx context.Context, method, path string, body any) (
 func (e *Engine) CheckAIConnection() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	data, c, err := e.aiRequest(ctx, http.MethodGet, "/models", nil)
+	data, c, err := e.providerRequest(ctx, http.MethodGet, "/models", nil)
 	if err != nil {
 		return "", err
 	}

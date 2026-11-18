@@ -10,6 +10,7 @@ const store = reactive({
   projectId: '',
   onCreate: () => {},
   onShoot: () => {},
+  onTemplate: () => {},
 })
 
 window.ReelCast = {

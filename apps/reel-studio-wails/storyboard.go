@@ -61,7 +61,8 @@ func (e *Engine) generateStoryboard(ctx context.Context, job *Job, progress func
 	progress("正在向配置的模型请求分镜（可能计费）", nil)
 	report(Step{ID: "ai-plan", Label: "AI 分镜", Status: "running", Origin: "cloud-paid"})
 	body := map[string]any{"messages": []map[string]string{{"role": "system", "content": e.systemInstruction(ctx, job)}, {"role": "user", "content": prompt}}, "stream": false}
-	data, c, err := e.aiRequest(ctx, http.MethodPost, "/chat/completions", body)
+	// 请求按当前提供方路由：MUSE AV 中台或直连服务。
+	data, c, err := e.providerRequest(ctx, http.MethodPost, "/chat/completions", body)
 	progress("正在校验模型响应", map[string]any{"requestedModel": c.Model, "actualModel": "unknown"})
 	if err != nil {
 		return "", err

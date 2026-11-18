@@ -35,7 +35,7 @@ func TestProductPipelineProducesVideo(t *testing.T) {
 	e := &Engine{store: store, note: "test"}
 	e.queue = NewJobQueue(store, e.runPipeline)
 
-	project, err := store.AddProject("端到端测试")
+	project, err := store.AddProject("端到端测试", "series")
 	if err != nil {
 		t.Fatalf("建项目失败：%v", err)
 	}

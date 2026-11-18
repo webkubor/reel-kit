@@ -79,6 +79,17 @@ var cnEpisodeNumbers = map[string]int{
 
 var reEpisodeNumber = regexp.MustCompile(`第([一二三四五六七八九十]+)集`)
 
+// reEpisodePrefix 标题里的「【沸腾之雪·第N集】」「【沸腾之雪·第N集·大结局】」这类前缀。
+var reEpisodePrefix = regexp.MustCompile(`^【[^】]*?第[一二三四五六七八九十]+集[^】]*】\s*`)
+
+// shortEpisodeTitle 去掉标题里的集数前缀，只留本集副标题。
+//
+// 侧栏只有 200 多像素宽，「【沸腾之雪·第五集】天门三日战」会被截成「【沸腾之雪…」；
+// 集号在侧栏本来就单独显示，标题只留副标题更好读。
+func shortEpisodeTitle(title string) string {
+	return strings.TrimSpace(reEpisodePrefix.ReplaceAllString(title, ""))
+}
+
 // parseEpisodeNumber 从标题里认集数；认不出返回 -1。
 func parseEpisodeNumber(title string) int {
 	if m := reEpisodeNumber.FindStringSubmatch(title); len(m) == 2 {
@@ -136,7 +147,7 @@ func (e *Engine) ImportYouTubeEpisodes(ctx context.Context, projectID, channelID
 				x.PublishURL, x.PublishTitle = it.URL, it.Title
 				x.PublishPlatform, x.VideoID, x.ThumbnailURL = "youtube", it.VideoID, it.Thumbnail
 				if x.Title == "" {
-					x.Title = it.Title
+					x.Title = shortEpisodeTitle(it.Title)
 				}
 			})
 			if err != nil {
@@ -146,7 +157,7 @@ func (e *Engine) ImportYouTubeEpisodes(ctx context.Context, projectID, channelID
 			continue
 		}
 		ep, err := e.store.AddEpisode(EpisodeDraft{
-			ProjectID: projectID, Number: it.Number, Title: it.Title,
+			ProjectID: projectID, Number: it.Number, Title: shortEpisodeTitle(it.Title),
 			PublishURL: it.URL, PublishTitle: it.Title, PublishPlatform: "youtube",
 			VideoID: it.VideoID, ThumbnailURL: it.Thumbnail,
 		})

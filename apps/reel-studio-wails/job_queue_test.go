@@ -24,7 +24,7 @@ func newTestStore(t *testing.T) *StudioStore {
 func TestStoreProjectAndAsset(t *testing.T) {
 	s := newTestStore(t)
 
-	p, err := s.AddProject("我的第一支短片")
+	p, err := s.AddProject("我的第一支短片", "series")
 	if err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
@@ -33,10 +33,10 @@ func TestStoreProjectAndAsset(t *testing.T) {
 	}
 
 	// 空名与超长名要报错。
-	if _, err := s.AddProject("  "); err == nil {
+	if _, err := s.AddProject("  ", "series"); err == nil {
 		t.Fatal("空项目名应当报错")
 	}
-	if _, err := s.AddProject(strings.Repeat("长", 81)); err == nil {
+	if _, err := s.AddProject(strings.Repeat("长", 81), "series"); err == nil {
 		t.Fatal("超长项目名应当报错")
 	}
 
@@ -71,7 +71,7 @@ func TestStoreInterruptedOnRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("第一次打开: %v", err)
 	}
-	p, _ := s1.AddProject("项目")
+	p, _ := s1.AddProject("项目", "series")
 	for _, status := range []string{"queued", "running"} {
 		s1.state.Jobs = append(s1.state.Jobs, &Job{
 			ID: newID(), ProjectID: p.ID, Status: status,
@@ -114,7 +114,7 @@ func TestStoreInterruptedOnRestart(t *testing.T) {
 // 队列要真的执行任务，并把结果写回 job。
 func TestQueueRunsJob(t *testing.T) {
 	s := newTestStore(t)
-	p, _ := s.AddProject("项目")
+	p, _ := s.AddProject("项目", "series")
 
 	started := make(chan struct{})
 	q := NewJobQueue(s, func(ctx context.Context, job *Job, progress func(string, map[string]any), report func(Step)) (string, error) {
@@ -160,7 +160,7 @@ func TestQueueRunsJob(t *testing.T) {
 // 取消要真的掐断执行中的任务，而不是等它跑完再把结果扔掉。
 func TestQueueCancelStopsRunningJob(t *testing.T) {
 	s := newTestStore(t)
-	p, _ := s.AddProject("项目")
+	p, _ := s.AddProject("项目", "series")
 
 	running := make(chan struct{})
 	canceled := make(chan error, 1)
@@ -219,7 +219,7 @@ func TestQueueCancelStopsRunningJob(t *testing.T) {
 // 排队的任务取消后直接结束，不必等 worker 轮到它。
 func TestQueueCancelQueuedJob(t *testing.T) {
 	s := newTestStore(t)
-	p, _ := s.AddProject("项目")
+	p, _ := s.AddProject("项目", "series")
 
 	// 不启动 worker，任务就一直排队。
 	q := NewJobQueue(s, func(ctx context.Context, job *Job, progress func(string, map[string]any), report func(Step)) (string, error) {
@@ -244,7 +244,7 @@ func TestQueueCancelQueuedJob(t *testing.T) {
 // 队列满了要拒绝新任务，别无限堆积。
 func TestQueueRejectsWhenFull(t *testing.T) {
 	s := newTestStore(t)
-	p, _ := s.AddProject("项目")
+	p, _ := s.AddProject("项目", "series")
 	q := NewJobQueue(s, func(ctx context.Context, job *Job, progress func(string, map[string]any), report func(Step)) (string, error) {
 		return "x", nil
 	})
@@ -261,7 +261,7 @@ func TestQueueRejectsWhenFull(t *testing.T) {
 // 已结束的任务不能再取消。
 func TestQueueCancelFinishedJob(t *testing.T) {
 	s := newTestStore(t)
-	p, _ := s.AddProject("项目")
+	p, _ := s.AddProject("项目", "series")
 	s.state.Jobs = append(s.state.Jobs, &Job{
 		ID: newID(), ProjectID: p.ID, Status: "succeeded",
 		Input: map[string]any{}, CreatedAt: nowISO(), UpdatedAt: nowISO(),

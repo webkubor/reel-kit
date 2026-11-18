@@ -8,7 +8,7 @@ import (
 // 没绑定中台项目时，角色/场景一律拒绝读写 —— 空工作区会列出账号下全部主体。
 func TestUnboundProjectRefusesSubjects(t *testing.T) {
 	s := newTestStore(t)
-	p, _ := s.AddProject("沸腾之雪")
+	p, _ := s.AddProject("沸腾之雪", "series")
 	e := &Engine{store: s}
 	if _, err := e.ListProjectSubjects(p.ID); !errors.Is(err, errProjectUnbound) {
 		t.Fatalf("未绑定应拒绝列主体：%v", err)
@@ -27,7 +27,7 @@ func TestUnboundProjectRefusesSubjects(t *testing.T) {
 // 绑定落盘，重开工作台仍在；老项目没有这个字段照常打开。
 func TestProjectWorkspaceBindingPersists(t *testing.T) {
 	s := newTestStore(t)
-	p, _ := s.AddProject("沸腾之雪")
+	p, _ := s.AddProject("沸腾之雪", "series")
 	if _, err := s.SetProjectWorkspace(p.ID, "ws-snow", "沸腾之雪"); err != nil {
 		t.Fatal(err)
 	}

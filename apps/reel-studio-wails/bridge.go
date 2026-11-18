@@ -197,6 +197,28 @@ func (a *App) ImportYouTubeEpisodes(projectID, channelID string) ([]*Episode, er
 	return a.engine.ImportYouTubeEpisodes(context.Background(), projectID, channelID)
 }
 
+// GetAIProviderStatus 报当前 AI 提供方状态（MUSE AV / 直连）。
+func (a *App) GetAIProviderStatus() AIProviderStatus {
+	return a.engine.GetAIProviderStatus()
+}
+
+// SetAIProvider 切换 AI 提供方：museav 或 direct。
+func (a *App) SetAIProvider(provider string) (AIProviderStatus, error) {
+	return a.engine.SetAIProvider(provider)
+}
+
+// ListAssetTemplates 列内置素材模板（kind: person / scene，空 = 全部）。
+func (a *App) ListAssetTemplates(kind string) []AssetTemplate {
+	return a.engine.ListAssetTemplates(kind)
+}
+
+// GenerateTemplate 按模板为角色或场景生成一组素材（联网，可能计费）。
+func (a *App) GenerateTemplate(subjectID, templateKey string) ([]string, error) {
+	return a.engine.GenerateTemplate(context.Background(), subjectID, templateKey, func(text string) {
+		a.emitter("template:progress")(text)
+	})
+}
+
 // ListWorkspaces 列可绑定的中台项目。
 func (a *App) ListWorkspaces() ([]WorkspaceOption, error) {
 	return a.engine.ListWorkspaces()
@@ -210,6 +232,11 @@ func (a *App) BindProjectWorkspace(projectID, workspaceID string) (*Project, err
 // ListProjectSubjects 列项目绑定的中台项目里的角色与场景。
 func (a *App) ListProjectSubjects(projectID string) ([]*Subject, error) {
 	return a.engine.ListProjectSubjects(projectID)
+}
+
+// CreateProject 新建项目（kind: series 短剧 / clip 短视频）。
+func (a *App) CreateProject(name string, kind string) (*Project, error) {
+	return a.engine.CreateProject(name, kind)
 }
 
 // CreateProjectScene 在项目绑定的中台项目里新建场景。

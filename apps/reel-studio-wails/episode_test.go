@@ -59,7 +59,7 @@ func TestMakeEpisodeEndToEnd(t *testing.T) {
 		t.Skip("ffmpeg unavailable")
 	}
 	s := newTestStore(t)
-	p, _ := s.AddProject("沸腾之雪")
+	p, _ := s.AddProject("沸腾之雪", "series")
 	e := &Engine{store: s}
 	e.speechOverride = fakeSpeech(t, s)
 
@@ -106,7 +106,7 @@ func TestMakeEpisodeNarrationTooLong(t *testing.T) {
 		t.Skip("ffmpeg unavailable")
 	}
 	s := newTestStore(t)
-	p, _ := s.AddProject("沸腾之雪")
+	p, _ := s.AddProject("沸腾之雪", "series")
 	e := &Engine{store: s}
 	e.speechOverride = fakeSpeech(t, s)
 	clip := fakeH3Clip(t, s, p.ID, true)
