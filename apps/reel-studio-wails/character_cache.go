@@ -287,7 +287,7 @@ func (e *Engine) cacheOneCharacter(ctx context.Context, client *MuseavClient, su
 			continue
 		}
 		mirrorAssets = append(mirrorAssets, MirrorAsset{AssetID: asset.ID, Name: ref.Name, Role: ref.Role, URL: ref.URL})
-		if isAvatarAsset(ref.Name) && !portrait.HasAvatar {
+		if isAvatarAsset(ref.Name) && !isRealFaceAsset(ref.Name) && !portrait.HasAvatar {
 			portrait.HasAvatar = true
 			portrait.AvatarURL = "/media/" + asset.ID
 		}
@@ -313,6 +313,10 @@ func (e *Engine) cacheOneCharacter(ctx context.Context, client *MuseavClient, su
 }
 
 func isAvatarAsset(name string) bool { return strings.Contains(name, "头像") }
+func isRealFaceAsset(name string) bool {
+	return strings.Contains(name, "真人参考") || strings.Contains(name, "脸部参考") || strings.Contains(name, "真人") || strings.Contains(name, "face")
+}
+
 func isWeaponAsset(name string) bool {
 	return strings.Contains(name, "武器") || strings.Contains(name, "面具") || strings.Contains(name, "兵器") || strings.Contains(name, "枪") || strings.Contains(name, "剑") || strings.Contains(name, "刀") || strings.Contains(name, "弓") || strings.Contains(name, "笛") || strings.Contains(name, "锤")
 }
@@ -379,7 +383,7 @@ func (e *Engine) ListCharacterPortraits(projectID string) ([]CharacterPortrait, 
 				}
 			}
 			for _, a := range mirror.Assets {
-				if isAvatarAsset(a.Name) {
+				if isAvatarAsset(a.Name) && !isRealFaceAsset(a.Name) {
 					p.HasAvatar = true
 					p.AvatarURL = "/media/" + a.AssetID
 					break
@@ -387,7 +391,7 @@ func (e *Engine) ListCharacterPortraits(projectID string) ([]CharacterPortrait, 
 			}
 			if !p.HasAvatar {
 				for _, a := range mirror.Assets {
-					if !isWeaponAsset(a.Name) {
+					if !isWeaponAsset(a.Name) && !isRealFaceAsset(a.Name) {
 						p.HasAvatar = true
 						p.AvatarURL = "/media/" + a.AssetID
 						break

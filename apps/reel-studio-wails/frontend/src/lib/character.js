@@ -37,32 +37,31 @@ export const VIEWS = [
 // 兵器与道具（面具、面甲等）单独成组：它们不是人物定妆，不该和三视图挤在一起。
 const isWeapon = (name) => /笛|枪|刀|剑|弓|锤|兵器|武器|面具|面甲|道具/.test(name || '') && !/三视图|定妆/.test(name || '')
 
-// 头像：有「-头像」素材就用它（每个角色自己的头像），否则退回正面视图 > 定妆稿。
+// 真人参考：现实照片质感或来源标注「真人/脸部参考」，永远不进角色形象区。
+const isRealFace = (name) => /真人参考|脸部参考|真人|face|photo/i.test(name || '')
+
+// 头像：只从「角色头像」类选（真人参考除外），否则退回定妆立绘 > 三视图。
+// 规则见 docs/asset-classification.md：角色是电影角色，真人参考只是建模参考。
 export function pickPortrait(c) {
   if (!c) return null
-  const avatar = (c.references || []).find((a) => /头像|avatar/i.test(a.name || '') && a.url)
+  const avatar = (c.references || []).find((a) => /头像|avatar/i.test(a.name || '') && a.url && !isRealFace(a.name))
   if (avatar) return avatar
   const front = (c.assets || []).find((a) => a.view === 'front' && a.url)
   if (front) return front
-  const refs = (c.references || []).filter((a) => a.url)
-  return refs.find((a) => /三视图|定妆|turnaround/i.test(a.name || '')) || refs.find((a) => !isWeapon(a.name)) || null
+  const refs = (c.references || []).filter((a) => a.url && !isRealFace(a.name))
+  return refs.find((a) => /定妆|costume|立绘/i.test(a.name || '')) || refs.find((a) => /三视图|turnaround/i.test(a.name || '')) || null
 }
 
-// 素材按类型分组，角色详情里分开展示，画面素材不进角色物料。
-//
-// 命名约定（导入时按此归类）：
-//   -头像 / avatar           → 头像
-//   -定妆 / 定妆照 / costume  → 定妆立绘
-//   -三视图 / turnaround     → 三视图
-//   兵器/面具/道具关键词      → 兵器与道具
-//   其余                      → 画面素材（不进角色详情，另列）
+// 素材按类型分组（见 docs/asset-classification.md 六类）：
+//   角色头像 / 定妆立绘 / 三视图 / 兵器与道具 / 真人参考 / 画面素材
 export function groupReferences(c) {
   const refs = (c?.references || []).filter((a) => a.url)
-  const avatars = refs.filter((a) => /头像|avatar/i.test(a.name || ''))
+  const realFaces = refs.filter((a) => isRealFace(a.name))
+  const avatars = refs.filter((a) => /头像|avatar/i.test(a.name || '') && !isRealFace(a.name))
   const sheets = refs.filter((a) => /三视图|turnaround/i.test(a.name || ''))
   const costumes = refs.filter((a) => /定妆|costume|立绘/i.test(a.name || ''))
   const weapons = refs.filter((a) => isWeapon(a.name))
-  const inRole = new Set([...avatars, ...sheets, ...costumes, ...weapons].map((a) => a.url))
+  const inRole = new Set([...realFaces, ...avatars, ...sheets, ...costumes, ...weapons].map((a) => a.url))
   const scenes = refs.filter((a) => !inRole.has(a.url))
-  return { avatars, sheets, costumes, weapons, scenes }
+  return { avatars, sheets, costumes, weapons, realFaces, scenes }
 }

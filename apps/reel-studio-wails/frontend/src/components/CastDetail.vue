@@ -58,6 +58,21 @@ const canShoot = computed(() => (character.value?.references || []).length || (c
         <p v-else-if="!character" class="text-2xs text-ink-lo">正在从中台读取角色物料…</p>
 
         <template v-else>
+          <section v-if="groups.realFaces.length" class="mb-5">
+            <h3 class="label">真人参考 <span class="label-hint">{{ groups.realFaces.length }} 张 · 非角色形象</span></h3>
+            <p class="mb-2 rounded-md border border-dashed border-line px-3 py-2 text-2xs leading-relaxed text-ink-lo">
+              这是给 AI 建模参考的真人照片，不是这个角色在剧里的形象；出镜不会用它锁定长相。
+            </p>
+            <div class="grid grid-cols-3 gap-3">
+              <button v-for="a in groups.realFaces" :key="a.id || a.url" type="button"
+                class="overflow-hidden rounded-md border border-line bg-paper text-left transition-colors hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                @click="preview = a">
+                <img :src="a.url" :alt="a.name" loading="lazy" class="block h-36 w-full object-contain" />
+                <span class="block truncate px-2.5 py-1.5 text-2xs text-ink-lo">{{ a.name }}</span>
+              </button>
+            </div>
+          </section>
+
           <section v-if="groups.avatars.length" class="mb-5">
             <h3 class="label">头像 <span class="label-hint">{{ groups.avatars.length }} 张</span></h3>
             <div class="grid grid-cols-3 gap-3">
