@@ -86,7 +86,8 @@ func (e *Engine) MakeEpisode(ctx context.Context, input EpisodeInput, progress P
 	// 旁白：逐句出音，拼成一条带停顿的整轨。
 	var voiceClips []VoiceClip
 	if len(lines) > 0 {
-		backend := firstNonEmpty(input.VoiceBackend, "sherpa")
+		// 没指定语音通道时选第一个就绪的：写死 sherpa 会因缺模型资源直接失败
+		backend := firstNonEmpty(input.VoiceBackend, e.defaultVoiceBackend())
 		origin := VoiceChannelInfo(backend)
 		files := []string{}
 		durs := []float64{}

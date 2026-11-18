@@ -259,3 +259,24 @@ func writeJSONFile(root, name string, value any) error {
 
 // jsonUnmarshal 解析 JSON。
 func jsonUnmarshal(data []byte, v any) error { return json.Unmarshal(data, v) }
+
+// defaultVoiceBackend 选一个可用的语音通道。
+//
+// 写死 sherpa 的问题是：它常缺本机模型资源，首选它就等于默认失败。
+// 这里按「本机离线优先、不联网优先」的顺序挑第一个就绪的通道。
+func (e *Engine) defaultVoiceBackend() string {
+	for _, c := range e.VoiceChannels() {
+		if c.Ready {
+			switch c.Origin {
+			case "local-offline":
+				return c.ID
+			}
+		}
+	}
+	for _, c := range e.VoiceChannels() {
+		if c.Ready {
+			return c.ID
+		}
+	}
+	return "sherpa"
+}

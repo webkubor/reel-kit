@@ -1737,8 +1737,10 @@
       var button = el('button', 'project-item', asset.name || '成片')
       button.type = 'button'
       button.addEventListener('click', function () { showVideo(asset.id) })
-      // 中台出的出镜素材还不是成片：旁边给一个「做成片」，加旁白、混声音。
-      if (asset.source === 'museav') {
+      // 出镜素材还不是成片：旁边给一个「做成片」，加旁白、混声音。
+      // 本机合成的成片同样可以重混加旁白 —— MakeEpisode 只要求一条视频素材。
+      // museav = 中台出的镜素材；muse-tv = 本机合成的成片（可再配音重混）
+      if (asset.source === 'museav' || asset.source === 'muse-tv') {
         var row = el('div', 'flex items-center gap-1')
         button.classList.add('min-w-0', 'flex-1')
         row.appendChild(button)
@@ -1782,7 +1784,11 @@
       .then(function (asset) {
         state.episodeBusy = false
         $('btn-submit-episode').disabled = false
+        // 收尾：关对话框、清提示。进度事件可能晚一步到，得先把忙碌标记撤掉，
+        // 否则「正在合成成片…」会留在已关的对话框上。
         $('episode-dialog').close()
+        $('episode-hint').textContent = ''
+        state.episodeClip = null
         return loadAssets().then(function () { if (asset && asset.id) showVideo(asset.id) })
       })
       .catch(function (err) {
