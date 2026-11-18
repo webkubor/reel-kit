@@ -318,23 +318,38 @@ func (e *Engine) ListCharacters(workspace string) ([]*Character, error) {
 // 没有镜像才回中台读，并把读到的结果写进本地镜像。
 func (e *Engine) GetCharacter(subjectID string) (*Character, error) {
 	if e.store != nil {
-		if mirror, ok := e.mirrorBySubjectID(subjectID); ok && len(mirror.Assets) > 0 {
+		// 有视图就算有：只有参考素材、没有视图的镜像同样是有效缓存
+		if mirror, ok := e.mirrorBySubjectID(subjectID); ok &&
+			(len(mirror.Assets) > 0 || len(mirror.Views) > 0) {
 			return e.characterFromMirror(mirror), nil
 		}
+	}
+	// 缓存的详情先给：素材没变的话不必再问中台（实测一个角色要 27 秒）。
+	// 没有素材的角色也要缓存 —— 那正是最慢的一类。
+	if c, ok := e.LoadCharacterDetail(subjectID); ok && len(c.Traits) > 0 {
+		return c, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), characterRequestTimeout)
 	defer cancel()
 	client := &MuseavClient{}
 	if err := client.Available(ctx); err != nil {
+		// 中台不可用：先看本机快照，再如实报错
+		if c, snapErr := e.characterFromSnapshot(subjectID); snapErr == nil {
+			return c, nil
+		}
 		return nil, err
 	}
 	detail, err := client.ShowSubject(ctx, subjectID)
 	if err != nil {
+		if c, snapErr := e.characterFromSnapshot(subjectID); snapErr == nil {
+			return c, nil
+		}
 		return nil, err
 	}
 	character := subjectToCharacter(*detail, "", e.sourceBatchFor(detail.Subject.ID))
 	if e.store != nil {
 		_ = e.SaveCharacterMirror(character)
+		_ = e.SaveCharacterDetail(subjectID, character)
 	}
 	return character, nil
 }

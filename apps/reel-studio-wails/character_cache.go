@@ -221,6 +221,46 @@ func (e *Engine) mirrorBySubjectID(subjectID string) (*CharacterMirror, bool) {
 	return nil, false
 }
 
+// CharacterDetailCache 角色详情的本地缓存目录。
+func (e *Engine) characterDetailCacheDir() string {
+	return filepath.Join(e.store.Root(), "character-details")
+}
+
+// SaveCharacterDetail 缓存一次角色详情。
+//
+// 中台读一个没素材的角色要 27 秒（实测），点开详情时干等太久。
+// 读过一次就存到本地，之后秒开；素材变了再刷新（RefreshCharacterCache 会清）。
+func (e *Engine) SaveCharacterDetail(subjectID string, c *Character) error {
+	if e.store == nil || c == nil {
+		return errNoStore
+	}
+	dir := e.characterDetailCacheDir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, subjectID+".json"), data, 0o600)
+}
+
+// LoadCharacterDetail 读缓存的角色详情。
+func (e *Engine) LoadCharacterDetail(subjectID string) (*Character, bool) {
+	if e.store == nil || strings.ContainsAny(subjectID, `/\\.`) {
+		return nil, false
+	}
+	data, err := os.ReadFile(filepath.Join(e.characterDetailCacheDir(), subjectID+".json"))
+	if err != nil {
+		return nil, false
+	}
+	var c Character
+	if json.Unmarshal(data, &c) != nil {
+		return nil, false
+	}
+	return &c, true
+}
+
 // RefreshCharacterCache 把项目所有角色的素材下载并登记进本地素材库。
 //
 // 返回每个角色「本地化了几张、失败了几张」的报告；失败不阻断（网络抖动

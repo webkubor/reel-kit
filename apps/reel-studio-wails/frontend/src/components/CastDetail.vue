@@ -55,7 +55,10 @@ const canShoot = computed(() => (character.value?.references || []).length || (c
 
       <div class="overflow-y-auto px-5 py-4">
         <p v-if="error" class="help help-error">读不到角色详情：{{ error }}</p>
-        <p v-else-if="!character" class="text-2xs text-ink-lo">正在从中台读取角色物料…</p>
+        <p v-else-if="!character" class="text-2xs text-ink-lo">正在从中台读取角色物料…（中台慢时会等一会儿）</p>
+        <p v-else-if="!(character.references?.length || character.assets?.length)" class="mt-3 rounded-md border border-dashed border-line px-3 py-2.5 text-2xs leading-relaxed text-ink-lo">
+          这个角色还没有任何图。出镜需要参考图锁定长相，先用「素材模板」补一套定妆或三视图。
+        </p>
 
         <template v-else>
           <section v-if="groups.realFaces.length" class="mb-5">
@@ -150,7 +153,8 @@ const canShoot = computed(() => (character.value?.references || []).length || (c
 
             <section>
               <template v-if="character.looks?.length">
-                <h3 class="label">装扮</h3>
+                <!-- 这里列的是「出镜时可切换的装扮名」，不是素材图片 -->
+                <h3 class="label">可选装扮 <span class="label-hint">{{ character.looks.length }} 套</span></h3>
                 <div class="mb-4 flex flex-wrap gap-1.5">
                   <span v-for="l in character.looks" :key="l" class="badge">{{ l }}</span>
                 </div>

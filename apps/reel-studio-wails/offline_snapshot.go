@@ -214,3 +214,73 @@ func (e *Engine) sceneDescriptionFromSnapshot(workspace, sceneID string) (string
 	}
 	return desc, nil
 }
+
+// characterFromSnapshot 从本机快照拼出角色详情。
+//
+// 快照里有主体的设定与素材名，但没有下载好的图；这里给的是「有哪些素材」
+// 的清单，图片仍要靠本机素材库。断网时至少让用户知道这个角色缺什么。
+func (e *Engine) characterFromSnapshot(subjectID string) (*Character, error) {
+	if e.store == nil {
+		return nil, errNoStore
+	}
+	dirs, err := snapshotDirs(e.store.Root())
+	if err != nil {
+		return nil, err
+	}
+	for _, dir := range dirs {
+		f, err := readSnapshotSubject(dir, subjectID)
+		if err != nil {
+			continue
+		}
+		c := &Character{
+			ID: f.Subject.ID, Name: f.Subject.Name, Kind: f.Subject.Kind,
+			References: []CharacterAsset{}, Assets: []CharacterAsset{}, Looks: []string{},
+		}
+		if f.Subject.PersonaSource != nil {
+			c.Persona = *f.Subject.PersonaSource
+		}
+		for k, v := range f.Subject.Traits {
+			c.Traits = append(c.Traits, CharacterTrait{Key: k, Value: traitText(v)})
+		}
+		for _, a := range f.Assets {
+			c.References = append(c.References, CharacterAsset{
+				ID: a.ID, Name: a.Name, Role: a.Role, URL: "",
+			})
+		}
+		c.Complete, c.Missing, c.Warnings = EvaluateCharacter(c)
+		return c, nil
+	}
+	return nil, errors.New("本机快照里没有这个角色")
+}
+
+// snapshotDirs 列出所有快照目录（按捕获时间从新到旧）。
+func snapshotDirs(root string) ([]string, error) {
+	base := filepath.Join(root, "museav-snapshots")
+	entries, err := os.ReadDir(base)
+	if err != nil {
+		return nil, errors.New("本机没有快照")
+	}
+	type found struct{ dir, at string }
+	var hits []found
+	for _, ent := range entries {
+		if !ent.IsDir() {
+			continue
+		}
+		dir := filepath.Join(base, ent.Name())
+		data, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+		if err != nil {
+			continue
+		}
+		var m snapshotManifest
+		if json.Unmarshal(data, &m) != nil {
+			continue
+		}
+		hits = append(hits, found{dir, m.CapturedAt})
+	}
+	sort.Slice(hits, func(i, j int) bool { return hits[i].at > hits[j].at })
+	out := make([]string, 0, len(hits))
+	for _, h := range hits {
+		out = append(out, h.dir)
+	}
+	return out, nil
+}
