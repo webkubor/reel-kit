@@ -614,10 +614,17 @@ func (s *StudioStore) DeleteProject(projectID string) error {
 		return err
 	}
 	for _, a := range doomed {
+		// 路径必须真的在 media 目录里才算数：
+		// 只比前缀的话，root=/data/studio 会把 /data/studio-other/x 也算进来。
 		path := filepath.Join(s.root, "media", a.File)
-		if path != "" && strings.HasPrefix(path, s.root) {
-			_ = os.Remove(path)
+		if path == "" {
+			continue
 		}
+		rel, err := filepath.Rel(filepath.Join(s.root, "media"), path)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
+		}
+		_ = os.Remove(path)
 	}
 	return nil
 }
