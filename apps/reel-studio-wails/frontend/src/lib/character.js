@@ -55,7 +55,15 @@ export function pickPortrait(c) {
 // 素材按类型分组（见 docs/asset-classification.md 六类）：
 //   角色头像 / 定妆立绘 / 三视图 / 兵器与道具 / 真人参考 / 画面素材
 export function groupReferences(c) {
-  const refs = (c?.references || []).filter((a) => a.url)
+  const seen = new Set()
+  const refs = (c?.references || []).filter((a) => {
+    if (!a.url) return false
+    // 同一素材（assetId 或 URL）只出现一次：导入去重后仍可能有同名不同 URL
+    const key = a.id || a.url
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
   const realFaces = refs.filter((a) => isRealFace(a.name))
   const avatars = refs.filter((a) => /头像|avatar/i.test(a.name || '') && !isRealFace(a.name))
   const sheets = refs.filter((a) => /三视图|turnaround/i.test(a.name || ''))

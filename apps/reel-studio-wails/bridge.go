@@ -187,6 +187,16 @@ func (a *App) DeleteProject(projectID string) error {
 	return a.engine.DeleteProject(projectID)
 }
 
+// ListYouTubeEpisodes 列 YouTube 频道里能认出局数的集（导入预览）。
+func (a *App) ListYouTubeEpisodes(channelID string) ([]YouTubeEpisode, error) {
+	return a.engine.ListYouTubeEpisodes(context.Background(), channelID)
+}
+
+// ImportYouTubeEpisodes 把 YouTube 频道的剧集导入到项目。
+func (a *App) ImportYouTubeEpisodes(projectID, channelID string) ([]*Episode, error) {
+	return a.engine.ImportYouTubeEpisodes(context.Background(), projectID, channelID)
+}
+
 // ListWorkspaces 列可绑定的中台项目。
 func (a *App) ListWorkspaces() ([]WorkspaceOption, error) {
 	return a.engine.ListWorkspaces()

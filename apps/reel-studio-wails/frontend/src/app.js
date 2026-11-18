@@ -269,6 +269,9 @@
     $('tab-cast').addEventListener('click', function () { setView('cast') })
     $('tab-scene').addEventListener('click', function () { setView('scene') })
     $('btn-new-episode').addEventListener('click', openEpisodeDialog2)
+    $('btn-import-episode').addEventListener('click', openImportDialog)
+    $('import-episode-form').addEventListener('submit', submitImportEpisodes)
+    $('btn-cancel-import-episode').addEventListener('click', function () { $('import-episode-dialog').close() })
     $('new-episode-form').addEventListener('submit', submitNewEpisode)
     $('btn-cancel-new-episode').addEventListener('click', function () { $('new-episode-dialog').close() })
     $('new-shot-form').addEventListener('submit', submitNewShot)
@@ -644,14 +647,25 @@
       var button = el('button', 'project-item' + (episode.id === state.episodeId ? ' is-active' : ''))
       button.type = 'button'
       var row = el('span', 'flex min-w-0 flex-1 items-baseline gap-2')
-      row.appendChild(el('span', 'text-[10px] font-semibold tabular-nums text-ink-dim', String(episode.number).padStart(2, '0')))
+      // 序章（number=0）显示「序」，正片用两位序号
+      var numLabel = episode.number === 0 ? '序' : String(episode.number).padStart(2, '0')
+      row.appendChild(el('span', 'text-[10px] font-semibold tabular-nums text-ink-dim', numLabel))
       row.appendChild(el('span', 'truncate', episode.title || '未命名剧集'))
+      // 已发布的集标一个平台徽章，点开能直接内嵌播放
+      if (episode.publishPlatform) {
+        var tag = el('span', 'badge shrink-0')
+        tag.textContent = episode.publishPlatform === 'youtube' ? 'YouTube' : episode.publishPlatform
+        row.appendChild(tag)
+      }
       button.appendChild(el('span', 'project-dot'))
       button.appendChild(row)
       button.addEventListener('click', function () {
         state.episodeId = episode.id
         paintEpisodes()
         refreshShots()
+        var picked = state.episodes.filter(function (e) { return e.id === state.episodeId })[0]
+        if (picked && picked.videoId) showYouTube(picked.videoId)
+        else clearStageEmbed()
       })
       list.appendChild(button)
     })
@@ -763,6 +777,37 @@
     if (dialog.showModal) dialog.showModal()
     else dialog.setAttribute('open', 'open')
     $('shot-title').focus()
+  }
+
+  function openImportDialog() {
+    if (!state.projectId) {
+      fail(new Error('先选一个项目'))
+      return
+    }
+    $('import-episode-form').reset()
+    $('import-episode-error').textContent = ''
+    var dialog = $('import-episode-dialog')
+    if (dialog.showModal) dialog.showModal()
+    else dialog.setAttribute('open', 'open')
+    $('import-channel').focus()
+  }
+
+  function submitImportEpisodes(event) {
+    event.preventDefault()
+    var channel = ($('import-channel').value || '').trim()
+    if (!channel) {
+      $('import-episode-error').textContent = '请填写频道 id'
+      return
+    }
+    app().ImportYouTubeEpisodes(state.projectId, channel).then(function (episodes) {
+      $('import-episode-dialog').close()
+      return refreshEpisodes().then(function () {
+        $('run-hint').textContent = '已导入 ' + episodes.length + ' 集'
+        $('run-hint').classList.remove('help-error')
+      })
+    }).catch(function (err) {
+      $('import-episode-error').textContent = String(err && err.message ? err.message : err)
+    })
   }
 
   function openSceneDialog() {
@@ -1757,6 +1802,7 @@
 
   function showImage() {
     if (!state.selectedAsset) return
+    clearStageEmbed()
     $('stage-video').pause()
     $('stage-video').classList.add('hidden')
     $('stage-canvas').classList.add('hidden')
@@ -1771,7 +1817,30 @@
     $('stage-note').textContent = '图片原图 · ' + (findAsset(state.selectedAsset).name || '')
   }
 
+  // 已发布的剧集：用 YouTube 内嵌播放器直接放（不下载、不转存）。
+  function showYouTube(videoID) {
+    var box = $('stage-youtube')
+    if (!box || !videoID) return
+    $('stage-image').classList.add('hidden')
+    $('stage-video').classList.add('hidden')
+    $('stage-canvas').classList.add('hidden')
+    box.classList.remove('hidden')
+    box.innerHTML = '<iframe class="h-full w-full" src="https://www.youtube-nocookie.com/embed/' +
+      encodeURIComponent(videoID) + '?rel=0" title="已发布剧集" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>'
+    $('stage-note').textContent = '已发布版本 · YouTube 内嵌播放'
+    $('btn-export').classList.add('hidden')
+  }
+
+  // 切回本地成片/素材时，收起 YouTube 播放器。
+  function clearStageEmbed() {
+    var box = $('stage-youtube')
+    if (!box) return
+    box.classList.add('hidden')
+    box.innerHTML = ''
+  }
+
   function showVideo(assetID) {
+    clearStageEmbed()
     $('stage-image').classList.add('hidden')
     var video = $('stage-video')
     var canvas = $('stage-canvas')

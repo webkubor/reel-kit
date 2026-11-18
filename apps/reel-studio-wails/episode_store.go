@@ -33,9 +33,19 @@ type Episode struct {
 	// SceneID 本集主场景（中台主体 id，kind=scene）。
 	SceneID string `json:"sceneId,omitempty"`
 	// Status draft | making | done。
-	Status    string `json:"status,omitempty"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	Status string `json:"status,omitempty"`
+	// PublishURL 已发布平台的这一集链接（YouTube/B站等），空 = 还没发。
+	PublishURL string `json:"publishUrl,omitempty"`
+	// PublishTitle 发布平台上的标题。
+	PublishTitle string `json:"publishTitle,omitempty"`
+	// PublishPlatform 发布平台：youtube | bilibili | douyin | …，空 = 未知。
+	PublishPlatform string `json:"publishPlatform,omitempty"`
+	// VideoID 发布平台上的视频 id（YouTube 的 11 位 id），用于内嵌播放。
+	VideoID string `json:"videoId,omitempty"`
+	// ThumbnailURL 封面图。
+	ThumbnailURL string `json:"thumbnailUrl,omitempty"`
+	CreatedAt    string `json:"createdAt"`
+	UpdatedAt    string `json:"updatedAt"`
 }
 
 // EpisodeShot 一集里的一个镜头。
@@ -79,6 +89,12 @@ type EpisodeDraft struct {
 	Summary      string
 	CharacterIDs []string
 	SceneID      string
+	// 发布信息：导入已发布的剧集时带上，界面可直接内嵌播放。
+	PublishURL      string
+	PublishTitle    string
+	PublishPlatform string
+	VideoID         string
+	ThumbnailURL    string
 }
 
 // ShotInput 新建一个镜头的参数。
@@ -119,7 +135,10 @@ func (s *StudioStore) AddEpisode(in EpisodeDraft) (*Episode, error) {
 		ID: newID(), ProjectID: in.ProjectID, Number: number, Title: title,
 		Summary: strings.TrimSpace(in.Summary), CharacterIDs: append([]string(nil), in.CharacterIDs...),
 		SceneID: strings.TrimSpace(in.SceneID), Status: "draft",
-		CreatedAt: now, UpdatedAt: now,
+		PublishURL: strings.TrimSpace(in.PublishURL), PublishTitle: strings.TrimSpace(in.PublishTitle),
+		PublishPlatform: strings.TrimSpace(in.PublishPlatform), VideoID: strings.TrimSpace(in.VideoID),
+		ThumbnailURL: strings.TrimSpace(in.ThumbnailURL),
+		CreatedAt:    now, UpdatedAt: now,
 	}
 	s.state.Episodes = append(s.state.Episodes, ep)
 	if err := s.saveLocked(); err != nil {
