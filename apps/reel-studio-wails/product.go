@@ -399,7 +399,7 @@ func (e *Engine) MakeProductVideo(ctx context.Context, input ProductInput, progr
 	}
 	hasAudio := true
 	return e.store.AddAsset(input.ProjectID, fmt.Sprintf("%s.mp4", firstNonEmpty(input.Title, "产品介绍")), "video/mp4", data, map[string]any{
-		"source":   "reel-kit",
+		"source":   "muse-tv",
 		"origin":   "code",
 		"engine":   "本地合成（渲染 + ffmpeg）",
 		"width":    layout.Width,

@@ -326,7 +326,7 @@ func (a *App) ExportVideo(projectID, assetID string) (string, error) {
 		return "", fmt.Errorf("只能导出 MP4 成片")
 	}
 	destination, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title: "导出成片", DefaultFilename: "reel-studio.mp4",
+		Title: "导出成片", DefaultFilename: "muse-tv.mp4",
 		Filters: []runtime.FileFilter{{DisplayName: "MP4 视频", Pattern: "*.mp4"}},
 	})
 	if err != nil || destination == "" {

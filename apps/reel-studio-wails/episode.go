@@ -13,7 +13,7 @@ import (
 // 成片：一条 H3 出镜素材 + 旁白 + 环境声/配乐 → 一集。
 //
 // H3 单条最长 15 秒，正好是沸腾之雪一集的长度，所以一集 = 一条镜头。
-// 画面不动（不重渲、不加字），只做 reel-kit 本行：配音与混音。
+// 画面不动（不重渲、不加字），只做 muse-tv 本行：配音与混音。
 //
 // 字幕：不烧。沸腾之雪的交付红线明确「无字幕；无字卡」，红线高于习惯。
 //
@@ -162,7 +162,7 @@ func (e *Engine) MakeEpisode(ctx context.Context, input EpisodeInput, progress P
 	}
 	hasAudio := len(voiceClips) > 0 || bed != ""
 	return e.store.AddAsset(input.ProjectID, firstNonEmpty(input.Title, strings.TrimSuffix(clipAsset.Name, ".mp4")+"-成片")+".mp4", "video/mp4", data, map[string]any{
-		"source":   "reel-kit",
+		"source":   "muse-tv",
 		"origin":   "code",
 		"engine":   "本地合成（出镜素材 + 旁白 + ffmpeg）",
 		"duration": total,
