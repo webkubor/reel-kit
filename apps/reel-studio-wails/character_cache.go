@@ -362,6 +362,26 @@ func (e *Engine) cacheOneCharacter(ctx context.Context, client *MuseavClient, su
 	return portrait, nil
 }
 
+// assetName 取素材在本机素材库里的实际名字；找不到就用传入的名字。
+func (e *Engine) assetName(assetID, fallback string) string {
+	if e.store == nil || assetID == "" {
+		return fallback
+	}
+	a, err := e.store.Asset(assetID, "")
+	if err != nil || a == nil {
+		return fallback
+	}
+	if a.Name != "" {
+		return a.Name
+	}
+	return fallback
+}
+
+// isCostumeAsset 定妆立绘：单人的全身/半身立绘，可以当头像。
+func isCostumeAsset(name string) bool {
+	return strings.Contains(name, "定妆") || strings.Contains(name, "立绘")
+}
+
 func isAvatarAsset(name string) bool { return strings.Contains(name, "头像") }
 func isRealFaceAsset(name string) bool {
 	return strings.Contains(name, "真人参考") || strings.Contains(name, "脸部参考") || strings.Contains(name, "真人") || strings.Contains(name, "face")
@@ -432,16 +452,24 @@ func (e *Engine) ListCharacterPortraits(projectID string) ([]CharacterPortrait, 
 					p.ReferenceCount++
 				}
 			}
+			// 判断用「素材库里的实际名字」，不用镜像里记的名字：
+			// 两者可能对不上（镜像写「陆听潮-头像」，素材库里那张图其实叫
+			// 「陆听潮-真人参考-头.jpg」）。按镜像的名字判会以为那是头像，
+			// 结果把真人照片摆到角色列表上。
 			for _, a := range mirror.Assets {
-				if isAvatarAsset(a.Name) && !isRealFaceAsset(a.Name) {
+				real := e.assetName(a.AssetID, a.Name)
+				if isAvatarAsset(real) && !isRealFaceAsset(real) {
 					p.HasAvatar = true
 					p.AvatarURL = "/media/" + a.AssetID
 					break
 				}
 			}
 			if !p.HasAvatar {
+				// 回退到「定妆立绘」：三视图是拼图（一张图里几个视角），
+				// 拿它当头像会显示成半个人或并排三个人，不对。
 				for _, a := range mirror.Assets {
-					if !isWeaponAsset(a.Name) && !isRealFaceAsset(a.Name) {
+					real := e.assetName(a.AssetID, a.Name)
+					if isCostumeAsset(real) && !isRealFaceAsset(real) {
 						p.HasAvatar = true
 						p.AvatarURL = "/media/" + a.AssetID
 						break
