@@ -166,6 +166,13 @@
       .VoiceChannels()
       .then(function (channels) {
         state.voiceChannels = channels || []
+        // 默认语音通道不能写死：写死 sherpa，而它常缺模型资源，
+        // 用户一进短视频就被「未就绪」堵住。改成选第一个就绪的通道。
+        var picked = state.voiceChannels.filter(function (c) { return c.id === state.voiceBackend })[0]
+        if (!picked || !picked.ready) {
+          var first = state.voiceChannels.filter(function (c) { return c.ready })[0]
+          if (first) state.voiceBackend = first.id
+        }
         selects.voice = window.ReelSelect.create($('select-voice'), {
           items: voiceItems(),
           value: state.voiceBackend,
@@ -198,8 +205,14 @@
   }
 
   function voiceItems() {
-    return state.voiceChannels.filter(function (c) { return c.id === 'sherpa' }).map(function (c) {
-      return { value: c.id, label: c.label, note: c.ready ? '本机离线' : '未就绪' }
+    // 就绪的通道都可选：只挑 sherpa 会把 VoxFlow、MiniMax 挡在门外，
+    // 而 sherpa 自己常缺模型资源，最后没有任何通道能用。
+    return state.voiceChannels.map(function (c) {
+      return {
+        value: c.id,
+        label: c.label,
+        note: c.ready ? (c.note || c.origin) : (c.note || '未就绪'),
+      }
     })
   }
 
@@ -1976,7 +1989,7 @@
       return
     }
     var channel = state.voiceChannels.filter(function (item) { return item.id === state.voiceBackend })[0]
-    if (!channel || !channel.ready || state.voiceBackend !== 'sherpa') {
+    if (!channel || !channel.ready) {
       $('run-hint').textContent = channel && channel.note ? channel.note : '当前语音通道不可用。'
       $('run-hint').classList.add('help-error')
       return
