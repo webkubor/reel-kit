@@ -687,6 +687,12 @@
         var stillThere = state.episodes.some(function (e) { return e.id === state.episodeId })
         if (!stillThere) state.episodeId = state.episodes.length ? state.episodes[0].id : ''
         paintEpisodes()
+        // 自动选中的那一集已发布就直接放出来；用户手选的不动（可能正在看本地成片）
+        if (!stillThere) {
+          var first = state.episodes.filter(function (e) { return e.id === state.episodeId })[0]
+          if (first && first.videoId) showYouTube(first.videoId)
+          else clearStageEmbed()
+        }
         return state.episodeId ? refreshShots() : null
       })
       .catch(function (err) {
@@ -1667,6 +1673,10 @@
   }
 
   // ── 素材 ──────────────────────────────────────────────
+  function isRealFaceName(name) {
+    return /真人参考|脸部参考|真人|face|photo/i.test(name || '')
+  }
+
   function loadAssets() {
     if (!state.projectId) {
       state.assets = []
@@ -1680,8 +1690,10 @@
         if (projectID !== state.projectId) return
         state.videos = (assets || []).filter(function (asset) { return asset.mime === 'video/mp4' })
         renderVideos()
+        // 真人参考 / 脸部参考不是片里的角色形象，不进画面素材
+        //（见 docs/asset-classification.md：只在角色详情的「真人参考」区出现）
         state.assets = (assets || []).filter(function (asset) {
-          return (asset.mime || '').indexOf('image/') === 0
+          return (asset.mime || '').indexOf('image/') === 0 && !isRealFaceName(asset.name)
         })
         if (state.selectedAsset && !findAsset(state.selectedAsset)) state.selectedAsset = ''
         renderAssets()
