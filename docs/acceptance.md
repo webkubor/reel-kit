@@ -44,6 +44,16 @@ bash apps/reel-studio-wails/scripts/preflight.sh <包目录>
 - **真实桌面窗口**：验收全程屏幕锁定（`IOConsoleLocked = true`），截不到窗口、点不了原生控件。
   上面所有界面验收都是用无界面浏览器打开**同一套前端**做的 ——
   验证的是渲染与逻辑，原生窗口、菜单栏、系统文件选择器、导出对话框**一次都没点过**。
+
+  查证过这件事的性质：用辅助功能 API（AXUIElement）问窗口服务器，
+  锁屏时 `AXWindows` 返回 0 个窗口，但 `OnStartup` 回调**确实执行了**
+  （启动日志有「已规整 22 个素材名」）。即：原生层完整初始化，
+  是窗口服务器在锁屏时不创建窗口，不是程序起不来。
+  配套脚本（解锁后一跑就知道）：
+
+  ```bash
+  bash apps/reel-studio-wails/scripts/check-native-window.sh <muse-tv.app 路径>
+  ```
 - **付费链路**：素材模板真生成、出镜（联网生成视频）要提交计费任务，未在验收中执行。
   两者的提示词组装、命名规则、分类落位已用单元测试覆盖。
 - **Apple 公证**：只有 ad-hoc 本机签名。
