@@ -44,8 +44,15 @@ type Episode struct {
 	VideoID string `json:"videoId,omitempty"`
 	// ThumbnailURL 封面图。
 	ThumbnailURL string `json:"thumbnailUrl,omitempty"`
-	CreatedAt    string `json:"createdAt"`
-	UpdatedAt    string `json:"updatedAt"`
+	// ShotCount 本集已有多少镜头。
+	//
+	// 从 YouTube 导入的剧集只有标题和链接，出场角色与分镜都得自己做；
+	// 这个数字让界面能直接说清「哪些还只是链接」。
+	ShotCount int `json:"shotCount"`
+	// CharacterCount 本集登记了多少出场角色。
+	CharacterCount int    `json:"characterCount"`
+	CreatedAt      string `json:"createdAt"`
+	UpdatedAt      string `json:"updatedAt"`
 }
 
 // EpisodeShot 一集里的一个镜头。
@@ -165,10 +172,16 @@ func (s *StudioStore) ListEpisodes(projectID string) []*Episode {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := []*Episode{}
+	shotsPerEpisode := map[string]int{}
+	for _, sh := range s.state.Shots {
+		shotsPerEpisode[sh.EpisodeID]++
+	}
 	for _, e := range s.state.Episodes {
 		if projectID == "" || e.ProjectID == projectID {
 			cp := *e
 			cp.CharacterIDs = append([]string(nil), e.CharacterIDs...)
+			cp.ShotCount = shotsPerEpisode[e.ID]
+			cp.CharacterCount = len(e.CharacterIDs)
 			out = append(out, &cp)
 		}
 	}

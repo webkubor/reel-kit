@@ -259,6 +259,11 @@
     @apply border-accent/60 bg-lit shadow-card;
   }
 
+  /* 还没分镜的集：标出来，避免让人以为已经做完 */
+  .episode-gap {
+    @apply rounded-sm bg-err/15 px-1 text-[9px] font-medium leading-4 text-err;
+  }
+
   /* 已发布标记：一个小点，不抢标题的宽度 */
   .publish-dot {
     @apply inline-block h-1.5 w-1.5 rounded-full bg-accent/80;

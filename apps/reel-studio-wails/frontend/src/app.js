@@ -721,6 +721,44 @@
       })
   }
 
+  // 本集状态：把「已发布」和「还缺什么」摆在一起。
+  //
+  // 从 YouTube 导入的剧集只有标题和链接 —— 出场角色、分镜、场景都得自己做。
+  // 这一栏要说清哪些是现成的、哪些要补，不能让人以为导入完就成了。
+  function paintEpisodeStatus() {
+    var panel = $('episode-status')
+    var body = $('episode-status-body')
+    if (!panel || !body) return
+    var episode = state.episodes.filter(function (e) { return e.id === state.episodeId })[0]
+    clear(body)
+    if (!episode) {
+      panel.classList.add('hidden')
+      return
+    }
+    panel.classList.remove('hidden')
+    var line = function (text, kind) {
+      var row = el('div', 'flex items-baseline justify-between gap-3 text-2xs')
+      row.appendChild(el('span', kind === 'ok' ? 'text-ink-mid' : 'text-ink-lo', text))
+      row.appendChild(el('span', kind === 'ok' ? 'text-ink-dim' : 'text-ink-lo', kind === 'ok' ? '有' : '缺'))
+      body.appendChild(row)
+    }
+    if (episode.publishPlatform) {
+      var pub = el('div', 'flex items-baseline justify-between gap-3 text-2xs')
+      pub.appendChild(el('span', 'text-ink-mid', '已发布到 ' + episode.publishPlatform))
+      pub.appendChild(el('a', 'text-ink-dim underline decoration-dotted', '打开原片'))
+      pub.setAttribute('href', episode.publishUrl || '#')
+      pub.setAttribute('target', '_blank')
+      pub.setAttribute('rel', 'noreferrer')
+      body.appendChild(pub)
+    }
+    line('出场角色', (episode.characterCount || 0) > 0 ? 'ok' : 'gap')
+    line('分镜镜头', (episode.shotCount || 0) > 0 ? 'ok' : 'gap')
+    if ((episode.characterCount || 0) === 0 && (episode.shotCount || 0) === 0) {
+      body.appendChild(el('p', 'mt-1 text-2xs leading-relaxed text-ink-lo',
+        '发布平台的标题和链接能自动抓到，但出场角色和分镜要自己排 —— 视频里没有这些信息。'))
+    }
+  }
+
   function refreshShots() {
     if (!state.episodeId) {
       state.shots = []
@@ -734,10 +772,12 @@
         if (episodeID !== state.episodeId) return
         state.shots = shots || []
         paintShots()
+        paintEpisodeStatus()
       })
       .catch(function () {
         state.shots = []
         paintShots()
+        paintEpisodeStatus()
       })
   }
 
@@ -766,6 +806,17 @@
         tag.title = '已发布到 ' + episode.publishPlatform
         tag.setAttribute('aria-label', '已发布到 ' + episode.publishPlatform)
         row.appendChild(tag)
+      }
+      // 完备度：只有发布链接、还没分镜的集要标出来，不能让人以为已经做完
+      var ready = (episode.shotCount || 0) > 0 || (episode.characterCount || 0) > 0
+      if (!ready) {
+        var gap = el('span', 'episode-gap shrink-0')
+        gap.textContent = '待分镜'
+        gap.title = episode.publishPlatform
+          ? '这一集只有已发布的链接，还没有出场角色与分镜'
+          : '这一集还没有出场角色与分镜'
+        gap.setAttribute('aria-label', gap.title)
+        row.appendChild(gap)
       }
       button.appendChild(el('span', 'project-dot'))
       button.appendChild(row)
@@ -1699,7 +1750,19 @@
 
   // ── 素材 ──────────────────────────────────────────────
   function isRealFaceName(name) {
-    return /真人参考|脸部参考|真人|face|photo/i.test(name || '')
+    return /真人参考|脸部参考|真人|脸参考|face|photo/i.test(name || '')
+  }
+
+  // 画面素材只放「能当画面用的图」：定妆立绘、场景参考等。
+  //
+  // 兵器与道具、三视图拼图、真人参考都不是画面素材 ——
+  // 它们分别属于角色详情里的兵器区与真人参考区。
+  // （分类规则见 docs/asset-classification.md）
+  function isSceneMaterial(name) {
+    if (isRealFaceName(name)) return false
+    if (/场景参考|场景|画面/.test(name)) return true
+    if (/定妆|立绘/.test(name)) return true
+    return false
   }
 
   function loadAssets() {
@@ -1715,10 +1778,10 @@
         if (projectID !== state.projectId) return
         state.videos = (assets || []).filter(function (asset) { return asset.mime === 'video/mp4' })
         renderVideos()
-        // 真人参考 / 脸部参考不是片里的角色形象，不进画面素材
-        //（见 docs/asset-classification.md：只在角色详情的「真人参考」区出现）
+        // 画面素材只收能当画面的图：真人参考、兵器、三视图拼图都不算
+        //（见 docs/asset-classification.md，它们各有各的位置）
         state.assets = (assets || []).filter(function (asset) {
-          return (asset.mime || '').indexOf('image/') === 0 && !isRealFaceName(asset.name)
+          return (asset.mime || '').indexOf('image/') === 0 && isSceneMaterial(asset.name)
         })
         if (state.selectedAsset && !findAsset(state.selectedAsset)) state.selectedAsset = ''
         renderAssets()
