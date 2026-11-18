@@ -146,6 +146,14 @@ func (s *StudioStore) AddEpisode(in EpisodeDraft) (*Episode, error) {
 				number = e.Number + 1
 			}
 		}
+	} else {
+		// 显式指定集号时不能撞号：侧栏会出现两个「01」，
+		// 导入时按集号匹配也就不确定该更新哪一集。
+		for _, e := range s.state.Episodes {
+			if e.ProjectID == in.ProjectID && e.Number == number {
+				return nil, fmt.Errorf("第 %d 集已经存在了", number)
+			}
+		}
 	}
 	now := nowISO()
 	ep := &Episode{
