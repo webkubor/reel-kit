@@ -1264,11 +1264,31 @@
         item.setAttribute('aria-current', 'true')
       }
       item.appendChild(el('span', 'project-dot'))
-      item.appendChild(el('span', 'min-w-0 flex-1 truncate', project.name))
+      var text = el('span', 'min-w-0 flex-1')
+      text.appendChild(el('span', 'block truncate', project.name))
+      // 标识数据来源：绑定了中台显示「中台」，否则显示「本地」
+      var badge = el('span', 'badge mt-0.5 inline-block')
+      badge.textContent = project.workspaceId ? '中台' : '本地'
+      text.appendChild(badge)
+      item.appendChild(text)
       item.addEventListener('click', function () {
         if (selects.project) selects.project.pick(project.id)
         else switchProject(project.id)
       })
+      // 删除：只对非当前项目提供；删除本地数据不可恢复，先确认。
+      var del = el('button', 'btn btn-ghost btn-icon text-xs', '×')
+      del.setAttribute('aria-label', '删除项目 ' + project.name)
+      del.title = '删除本地项目（素材一并删除，不可恢复）'
+      del.addEventListener('click', function (event) {
+        event.stopPropagation()
+        var msg = '确定删除项目「' + project.name + '」？\n\n它会连同本项目的本地素材一起删除，无法恢复。\n中台素材不受影响。'
+        if (!window.confirm(msg)) return
+        app().DeleteProject(project.id).then(function () {
+          if (state.projectId === project.id) state.projectId = ''
+          return refreshProjects()
+        }).catch(fail)
+      })
+      item.appendChild(del)
       list.appendChild(item)
     })
   }

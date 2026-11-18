@@ -182,6 +182,11 @@ func (a *App) SceneReferenceURL(projectID, sceneID string) (string, error) {
 	return ref.URL, nil
 }
 
+// DeleteProject 删除本地项目（含名下素材），不动中台数据。
+func (a *App) DeleteProject(projectID string) error {
+	return a.engine.DeleteProject(projectID)
+}
+
 // ListWorkspaces 列可绑定的中台项目。
 func (a *App) ListWorkspaces() ([]WorkspaceOption, error) {
 	return a.engine.ListWorkspaces()

@@ -48,10 +48,21 @@ export function pickPortrait(c) {
   return refs.find((a) => /三视图|定妆|turnaround/i.test(a.name || '')) || refs.find((a) => !isWeapon(a.name)) || null
 }
 
+// 素材按类型分组，角色详情里分开展示，画面素材不进角色物料。
+//
+// 命名约定（导入时按此归类）：
+//   -头像 / avatar           → 头像
+//   -定妆 / 定妆照 / costume  → 定妆立绘
+//   -三视图 / turnaround     → 三视图
+//   兵器/面具/道具关键词      → 兵器与道具
+//   其余                      → 画面素材（不进角色详情，另列）
 export function groupReferences(c) {
   const refs = (c?.references || []).filter((a) => a.url)
-  return {
-    sheets: refs.filter((a) => !isWeapon(a.name)),
-    weapons: refs.filter((a) => isWeapon(a.name)),
-  }
+  const avatars = refs.filter((a) => /头像|avatar/i.test(a.name || ''))
+  const sheets = refs.filter((a) => /三视图|turnaround/i.test(a.name || ''))
+  const costumes = refs.filter((a) => /定妆|costume|立绘/i.test(a.name || ''))
+  const weapons = refs.filter((a) => isWeapon(a.name))
+  const inRole = new Set([...avatars, ...sheets, ...costumes, ...weapons].map((a) => a.url))
+  const scenes = refs.filter((a) => !inRole.has(a.url))
+  return { avatars, sheets, costumes, weapons, scenes }
 }

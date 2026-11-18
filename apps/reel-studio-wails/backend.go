@@ -148,6 +148,14 @@ func (e *Engine) ListProjects() []*Project {
 	return out
 }
 
+// DeleteProject 删除本地项目（含名下素材与媒体文件）。
+func (e *Engine) DeleteProject(projectID string) error {
+	if e.store == nil {
+		return errNoStore
+	}
+	return e.store.DeleteProject(projectID)
+}
+
 // CreateProject 新建项目。
 func (e *Engine) CreateProject(name string) (*Project, error) {
 	if e.store == nil {

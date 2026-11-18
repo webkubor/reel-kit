@@ -23,14 +23,18 @@ import (
 // ──────────────────────────────────────────────────────────────
 
 // CharacterPortrait 角色列表里的一格（头像 + 名字 + 素材数）。
+//
+// ReferenceCount 只算角色素材（头像/定妆/三视图），WeaponCount 单独算
+// 兵器道具——列表上「角色素材」和「兵器」分开显示，不混在一起。
 type CharacterPortrait struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	HasAvatar   bool   `json:"hasAvatar"`
-	AvatarURL   string `json:"avatarUrl,omitempty"` // /media/<id>（本地）或中台直链
-	AssetCount  int    `json:"assetCount"`
-	MirrorLocal bool   `json:"mirrorLocal"` // 素材是否已缓存到本地
-	Workspace   string `json:"workspace,omitempty"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	HasAvatar      bool   `json:"hasAvatar"`
+	AvatarURL      string `json:"avatarUrl,omitempty"` // /media/<id>（本地）或中台直链
+	ReferenceCount int    `json:"referenceCount"`
+	WeaponCount    int    `json:"weaponCount"`
+	MirrorLocal    bool   `json:"mirrorLocal"` // 素材是否已缓存到本地
+	Workspace      string `json:"workspace,omitempty"`
 }
 
 // CharacterMirror 角色的本地镜像。
@@ -256,7 +260,15 @@ func (e *Engine) cacheOneCharacter(ctx context.Context, client *MuseavClient, su
 		return nil, err
 	}
 	character := subjectToCharacter(*detail, projectID, e.sourceBatchFor(sub.ID))
-	portrait := &CharacterPortrait{ID: sub.ID, Name: character.Name, Workspace: client.Workspace, AssetCount: len(character.References) + len(character.Assets)}
+	refCount, weaponCount := 0, 0
+	for _, ref := range character.References {
+		if isWeaponAsset(ref.Name) {
+			weaponCount++
+		} else {
+			refCount++
+		}
+	}
+	portrait := &CharacterPortrait{ID: sub.ID, Name: character.Name, Workspace: client.Workspace, ReferenceCount: refCount, WeaponCount: weaponCount}
 	// 登记每一张参考图进本地素材库（头像/定妆/三视图/武器）。
 	mirrorAssets := []MirrorAsset{}
 	for _, ref := range character.References {
@@ -356,9 +368,16 @@ func (e *Engine) ListCharacterPortraits(projectID string) ([]CharacterPortrait, 
 		if sub.Kind != "person" {
 			continue
 		}
-		p := CharacterPortrait{ID: sub.ID, Name: sub.Name, Workspace: ws, AssetCount: sub.AssetCount}
+		p := CharacterPortrait{ID: sub.ID, Name: sub.Name, Workspace: ws}
 		if mirror, ok := e.mirrorBySubjectID(sub.ID); ok {
 			p.MirrorLocal = true
+			for _, a := range mirror.Assets {
+				if isWeaponAsset(a.Name) {
+					p.WeaponCount++
+				} else {
+					p.ReferenceCount++
+				}
+			}
 			for _, a := range mirror.Assets {
 				if isAvatarAsset(a.Name) {
 					p.HasAvatar = true

@@ -550,3 +550,71 @@ func truncate(s string, n int) string {
 	}
 	return string(r[:n])
 }
+
+// DeleteProject 删除一个本地项目及其名下素材（含媒体文件）。
+//
+// 只删本地数据，不动中台：绑定关系随项目一起消失，角色/场景素材
+// 仍然在中台里，换个项目重新绑定即可找回。
+func (s *StudioStore) DeleteProject(projectID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	idx := -1
+	for i, p := range s.state.Projects {
+		if p.ID == projectID {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return errors.New("项目不存在")
+	}
+	// 收集要删的素材，先删文件再删账本；文件删失败不阻断（账本为准）。
+	var doomed []*Asset
+	for _, a := range s.state.Assets {
+		if a.ProjectID == projectID {
+			doomed = append(doomed, a)
+		}
+	}
+	s.state.Projects = append(s.state.Projects[:idx], s.state.Projects[idx+1:]...)
+	assets := s.state.Assets
+	keep := assets[:0]
+	for _, a := range assets {
+		if a.ProjectID == projectID {
+			continue
+		}
+		keep = append(keep, a)
+	}
+	s.state.Assets = keep
+	s.state.Episodes = filterEpisodes(s.state.Episodes, projectID)
+	s.state.Shots = filterShots(s.state.Shots, projectID)
+	if err := s.saveLocked(); err != nil {
+		return err
+	}
+	for _, a := range doomed {
+		path := filepath.Join(s.root, "media", a.File)
+		if path != "" && strings.HasPrefix(path, s.root) {
+			_ = os.Remove(path)
+		}
+	}
+	return nil
+}
+
+func filterEpisodes(in []*Episode, projectID string) []*Episode {
+	out := in[:0]
+	for _, e := range in {
+		if e.ProjectID != projectID {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func filterShots(in []*EpisodeShot, projectID string) []*EpisodeShot {
+	out := in[:0]
+	for _, s := range in {
+		if s.ProjectID != projectID {
+			out = append(out, s)
+		}
+	}
+	return out
+}

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 
 // 头像由 CastLibrary 一次性批量传入（后端 ListCharacterPortraits），
 // 本组件只负责显示，不再逐个调 GetCharacter —— 角色库打开就是快的。
@@ -25,6 +25,16 @@ watch(
   },
   { immediate: true }
 )
+
+// 角色素材和兵器分开显示：定妆 N · 兵器 M，不再混成一个总数。
+const countLabel = computed(() => {
+  const p = props.portrait
+  if (!p) return '—'
+  const parts = []
+  if (p.referenceCount > 0) parts.push(`定妆 ${p.referenceCount}`)
+  if (p.weaponCount > 0) parts.push(`兵器 ${p.weaponCount}`)
+  return parts.length ? parts.join(' · ') : '—'
+})
 </script>
 
 <template>
@@ -54,7 +64,7 @@ watch(
     </span>
     <span class="w-full truncate text-sm font-medium text-ink">{{ subject.name || '未命名角色' }}</span>
     <span class="text-2xs text-ink-dim">
-      {{ state === 'loading' ? '读取头像…' : state === 'error' ? '头像读取失败' : state === 'empty' ? '待定头像' : `${subject.asset_count} 张图` }}
+      {{ state === 'loading' ? '读取头像…' : state === 'error' ? '头像读取失败' : state === 'empty' ? '待定头像' : countLabel }}
     </span>
   </button>
 </template>
