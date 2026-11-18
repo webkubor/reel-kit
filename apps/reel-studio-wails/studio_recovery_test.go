@@ -78,3 +78,47 @@ func TestAssetsSurviveStateLoss(t *testing.T) {
 		t.Fatalf("磁盘上的素材文件应还在，实际 %d 个", kept)
 	}
 }
+
+// 账本丢了之后能从磁盘把素材补回来。
+func TestRebuildAssetsFromDisk(t *testing.T) {
+	s := newTestStore(t)
+	p, _ := s.AddProject("重建", "series")
+	a, err := s.AddAsset(p.ID, "顾栖月-头像", "image/png", []byte("bytes"), map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 再造一个没登记的文件（模拟账本丢失前就在磁盘上的）
+	orphan := filepath.Join(s.Root(), "media", "11111111-2222-3333-4444-555555555555-夜惊鸿-三视图.png")
+	if err := os.WriteFile(orphan, []byte("orphan"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// 清掉账本里的素材记录，模拟账本丢了
+	s.mu.Lock()
+	s.state.Assets = nil
+	s.mu.Unlock()
+
+	out, err := s.RebuildAssetsFromDisk(p.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("应补回 2 个：%d", len(out))
+	}
+	names := map[string]bool{}
+	for _, x := range out {
+		names[x.Name] = true
+	}
+	if !names["顾栖月-头像"] {
+		t.Fatalf("原名没还原：%v", names)
+	}
+	if !names["夜惊鸿-三视图"] {
+		t.Fatalf("孤儿文件没补进来：%v", names)
+	}
+	if len(s.State().Assets) != 2 {
+		t.Fatalf("账本里应有 2 条：%d", len(s.State().Assets))
+	}
+	// 文件名能被还原（供下一轮重建用）
+	if got := recoverAssetName(a.File); got != "顾栖月-头像" {
+		t.Fatalf("文件名还原：%s", got)
+	}
+}

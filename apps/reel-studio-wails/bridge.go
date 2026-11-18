@@ -253,6 +253,11 @@ func (a *App) OpenMuseavLogin() error {
 	return a.engine.OpenMuseavLogin()
 }
 
+// RebuildAssetsFromDisk 从磁盘重建素材库（账本丢失或损坏后的补救）。
+func (a *App) RebuildAssetsFromDisk(projectID string) ([]*Asset, error) {
+	return a.engine.store.RebuildAssetsFromDisk(projectID)
+}
+
 // ListWorkspaces 列可绑定的中台项目。
 func (a *App) ListWorkspaces() ([]WorkspaceOption, error) {
 	return a.engine.ListWorkspaces()

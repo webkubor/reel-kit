@@ -483,7 +483,9 @@ func (s *StudioStore) AddAsset(projectID, name, mime string, bytes []byte, extra
 	}
 	a := &Asset{
 		ID: newID(), ProjectID: projectID,
-		Name: truncate(name, 160), MIME: mime, File: newID() + ext,
+		Name: truncate(name, 160), MIME: mime,
+		// 文件名带上可读的原名：账本丢了还能从磁盘上认出这是哪张图。
+		File:      newID() + "-" + sanitizeFileName(name) + ext,
 		CreatedAt: nowISO(),
 		Hash:      hash,
 	}
@@ -782,4 +784,82 @@ func (s *StudioStore) RemoveAssetsByMuseavWorkspace(projectID, workspaceID strin
 		_ = os.Remove(path)
 	}
 	return len(doomed), nil
+}
+
+// RebuildAssetsFromDisk 把 media 目录里没登记的文件补进账本。
+//
+// 账本（studio.json）丢了或损坏时，素材文件本身还在 media/ 目录里。
+// 这个函数按文件名认出素材类型与原名，把它们重新登记 ——
+// 名字里带原名就是为这一天准备的。
+//
+// 补进来的素材归到指定项目；projectID 为空则不登记，只回报会补多少。
+func (s *StudioStore) RebuildAssetsFromDisk(projectID string) ([]*Asset, error) {
+	if projectID != "" {
+		if _, err := s.Project(projectID); err != nil {
+			return nil, err
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	known := map[string]bool{}
+	for _, a := range s.state.Assets {
+		known[a.File] = true
+	}
+	entries, err := os.ReadDir(filepath.Join(s.root, "media"))
+	if err != nil {
+		return nil, nil // 没有 media 目录，没什么可补的
+	}
+	out := []*Asset{}
+	for _, ent := range entries {
+		if ent.IsDir() || known[ent.Name()] {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(ent.Name()))
+		mime := map[string]string{
+			".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+			".webp": "image/webp", ".gif": "image/gif",
+			".mp4": "video/mp4", ".wav": "audio/wav", ".mp3": "audio/mpeg",
+			".m4a": "audio/mp4", ".ogg": "audio/ogg", ".json": "application/json",
+		}[ext]
+		if mime == "" {
+			continue
+		}
+		name := recoverAssetName(ent.Name())
+		if projectID == "" {
+			out = append(out, &Asset{Name: name, MIME: mime, File: ent.Name()})
+			continue
+		}
+		full := filepath.Join(s.root, "media", ent.Name())
+		data, err := os.ReadFile(full)
+		if err != nil {
+			continue
+		}
+		a := &Asset{
+			ID: newID(), ProjectID: projectID, Name: name, MIME: mime,
+			File: ent.Name(), CreatedAt: nowISO(), Hash: HashBytes(data),
+		}
+		a.SetExtra("source", "rebuilt")
+		a.SetExtra("origin", "rebuild")
+		s.state.Assets = append(s.state.Assets, a)
+		out = append(out, a)
+	}
+	if projectID != "" && len(out) > 0 {
+		if err := s.saveLocked(); err != nil {
+			return out, err
+		}
+	}
+	return out, nil
+}
+
+// recoverAssetName 从素材文件名里还原原名。
+//
+// 新登记的文件名是 "<id>-<原名><扩展名>"；老的是纯 "<id><扩展名>"，
+// 那就只能退回文件名本身。
+func recoverAssetName(file string) string {
+	base := strings.TrimSuffix(file, filepath.Ext(file))
+	// id 是一段 36 位的 uuid，带连字符；原名从它后面开始
+	if len(base) > 36 && base[8] == '-' && base[13] == '-' && base[18] == '-' && base[23] == '-' {
+		return base[37:]
+	}
+	return base
 }

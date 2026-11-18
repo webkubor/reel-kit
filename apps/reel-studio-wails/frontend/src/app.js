@@ -276,6 +276,7 @@
     $('mode-code').addEventListener('click', function () { setMode('code') })
     $('btn-view-image').addEventListener('click', showImage)
     $('btn-pick-images').addEventListener('click', pickImages)
+    $('btn-rebuild-assets').addEventListener('click', rebuildAssets)
     $('btn-pick-images-2').addEventListener('click', pickImages)
     $('btn-export').addEventListener('click', function () {
       if (!state.projectId || !state.videoId) return
@@ -1032,6 +1033,26 @@
     }).catch(function (err) {
       if (summary) summary.textContent = '检查失败：' + String(err && err.message ? err.message : err)
     })
+  }
+
+  // 从磁盘重建素材库：账本丢了或损坏时，media/ 目录里的文件还在。
+  function rebuildAssets() {
+    if (!state.projectId) {
+      fail(new Error('先选一个项目'))
+      return
+    }
+    if (!window.confirm('扫描本机素材目录，把没登记的文件补进素材库。继续？')) return
+    app()
+      .RebuildAssetsFromDisk(state.projectId)
+      .then(function (assets) {
+        if (!assets.length) {
+          $('run-hint').textContent = '没有找到需要补登记的素材文件'
+          return
+        }
+        $('run-hint').textContent = '补回 ' + assets.length + ' 个素材'
+        return loadAssets()
+      })
+      .catch(fail)
   }
 
   function openTemplateDialog(kind) {
