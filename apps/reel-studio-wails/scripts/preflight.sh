@@ -33,6 +33,7 @@ if [[ $# -ge 1 ]]; then
   check '校验和通过' bash -c "cd '$pkg' && shasum -a 256 -c SHA256SUMS"
   check '来源 commit 在 main 上' bash -c "git -C '$here' merge-base --is-ancestor \$(python3 -c 'import json;print(json.load(open(\"$pkg/build-info.json\"))[\"commit\"])') origin/main"
   check '签名有效' codesign --verify --deep --strict "$pkg/muse-tv.app"
+  check '打包界面终检通过' bash scripts/verify-package-ui.sh "$pkg"
 fi
 
 printf '\n'
