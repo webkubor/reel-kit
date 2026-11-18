@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/fs"
 	"os"
 	"strings"
 	"testing"
@@ -36,6 +37,16 @@ func TestFrontendDistIsInSync(t *testing.T) {
 	for _, k := range []string{"可选装扮", "真人参考", "五视图"} {
 		if !strings.Contains(castText, k) {
 			t.Errorf("角色库产物缺 %q：改了组件没跑 frontend/build.sh", k)
+		}
+	}
+}
+
+// 嵌入二进制的前端资源要完整：少一个文件，装出来的 app 就少一块界面。
+func TestEmbeddedFrontendHasAllFiles(t *testing.T) {
+	want := []string{"index.html", "app.js", "app.css", "cast.js", "select.js"}
+	for _, name := range want {
+		if _, err := fs.Stat(assets, "frontend/dist/"+name); err != nil {
+			t.Errorf("嵌入资源缺 %s：%v", name, err)
 		}
 	}
 }
