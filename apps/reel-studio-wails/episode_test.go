@@ -144,3 +144,37 @@ func TestEpisodeSingleLineTooLong(t *testing.T) {
 		t.Fatalf("到上限不该拦：%v", err)
 	}
 }
+
+// 旁白念不完要明确报错，并且不留下半成品。
+//
+// 「不拉长画面、不加速念白」是产品承诺：观众看到的时长就是素材时长，
+// 念到一半被截断比报错更糟。
+func TestEpisodeNarrationTooLong(t *testing.T) {
+	s := newTestStore(t)
+	e := &Engine{store: s}
+	e.speechOverride = fakeSpeech(t, s)
+	p, _ := s.AddProject("旁白过长", "series")
+	clip := fakeH3Clip(t, s, p.ID, true) // 15 秒素材
+	before := len(s.State().Assets)
+	// 每句 0.25 秒/字；6 句 60 字 = 90 秒，远超 15 秒
+	long := make([]string, 6)
+	for i := range long {
+		long[i] = strings.Repeat("雪", 60)
+	}
+	_, err := e.MakeEpisode(context.Background(), EpisodeInput{
+		ProjectID: p.ID, ClipAssetID: clip.ID, Lines: long, KeepAmbient: true,
+	}, nil, nil)
+	if err == nil {
+		t.Fatal("旁白念不完应当报错")
+	}
+	if !strings.Contains(err.Error(), "删减旁白") {
+		t.Fatalf("报错要给出可操作提示，实际 %v", err)
+	}
+	// 不该留下半成品成片
+	for _, a := range s.State().Assets {
+		if a.MIME == "video/mp4" && a.ID != clip.ID {
+			t.Fatalf("留下了半成品：%s", a.Name)
+		}
+	}
+	_ = before
+}
