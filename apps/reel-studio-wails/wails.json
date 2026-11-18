@@ -5,7 +5,7 @@
   "frontend:install": "",
   "frontend:build": "",
   "frontend:dev:watcher": "",
-  "frontend:dev:serverUrl": "auto",
+  "frontend:dev:serverUrl": "",
   "author": {
     "name": "webkubor",
     "email": "jmx6kuqy@163.com"

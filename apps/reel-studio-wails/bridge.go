@@ -148,6 +148,25 @@ func (a *App) ResolveInterruptedShot(shotID string) (*EpisodeShot, error) {
 	return a.engine.ResolveInterruptedShot(shotID)
 }
 
+// SceneReferenceURL 只读项目场景的正式参考图，用于场景库预览。
+func (a *App) SceneReferenceURL(projectID, sceneID string) (string, error) {
+	ws, err := a.engine.projectWorkspace(projectID)
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), characterRequestTimeout)
+	defer cancel()
+	detail, err := (&MuseavClient{Workspace: ws}).ShowSubject(ctx, sceneID)
+	if err != nil {
+		return "", err
+	}
+	ref, err := sceneReference(*detail, ws)
+	if err != nil {
+		return "", err
+	}
+	return ref.URL, nil
+}
+
 // ListWorkspaces 列可绑定的中台项目。
 func (a *App) ListWorkspaces() ([]WorkspaceOption, error) {
 	return a.engine.ListWorkspaces()

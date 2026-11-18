@@ -98,15 +98,32 @@ func TestShootShotOnlyOnceConcurrently(t *testing.T) {
 		<-gate
 		return s.AddAsset(in.ProjectID, "c.mp4", "video/mp4", []byte("c"), nil)
 	}
-	var wg sync.WaitGroup
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		go func() { defer wg.Done(); _, _ = e.ShootShot(context.Background(), sh.ID, nil, nil) }()
+	started := make(chan struct{})
+	firstDone := make(chan error, 1)
+	originalShoot := e.shootOverride
+	e.shootOverride = func(ctx context.Context, in CharacterVideoInput) (*Asset, error) {
+		close(started)
+		return originalShoot(ctx, in)
 	}
-	for atomic.LoadInt32(&calls) == 0 {
+	go func() { _, err := e.ShootShot(context.Background(), sh.ID, nil, nil); firstDone <- err }()
+	<-started
+	var wg sync.WaitGroup
+	rejected := make(chan error, 4)
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() { defer wg.Done(); _, err := e.ShootShot(context.Background(), sh.ID, nil, nil); rejected <- err }()
+	}
+	wg.Wait() // 第一笔仍被 gate 阻塞，所有竞争请求必须先被拒绝。
+	close(rejected)
+	for err := range rejected {
+		if err == nil {
+			t.Fatal("并发请求应被拒绝")
+		}
 	}
 	close(gate)
-	wg.Wait()
+	if err := <-firstDone; err != nil {
+		t.Fatal(err)
+	}
 	if calls != 1 {
 		t.Fatalf("并发出镜调用了 %d 次", calls)
 	}

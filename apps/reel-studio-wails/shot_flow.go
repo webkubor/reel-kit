@@ -131,7 +131,7 @@ func (e *Engine) ShootShot(ctx context.Context, shotID string, progress Progress
 	}
 	input := CharacterVideoInput{
 		ProjectID: shot.ProjectID, SubjectID: shot.CharacterID, Action: shot.Action,
-		Look: shot.Look, Scene: scene, ExpectWorkspace: ws,
+		Look: shot.Look, Scene: scene, SceneID: shot.SceneID, ExpectWorkspace: ws,
 	}
 	var clip *Asset
 	if e.shootOverride != nil {

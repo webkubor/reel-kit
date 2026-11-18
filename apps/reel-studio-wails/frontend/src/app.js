@@ -1033,10 +1033,30 @@
       var head = el('div', 'character-head')
       var left = el('div', 'min-w-0')
       left.appendChild(el('div', 'character-name', subject.name || '未命名场景'))
-      left.appendChild(el('div', 'text-2xs text-ink-lo', (subject.traits || {})['画面描述'] || ''))
       head.appendChild(left)
       head.appendChild(el('span', 'badge', (subject.asset_count || 0) + ' 图'))
       card.appendChild(head)
+      var preview = el('div', 'mt-3 overflow-hidden rounded-md border border-line bg-paper')
+      var image = el('img', 'block w-full object-cover')
+      image.style.aspectRatio = '16 / 9'
+      image.alt = (subject.name || '场景') + ' · 标准参考图'
+      image.loading = 'lazy'
+      preview.appendChild(image)
+      var note = el('p', 'mt-2 text-2xs text-ink-lo', '正在读取参考图…')
+      card.appendChild(preview)
+      card.appendChild(note)
+      card.appendChild(el('p', 'mt-2 text-2xs leading-relaxed text-ink-lo', (subject.traits || {})['画面描述'] || ''))
+      var projectID = state.projectId
+      app().SceneReferenceURL(projectID, subject.id).then(function (url) {
+        if (projectID !== state.projectId || !card.isConnected) return
+        image.onload = function () { note.textContent = '出镜时使用这张图作为场景参考' }
+        image.onerror = function () { note.textContent = '参考图加载失败，请检查网络' }
+        image.src = url
+      }).catch(function (err) {
+        if (projectID !== state.projectId || !card.isConnected) return
+        preview.classList.add('hidden')
+        note.textContent = String(err && err.message ? err.message : err)
+      })
       grid.appendChild(card)
     })
   }

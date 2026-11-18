@@ -28,6 +28,8 @@ type CharacterVideoInput struct {
 	Look string
 	// Scene 场景画面描述（来自场景主体），空 = 不指定场景。
 	Scene string
+	// SceneID 绑定场景主体；生成时读取其标准参考图。
+	SceneID string
 	// ExpectWorkspace 镜头所属项目绑定的中台工作区。非空时角色必须属于它：
 	// 别的片子的角色不能出现在这部戏里。
 	ExpectWorkspace string
@@ -88,6 +90,17 @@ func (e *Engine) MakeCharacterVideo(ctx context.Context, input CharacterVideoInp
 	refs := characterReferences(character, look)
 	if len(refs) == 0 {
 		return nil, fmt.Errorf("角色「%s」名下还没有图，请先补定妆稿", character.Name)
+	}
+	if input.SceneID != "" {
+		detail, err := client.ShowSubject(ctx, input.SceneID)
+		if err != nil {
+			return nil, err
+		}
+		ref, err := sceneReference(*detail, character.Workspace)
+		if err != nil {
+			return nil, err
+		}
+		refs = withSceneReference(refs, ref)
 	}
 
 	// 项目哲学：画面口径 + 出片规格（画幅、时长）都从角色所属工作区来。
