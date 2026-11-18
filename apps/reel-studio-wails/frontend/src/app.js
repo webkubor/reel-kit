@@ -100,6 +100,7 @@
     if (window.ReelCast && window.ReelCast.setData) {
       window.ReelCast.setData({
         subjects: state.subjects || [],
+        portraits: state.portraits || [],
         error: state.subjectsError || '',
         projectId: state.projectId || '',
       })
@@ -937,9 +938,14 @@
       .then(function (subjects) {
         if (projectID !== state.projectId) return
         state.subjects = subjects || []
-        paintCast()
         paintScenes()
         paintShots()
+        // 头像一次批量返回（本地缓存优先），不再逐角色打网络
+        return app().ListCharacterPortraits(projectID).then(function (portraits) {
+          if (projectID !== state.projectId) return
+          state.portraits = portraits || []
+          paintCast()
+        }).catch(function () { state.portraits = []; paintCast() })
       })
       .catch(function (err) {
         if (projectID !== state.projectId) return

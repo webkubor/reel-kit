@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -315,7 +313,15 @@ func (e *Engine) ListCharacters(workspace string) ([]*Character, error) {
 }
 
 // GetCharacter 拉一个角色的详情与完成度。
+//
+// 优先读本地镜像（详情所需的定妆/三视图/头像都已缓存），网络断了也能看；
+// 没有镜像才回中台读，并把读到的结果写进本地镜像。
 func (e *Engine) GetCharacter(subjectID string) (*Character, error) {
+	if e.store != nil {
+		if mirror, ok := e.mirrorBySubjectID(subjectID); ok && len(mirror.Assets) > 0 {
+			return e.characterFromMirror(mirror), nil
+		}
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), characterRequestTimeout)
 	defer cancel()
 	client := &MuseavClient{}
@@ -326,164 +332,25 @@ func (e *Engine) GetCharacter(subjectID string) (*Character, error) {
 	if err != nil {
 		return nil, err
 	}
-	return subjectToCharacter(*detail, "", e.sourceBatchFor(detail.Subject.ID)), nil
+	character := subjectToCharacter(*detail, "", e.sourceBatchFor(detail.Subject.ID))
+	if e.store != nil {
+		_ = e.SaveCharacterMirror(character)
+	}
+	return character, nil
 }
 
-// CharacterMirrorPath 角色图在本地的镜像目录。
-func (e *Engine) characterMirrorDir() string {
-	return filepath.Join(e.store.Root(), "characters")
-}
-
-// mirrorCharacterImage 把中台直链的角色图存一份到本地。
-//
-// 为什么要存：界面上的角色卡不能只靠远程直链 —— 断了网就白板，
-// 而且用户导出的片子里的角色图也得跟着走。
-func (e *Engine) mirrorCharacterImage(ctx context.Context, url, name string) (string, error) {
-	client := &MuseavClient{}
-	data, mime, err := client.DownloadImage(ctx, url)
-	if err != nil {
-		return "", err
+// characterFromMirror 从本地镜像还原角色详情（离线可用）。
+func (e *Engine) characterFromMirror(m *CharacterMirror) *Character {
+	c := &Character{
+		ID: m.SubjectID, Name: m.Name, Persona: m.Persona, Traits: m.Traits,
+		Complete: m.Complete, Missing: m.Missing, Warnings: m.Warnings, SourceBatch: m.SourceBatch,
+		References: []CharacterAsset{}, Assets: []CharacterAsset{}, Looks: []string{},
 	}
-	dir := e.characterMirrorDir()
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", err
+	for _, a := range m.Assets {
+		c.References = append(c.References, CharacterAsset{Name: a.Name, URL: "/media/" + a.AssetID, Role: a.Role})
 	}
-	ext := map[string]string{
-		"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif",
-	}[mime]
-	if ext == "" {
-		ext = ".png"
+	for view, url := range m.Views {
+		c.Assets = append(c.Assets, CharacterAsset{View: CharacterView(view), URL: url})
 	}
-	path := filepath.Join(dir, fmt.Sprintf("%s-%s%s", newID(), sanitizeFileName(name), ext))
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
-// sanitizeFileName 把名字里的路径分隔符换掉，避免拼出目录外的路径。
-func sanitizeFileName(name string) string {
-	replacer := strings.NewReplacer("/", "-", "\\", "-", ":", "-", " ", "")
-	out := replacer.Replace(strings.TrimSpace(name))
-	if out == "" {
-		out = "image"
-	}
-	if len([]rune(out)) > 40 {
-		out = string([]rune(out)[:40])
-	}
-	return out
-}
-
-// ──────────────────────────────────────────────────────────────
-// 本地镜像
-// ──────────────────────────────────────────────────────────────
-
-// CharacterMirror 角色的本地镜像。
-//
-// 中台是真源，本地这份是为了「打开就有、断了网也有、导得出」。
-type CharacterMirror struct {
-	ID        string            `json:"id"`
-	SubjectID string            `json:"subjectId"`
-	Name      string            `json:"name"`
-	Persona   string            `json:"persona"`
-	Traits    []CharacterTrait  `json:"traits"`
-	Complete  bool              `json:"complete"`
-	Missing   []string          `json:"missing,omitempty"`
-	Warnings  []string          `json:"warnings,omitempty"`
-	Views     map[string]string `json:"views"`
-	// SourceBatch 五视图的同源批次标记。
-	//
-	// 只有本地知道「这五张是不是同一轮生成的」，所以存这儿。
-	// 读角色时拿它回填，完成度判定才认得出同源。
-	SourceBatch string `json:"sourceBatch,omitempty"`
-	UpdatedAt   string `json:"updatedAt"`
-}
-
-// SaveCharacterMirror 存角色的本地镜像。
-func (e *Engine) SaveCharacterMirror(character *Character) error {
-	if e.store == nil {
-		return errNoStore
-	}
-	dir := e.characterMirrorDir()
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
-	mirror := &CharacterMirror{
-		ID:          character.ID,
-		SubjectID:   character.ID,
-		Name:        character.Name,
-		Persona:     character.Persona,
-		Traits:      character.Traits,
-		Complete:    character.Complete,
-		Missing:     character.Missing,
-		Warnings:    character.Warnings,
-		Views:       map[string]string{},
-		SourceBatch: character.SourceBatch,
-		UpdatedAt:   nowISO(),
-	}
-	for _, a := range character.Assets {
-		local, err := e.mirrorCharacterImage(context.Background(), a.URL, string(a.View))
-		if err != nil {
-			// 镜像失败不阻断：角色在中台还是好的，只是本地没缓存。
-			continue
-		}
-		mirror.Views[string(a.View)] = local
-	}
-	data, err := json.MarshalIndent(mirror, "", "  ")
-	if err != nil {
-		return err
-	}
-	path := filepath.Join(dir, sanitizeFileName(character.Name)+".json")
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return err
-	}
-	return nil
-}
-
-// sourceBatchFor 从本地镜像里读某个主体的同源批次标记。
-//
-// 读不到就返回空串 —— 空串会让完成度判定报「无法确认同源」，
-// 那是诚实的结果，不该猜一个批次号糊弄过去。
-func (e *Engine) sourceBatchFor(subjectID string) string {
-	mirrors, err := e.ListCharacterMirrors()
-	if err != nil {
-		return ""
-	}
-	for _, m := range mirrors {
-		if m.SubjectID == subjectID {
-			return m.SourceBatch
-		}
-	}
-	return ""
-}
-
-// ListCharacterMirrors 列本地镜像的角色。
-func (e *Engine) ListCharacterMirrors() ([]*CharacterMirror, error) {
-	if e.store == nil {
-		return nil, errNoStore
-	}
-	dir := e.characterMirrorDir()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []*CharacterMirror{}, nil
-		}
-		return nil, err
-	}
-	out := []*CharacterMirror{}
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
-		if err != nil {
-			continue
-		}
-		var mirror CharacterMirror
-		if err := json.Unmarshal(data, &mirror); err != nil {
-			continue
-		}
-		out = append(out, &mirror)
-	}
-	return out, nil
+	return c
 }

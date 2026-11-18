@@ -72,6 +72,16 @@ func (a *App) GetCharacter(subjectID string) (*Character, error) {
 	return a.engine.GetCharacter(subjectID)
 }
 
+// ListCharacterPortraits 一次返回项目全部角色的头像格（本地缓存优先）。
+func (a *App) ListCharacterPortraits(projectID string) ([]CharacterPortrait, error) {
+	return a.engine.ListCharacterPortraits(projectID)
+}
+
+// RefreshCharacterCache 把项目全部角色的素材下载进本地素材库，之后离线可看。
+func (a *App) RefreshCharacterCache(projectID string) ([]CharacterPortrait, error) {
+	return a.engine.RefreshCharacterCache(projectID)
+}
+
 // CreateCharacter 走完 0→1 建角色：一张脸 → 名称 + 体貌 + 五视图齐全的角色。
 //
 // 联网且可能计费（中台出图），所以调用方必须明确触发。

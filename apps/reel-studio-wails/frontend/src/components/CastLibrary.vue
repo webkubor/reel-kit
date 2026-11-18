@@ -14,6 +14,10 @@ const list = computed(() => {
   if (!q) return people.value
   return people.value.filter((s) => ((s.name || '') + ' ' + JSON.stringify(s.traits || {})).toLowerCase().includes(q))
 })
+const portraits = computed(() => Object.fromEntries((props.store.portraits || []).map((p) => [p.id, p])))
+function portraitOf(s) {
+  return portraits.value[s.id] || null
+}
 </script>
 
 <template>
@@ -34,7 +38,7 @@ const list = computed(() => {
         {{ query ? `没有匹配「${query}」的角色。` : '还没有角色。' }}
       </p>
       <div v-else class="mt-4 grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-x-3 gap-y-4">
-        <CastTile v-for="s in list" :key="`${store.projectId}:${s.id}`" :subject="s" @open="selected = $event" />
+        <CastTile v-for="s in list" :key="`${store.projectId}:${s.id}`" :subject="s" :portrait="portraitOf(s)" @open="selected = $event" />
       </div>
     </div>
   </div>

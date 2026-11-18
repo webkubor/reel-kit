@@ -1,23 +1,30 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { loadCharacter, pickPortrait } from '../lib/character.js'
+import { ref, watch } from 'vue'
 
-const props = defineProps({ subject: { type: Object, required: true } })
+// 头像由 CastLibrary 一次性批量传入（后端 ListCharacterPortraits），
+// 本组件只负责显示，不再逐个调 GetCharacter —— 角色库打开就是快的。
+const props = defineProps({
+  subject: { type: Object, required: true },
+  portrait: { type: Object, default: null },
+})
 defineEmits(['open'])
 
 const url = ref('')
-const state = ref(props.subject.asset_count ? 'loading' : 'empty')
+const state = ref('empty')
 
-onMounted(() => {
-  if (!props.subject.asset_count) return
-  loadCharacter(props.subject.id)
-    .then((c) => {
-      const p = pickPortrait(c)
-      if (p) url.value = p.url
-      else state.value = 'empty'
-    })
-    .catch(() => { state.value = 'error' })
-})
+watch(
+  () => props.portrait,
+  (p) => {
+    if (p && p.avatarUrl) {
+      url.value = p.avatarUrl
+      state.value = 'loading'
+    } else {
+      url.value = ''
+      state.value = 'empty'
+    }
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
