@@ -194,18 +194,25 @@ func templatePrompt(subjectName, traits string, item AssetTemplateItem) string {
 }
 
 // templateAssetName 按分类规则命名素材。
+//
+// 描述段用中文说明（"三视图-正面"、"武器-长枪"），不用英文占位词 ——
+// 名字是给人看的，也是分类判断的依据。
 func templateAssetName(subjectName string, item AssetTemplateItem) string {
+	desc := item.Label
+	if desc == "" {
+		desc = item.Key
+	}
 	switch item.Class {
 	case "avatar":
 		return subjectName + "-头像"
 	case "costume":
-		return subjectName + "-定妆-" + item.Key
+		return subjectName + "-定妆-" + desc
 	case "weapon":
-		return subjectName + "-武器-" + item.Key
+		return subjectName + "-武器-" + desc
 	case "scene":
-		return subjectName + "-画面-" + item.Key
+		return subjectName + "-画面-" + desc
 	default:
-		return subjectName + "-三视图-" + item.Key
+		return subjectName + "-三视图-" + desc
 	}
 }
 
