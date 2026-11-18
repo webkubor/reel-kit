@@ -35,21 +35,19 @@ export const VIEWS = [
 ]
 
 // 兵器与道具（面具、面甲等）单独成组：它们不是人物定妆，不该和三视图挤在一起。
-const isWeapon = (name) => /笛|枪|刀|剑|弓|锤|兵器|武器|面具|面甲|道具/.test(name || '') && !/三视图|定妆/.test(name || '')
-
-// 真人参考：现实照片质感或来源标注「真人/脸部参考」，永远不进角色形象区。
-const isRealFace = (name) => /真人参考|脸部参考|真人|face|photo/i.test(name || '')
+// 分类规则集中在 classification.js，与后端一一对应（见那里的说明）。
+import { isWeapon, isRealFace, isDesignSheet, isAvatar } from './classification.js'
 
 // 头像：只从「角色头像」类选（真人参考除外），否则退回定妆立绘 > 三视图。
 // 规则见 docs/asset-classification.md：角色是电影角色，真人参考只是建模参考。
 export function pickPortrait(c) {
   if (!c) return null
-  const avatar = (c.references || []).find((a) => /头像|avatar/i.test(a.name || '') && a.url && !isRealFace(a.name))
+  const avatar = (c.references || []).find((a) => a.url && isAvatar(a.name))
   if (avatar) return avatar
   const front = (c.assets || []).find((a) => a.view === 'front' && a.url)
   if (front) return front
   const refs = (c.references || []).filter((a) => a.url && !isRealFace(a.name))
-  return refs.find((a) => /定妆|costume|立绘/i.test(a.name || '')) || refs.find((a) => /三视图|turnaround/i.test(a.name || '')) || null
+  return refs.find((a) => isDesignSheet(a.name)) || null
 }
 
 // 素材按类型分组（见 docs/asset-classification.md 六类）：
@@ -65,9 +63,9 @@ export function groupReferences(c) {
     return true
   })
   const realFaces = refs.filter((a) => isRealFace(a.name))
-  const avatars = refs.filter((a) => /头像|avatar/i.test(a.name || '') && !isRealFace(a.name))
-  const sheets = refs.filter((a) => /三视图|turnaround/i.test(a.name || ''))
-  const costumes = refs.filter((a) => /定妆|costume|立绘/i.test(a.name || ''))
+  const avatars = refs.filter((a) => isAvatar(a.name))
+  const sheets = refs.filter((a) => /三视图|turnaround/i.test(a.name || '') && !isWeapon(a.name))
+  const costumes = refs.filter((a) => /定妆|costume|立绘/i.test(a.name || '') && !isWeapon(a.name))
   const weapons = refs.filter((a) => isWeapon(a.name))
   const inRole = new Set([...realFaces, ...avatars, ...sheets, ...costumes, ...weapons].map((a) => a.url))
   const scenes = refs.filter((a) => !inRole.has(a.url))
