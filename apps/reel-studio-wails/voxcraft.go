@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -316,18 +316,12 @@ func downloadAudio(base, filename, out string) error {
 	return os.WriteFile(out, data, 0o644)
 }
 
+// urlEncode 按 UTF-8 字节做百分号编码。
+//
+// 服务端生成的文件名带中文（如「[克隆]朝朝-元气阳光_20261118_221530.wav」），
+// 必须按 UTF-8 字节编码；按 Unicode 码点编码会得到无效路径，服务返回 404。
 func urlEncode(s string) string {
-	// 简单的 URL 编码，足够当前用法（文件名由服务生成，通常安全）
-	var b strings.Builder
-	for _, c := range s {
-		if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
-			c == '-' || c == '_' || c == '.' || c == '~' {
-			b.WriteRune(c)
-		} else {
-			b.WriteString(fmt.Sprintf("%%%02X", c))
-		}
-	}
-	return b.String()
+	return url.PathEscape(s)
 }
 
 func homeDir() string {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -105,8 +106,14 @@ func (e *Engine) generateVoxflowSpeech(ctx context.Context, projectID, text, ton
 		e.mu.Unlock()
 		server = started
 	}
+	// VoxFlow 的 persona 必须是已注册的音色名；写死 default 会在合成时报
+	// 「音色 default 未注册」。没指定时用服务里实际有的第一个音色。
 	if voiceID == "" {
-		voiceID = "default"
+		info := LocateVoxcraft()
+		if len(info.Personas) == 0 {
+			return nil, errors.New("VoxFlow 还没有可用音色：请先在 voxflow 里登记一个 persona")
+		}
+		voiceID = info.Personas[0]
 	}
 	if model == "" {
 		model = "voxflow-local"
