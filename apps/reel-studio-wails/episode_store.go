@@ -95,6 +95,9 @@ type EpisodeDraft struct {
 	PublishPlatform string
 	VideoID         string
 	ThumbnailURL    string
+	// Prologue 序章 / 楔子：编号固定为 0，排在第一集之前。
+	// Number 为 0 时默认「自动取下一集」，所以序章必须显式标出来。
+	Prologue bool `json:"prologue,omitempty"`
 }
 
 // ShotInput 新建一个镜头的参数。
@@ -122,7 +125,14 @@ func (s *StudioStore) AddEpisode(in EpisodeDraft) (*Episode, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	number := in.Number
-	if number <= 0 {
+	if in.Prologue {
+		number = 0
+		for _, e := range s.state.Episodes {
+			if e.ProjectID == in.ProjectID && e.Number == 0 {
+				return nil, errors.New("这个项目已经有序章了")
+			}
+		}
+	} else if number <= 0 {
 		number = 1
 		for _, e := range s.state.Episodes {
 			if e.ProjectID == in.ProjectID && e.Number >= number {
