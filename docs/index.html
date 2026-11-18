@@ -1,197 +1,58 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <title>Reel Studio · 把文案和素材，变成一条能直接发的短视频</title>
-  <meta name="description" content="Reel Studio 1.8.1：macOS Apple Silicon 桌面视频工作台。AI 分镜、JSON 编辑、本机中文配音、画面渲染和 MP4 导出。AI 请求连接你配置的服务，制作过程在本机完成。">
-  <meta name="keywords" content="reel-kit, Reel Studio, 短视频合成, 桌面应用, 视频模板, HTML 模板, ffmpeg, 本地 TTS, 视频生成, text to speech, video composer">
-  <meta name="author" content="webkubor">
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>muse-tv · 把一部短剧，放进一个工作台</title>
+  <meta name="description" content="muse-tv 是面向短剧制作的桌面工作台。按项目组织剧集、镜头、角色与场景，连接 MUSE AV 素材与生成能力，在本机制作成片。">
+  <meta name="keywords" content="muse-tv, 短剧工作台, AI短剧, 角色库, 场景库, 剧集管理, 视频制作, MUSE AV">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Reel Studio · 把文案和素材，变成一条能直接发的短视频">
-  <meta property="og:description" content="macOS Apple Silicon · AI 分镜与 JSON 编辑 · 本机离线配音和视频制作">
-  <meta property="og:image" content="https://museav-ai.github.io/muse-tv/images/poster-16x9.jpg">
+  <meta property="og:title" content="muse-tv · 把一部短剧，放进一个工作台">
+  <meta property="og:description" content="从角色、场景到剧集、镜头和成片，让一部短剧有条理地向前走。">
+  <meta property="og:image" content="https://museav-ai.github.io/muse-tv/images/muse-tv-snow-scene.jpg">
   <meta name="twitter:card" content="summary_large_image">
-
-  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="canonical" href="https://museav-ai.github.io/muse-tv/">
+  <link rel="icon" type="image/svg+xml" href="muse-tv-icon.svg">
   <link rel="stylesheet" href="style.css">
-
 </head>
 <body>
-
-  <!-- ───── Hero ───── -->
-  <header class="hero">
-    <img src="logo.svg" alt="reel-kit" class="logo">
-    <h1>把文案和素材，变成一条能直接发的短视频</h1>
-    <p class="tagline">
-      <b>Reel Studio 1.8.1</b>：macOS Apple Silicon 桌面视频工作台。<br>
-      写文案或生成 AI 分镜，逐句离线配音、渲染画面、导出 MP4。<br>
-      1.8.0 新增角色素材库：上传一张人脸建出角色，补齐五视图，缺哪一项逐条点名。<br>
-      1.8.1 修复角色素材库落地的四处缺陷（选脸路径、建主体回执、批量提示词拆行、错位图登记）。<br>
-      表单与分镜 JSON 双向编辑，图片和历史视频在应用内直接查看。<br>
-      配音与视频制作在本机完成；AI 分镜使用你配置的模型服务，可能计费。
-    </p>
-
-    <a href="https://github.com/museav-ai/muse-tv/releases/download/app-v1.8.1/reel-studio-1.8.1-darwin-arm64.zip" class="install">下载 macOS（Apple Silicon · 1.8.1）</a>
-    <a href="https://github.com/museav-ai/muse-tv/releases/tag/app-v1.8.1" class="install secondary">查看发布说明</a>
-
-    <div class="links">
-      <a href="https://github.com/museav-ai/muse-tv">⭐ GitHub</a>
-      <a href="https://github.com/museav-ai/muse-tv/blob/main/README.md">📖 怎么用</a>
-      <a href="https://github.com/museav-ai/muse-tv/blob/main/docs/cli.md">🧑‍💻 开发者文档</a>
+  <header class="site-header">
+    <div class="wrap nav">
+      <a class="wordmark" href="#top" aria-label="muse-tv 首页"><img class="mark" src="muse-tv-icon.svg" alt="" width="26" height="26"><span>muse<span class="wordmark-dim">-</span>tv</span></a>
+      <nav aria-label="主导航"><a href="#workflow">制作流程</a><a href="#data">数据与素材</a><a href="#download">下载</a><a href="https://github.com/museav-ai/muse-tv">GitHub <span aria-hidden="true">↗</span></a></nav>
     </div>
   </header>
-
-  <!-- ───── Reel Studio 桌面版 ───── -->
-  <section class="studio" id="studio">
-    <div class="studio-head">
-      <h2>本机离线制作，文案变成短片</h2>
-      <p class="section-intro">
-        Reel Studio 1.8.1 使用 Wails + Go，左侧填写文案，右侧播放成片。
-        包内提供离线中文语音、Chrome 与 FFmpeg，无 Node 运行时、无本地 HTTP 业务服务。
-        素材与成片留在你自己电脑上。
-      </p>
-    </div>
-    <div class="studio-grid">
-      <div class="studio-card">
-        <h3>项目与素材</h3>
-        <p>新建项目、导入图片，按项目保存素材、任务记录与历史成片。</p>
+  <main id="top">
+    <section class="hero wrap">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot"></span> 短剧制作工作台 <span class="slash">/</span> MUSE AV</p>
+        <h1>把一部短剧，<br><span>放进一个工作台。</span></h1>
+        <p class="lead">从角色、场景到剧集、镜头和成片。让每一集的素材和进度，都有清楚的位置。</p>
+        <div class="hero-actions"><a class="button primary" href="#download">了解下载 <span aria-hidden="true">↗</span></a><a class="text-link" href="#workflow">看看制作流程 <span aria-hidden="true">↓</span></a></div>
+        <p class="version-note">项目 · 剧集 · 镜头工作流目前处于开发中</p>
       </div>
-      <div class="studio-card">
-        <h3>逐句离线配音</h3>
-        <p>一行一句、一句一镜，按真实语音时长安排画面；最多 8 句，每句 80 字。</p>
-      </div>
-      <div class="studio-card">
-        <h3>合成与导出</h3>
-        <p>在应用里播放真实成片，通过系统保存对话框导出 MP4；制作中可以取消。</p>
-      </div>
-      <div class="studio-card">
-        <h3>AI 分镜与生成记录</h3>
-        <p>配置兼容模型服务，生成可编辑的分镜 JSON；历史记录保留提示词、模型回执、工序时间与错误，审阅后再制作。</p>
-      </div>
-    </div>
-    <div class="studio-download">
-      <a class="install" href="https://github.com/museav-ai/muse-tv/releases/download/app-v1.8.1/reel-studio-1.8.1-darwin-arm64.zip">下载 macOS（Apple Silicon）</a>
-      <p class="studio-meta">
-        v1.8.1 · macOS 13+ · 本版暂不提供 Windows 安装包 ·
-        <a href="https://github.com/museav-ai/muse-tv/releases/tag/app-v1.8.1">发布页与校验值</a> ·
-        <a href="https://github.com/museav-ai/muse-tv/releases">历史版本</a>
-      </p>
-    </div>
-    <div class="studio-firstrun">
-      <h3>离线资源随包提供</h3>
-      <p>中文配音使用 sherpa-onnx：不联网、不按调用计费。缺少资源时显示错误，不偷偷切换到云服务。</p>
-      <p class="studio-meta"><strong>签名状态：</strong>ad-hoc 签名、未 Apple 公证，macOS 可能拦截首次启动。当前需要手动下载更新。</p>
-      <p class="studio-meta"><strong>MVP 边界：</strong>编辑画面为示意；草稿只在当前进程内暂存。尚未提供云 TTS、声音克隆、AI 素材生成或旧项目自动迁移。</p>
-      <p class="studio-meta">失败时查看「制作过程」，复制错误并移除私人路径后提交 <a href="https://github.com/museav-ai/muse-tv/issues/new/choose">问题反馈</a>。</p>
-    </div>
-  </section>
-
-  <div class="container">
-
-    <!-- ───── Features ───── -->
-    <section>
-      <h2>桌面应用底下，是一套能自己搭的引擎</h2>
-      <p class="section-intro">
-        仓库另外提供独立的 CLI/库，适合批量出片和模板开发；以下能力属于 CLI，不代表桌面 MVP 已开放全部入口。
-      </p>
-      <div class="features">
-        <div class="feature">
-          <h3>🎬 剪辑</h3>
-          <p>命令行一行出片：<code>reel make</code>。10 套 HTML 模板、9 种 xfade 转场、长句字幕分镜、BGM 平滑接缝、念白驱动镜头时长。</p>
-        </div>
-        <div class="feature">
-          <h3>✍️ 模板开发</h3>
-          <p>20 套手绘风格配方、44 套知识短视频视觉风格，模板用 HTML/CSS 写，所见即所得，改完直接用。</p>
-        </div>
-      </div>
+      <figure class="hero-visual">
+        <div class="visual-head"><span><span class="status-dot"></span> 沸腾之雪 <span class="muted">/ 场景参考</span></span><span class="visual-index">01 — 04</span></div>
+        <img src="images/muse-tv-snow-scene.jpg" alt="沸腾之雪的场景参考图：雪夜里灯火映在石板长街上" width="1400" height="788">
+        <figcaption><span>雨夜长街 · 天门关</span><span>真实项目素材 <span aria-hidden="true">↗</span></span></figcaption>
+      </figure>
+      <div class="hero-bottom"><span>一部戏，一个项目</span><span class="line"></span><span>让创作有处可循</span></div>
     </section>
 
-    <!-- ───── 成片示例 ───── -->
-    <section>
-      <h2>看几条真实成片 <span class="small">由 reel-kit 在本机生成 · 点开即播</span></h2>
-      <p class="section-intro">
-        下面是仓库随附的示例成片，都在本机由 reel-kit 合成，未使用外部视频服务。
-        左图是竖版、横版商品介绍，加上一条品牌示例，可点播放查看真实画面与配音。
-      </p>
-      <div class="videos">
-        <figure class="video wide">
-          <div class="frame">
-            <video controls playsinline preload="metadata" poster="images/poster-16x9.jpg">
-              <source src="samples/product-intro-16x9.mp4" type="video/mp4">
-            </video>
-          </div>
-          <figcaption><b>商品介绍 · 横版</b> 1920 × 1080 · 约 11 秒</figcaption>
-        </figure>
-        <figure class="video">
-          <div class="frame">
-            <video controls playsinline preload="metadata" poster="images/poster-9x16.jpg">
-              <source src="samples/product-intro-9x16.mp4" type="video/mp4">
-            </video>
-          </div>
-          <figcaption><b>商品介绍 · 竖版</b> 1080 × 1920 · 约 8 秒（含字幕自动收档演示）</figcaption>
-        </figure>
-        <figure class="video">
-          <div class="frame">
-            <video controls playsinline preload="metadata" poster="images/poster-demo.jpg">
-              <source src="samples/demo-9x16.mp4" type="video/mp4">
-            </video>
-          </div>
-          <figcaption><b>品牌示例 · 竖版</b> 1080 × 1920 · 约 14 秒</figcaption>
-        </figure>
+    <section class="section wrap" id="workflow">
+      <div class="section-intro"><p class="eyebrow">01 <span class="slash">/</span> 制作流程</p><div><h2>从整部戏，<br>看到每一个镜头。</h2><p>先建立项目，再按剧集推进。角色和场景统一管理，镜头记住它需要的素材。</p></div></div>
+      <div class="steps">
+        <article><span class="step-number">01</span><h3>建立项目</h3><p>一部短剧对应一个项目，绑定 MUSE AV 工作区，让这部戏的角色和场景归到一起。</p><span class="step-caption">项目 / 工作区</span></article>
+        <article><span class="step-number">02</span><h3>准备角色与场景</h3><p>在角色库查看人物设定和参考素材，在场景库保存画面描述与场景参考图。</p><span class="step-caption">角色库 / 场景库</span></article>
+        <article><span class="step-number">03</span><h3>逐集制作</h3><p>为每集安排镜头，选择角色、装扮和场景；出镜素材与成片回到对应镜头。</p><span class="step-caption">剧集 / 镜头 / 成片</span></article>
       </div>
-      <p class="template-list">
-        模板仍在维护：<code>sticker-promo</code> · <code>music-card</code> · <code>sticker-square</code> ·
-        <code>quote</code> · <code>landscape-product</code> · <code>knowledge-dark</code> ·
-        <code>knowledge-paper</code> · <code>knowledge-gufeng</code> ·
-        <code>project-recommendation</code> · <code>product-presenter</code>
-      </p>
+      <p class="footnote">以上为开发版工作流。AI 出镜会连接中台并可能消耗额度；生成画面仍需要人工审阅。</p>
     </section>
 
-    <!-- ───── Quick Start ───── -->
-    <section>
-      <h2>命令行一行出片</h2>
-      <p class="section-intro">
-        准备一个图片目录，和一份一行一句的文案就能跑。这条命令直接从 Git 仓库执行 ——
-        本项目不发布 npm 包，用户一律走应用下载。完整参数见
-        <a href="https://github.com/museav-ai/muse-tv/blob/main/docs/cli.md">开发者文档</a>。
-      </p>
-      <div class="split">
-        <div class="card">
-          <div class="label">CLI</div>
-          <h3>不需要先安装</h3>
-<pre><code>npx github:museav-ai/muse-tv make \
-  --template sticker-promo \
-  --title "新功能" \
-  --assets ./shots \
-  --caps ./captions.txt \
-  --out out.mp4</code></pre>
-        </div>
-      </div>
-    </section>
+    <section class="section section-split" id="data"><div class="wrap split-inner"><div><p class="eyebrow">02 <span class="slash">/</span> 数据与素材</p><h2>知道素材在哪里，<br><span>也知道它属于谁。</span></h2></div><div class="data-list"><div><span class="data-index">01</span><div><h3>角色与场景，在 MUSE AV</h3><p>角色主体、场景主体和中台素材按工作区管理。工作台通过绑定的项目读取，使用时需要网络连接。</p></div></div><div><span class="data-index">02</span><div><h3>剧集与成片，在本机</h3><p>桌面工作台的剧集、镜头与本地媒体保存在电脑上。请按自己的备份习惯保管这些数据。</p></div></div><div><span class="data-index">03</span><div><h3>创作过程，随时核对</h3><p>镜头出镜失败或中断后可核对任务状态，避免在结果不明时重复提交。</p></div></div></div></div></section>
 
-    <!-- ───── 数据归属 ───── -->
-    <section>
-      <h2>本地优先,默认不上报</h2>
-      <p class="section-intro">
-        reel-kit 是 <b>本地工具</b>:素材、文案、模板、合成,全在你机器上跑。
-        CLI 工具 <b>默认不开 telemetry</b>——你的内容不会因为跑了 <code>reel make</code> 而被传到任何地方。
-        <br><br>
-        GitHub Pages 站只用作项目门面,可选集成 Plausible(隐私友好的无 cookie 埋点),见
-        <a href="analytics-setup.md">docs/analytics-setup.md</a>。
-      </p>
-    </section>
-
-  </div>
-
-  <footer>
-    <p>
-      <a href="https://github.com/museav-ai/muse-tv">reel-kit</a> · MIT License
-      · <a href="https://github.com/museav-ai/muse-tv/blob/main/CHANGELOG.md">更新日志</a>
-    </p>
-  </footer>
-
+    <section class="section wrap download" id="download"><div><p class="eyebrow">03 <span class="slash">/</span> 获取应用</p><h2>开始制作。</h2><p>查看已发布的桌面版本、安装说明与更新记录。</p></div><div class="download-panel"><div class="download-top"><span>macOS</span><span class="badge">APPLE SILICON</span></div><h3>桌面应用</h3><p>当前公开版本为 Reel Studio 1.8.1，是 muse-tv 的前身；本页介绍的短剧项目与剧集工作流尚未包含在该公开安装包中。</p><a class="button primary" href="https://github.com/museav-ai/muse-tv/releases/tag/app-v1.8.1">查看 1.8.1 发布页 <span aria-hidden="true">↗</span></a><p class="fine-print">该版本为 ad-hoc 签名、未经过 Apple 公证；安装说明和校验值见发布页。</p></div></section>
+  </main>
+  <footer><div class="wrap footer-inner"><div><a class="wordmark" href="#top"><img class="mark" src="muse-tv-icon.svg" alt="" width="26" height="26">muse<span class="wordmark-dim">-</span>tv</a><p>一部戏的创作，从这里开始。</p></div><div class="footer-links"><a href="https://github.com/museav-ai/muse-tv">GitHub</a><a href="https://github.com/museav-ai/muse-tv/blob/main/README.md">项目说明</a><a href="https://www.museav.top">MUSE AV</a></div></div><div class="wrap footer-bottom"><span>© MUSE AV · muse-tv</span><a href="#top">回到顶部 ↑</a></div></footer>
 </body>
 </html>
