@@ -546,7 +546,8 @@ func isWeaponAsset(name string) bool {
 	if isDesignSheet(name) {
 		return false
 	}
-	return strings.Contains(name, "武器") || strings.Contains(name, "面具") || strings.Contains(name, "兵器") ||
+	return strings.Contains(name, "武器") || strings.Contains(name, "兵器") || strings.Contains(name, "道具") ||
+		strings.Contains(name, "面具") || strings.Contains(name, "面甲") ||
 		strings.Contains(name, "枪") || strings.Contains(name, "剑") || strings.Contains(name, "刀") ||
 		strings.Contains(name, "弓") || strings.Contains(name, "笛") || strings.Contains(name, "锤") ||
 		strings.Contains(name, "鞭") || strings.Contains(name, "匕") || strings.Contains(name, "枷")
