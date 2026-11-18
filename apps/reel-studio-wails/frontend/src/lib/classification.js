@@ -22,7 +22,3 @@ export const isDesignSheet = (name) => /三视图|定妆|设定|turnaround/i.tes
 
 // 角色头像。
 export const isAvatar = (name) => /头像|avatar/i.test(name || '') && !isRealFace(name)
-
-// 已知类别词（素材名「角色名-类别-描述」里的第二段）。
-export const isCategoryWord = (word) =>
-  ['定妆', '三视图', '五视图', '画面', '武器', '兵器', '道具', '头像', '真人参考', '脸部参考'].includes(word)
