@@ -734,3 +734,46 @@ func (s *StudioStore) NormalizeAssetNames() (int, error) {
 	}
 	return changed, nil
 }
+
+// RemoveAssetsByMuseavWorkspace 清掉某个中台工作区在项目里留下的素材。
+//
+// 项目换绑到另一个中台项目后，旧工作区的角色图还留在素材库里，
+// 角色库页面会按新工作区列主体、按镜像找头像 —— 于是显示的是旧角色。
+// 换绑时按工作区清掉，才不会串。
+func (s *StudioStore) RemoveAssetsByMuseavWorkspace(projectID, workspaceID string) (int, error) {
+	if workspaceID == "" {
+		return 0, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var doomed []*Asset
+	keep := s.state.Assets[:0]
+	for _, a := range s.state.Assets {
+		if a.ProjectID == projectID {
+			if ws, ok := a.GetExtra("museavWorkspaceId"); ok {
+				if id, _ := ws.(string); id == workspaceID {
+					doomed = append(doomed, a)
+					continue
+				}
+			}
+		}
+		keep = append(keep, a)
+	}
+	s.state.Assets = keep
+	if len(doomed) == 0 {
+		return 0, nil
+	}
+	if err := s.saveLocked(); err != nil {
+		return len(doomed), err
+	}
+	mediaDir := filepath.Join(s.root, "media")
+	for _, a := range doomed {
+		path := filepath.Join(mediaDir, a.File)
+		rel, err := filepath.Rel(mediaDir, path)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
+		}
+		_ = os.Remove(path)
+	}
+	return len(doomed), nil
+}

@@ -71,6 +71,17 @@ func (e *Engine) BindProjectWorkspace(projectID, workspaceID string) (*Project, 
 	if !ok {
 		return nil, errors.New("中台项目不存在或当前账号无权访问")
 	}
+	// 换绑：旧工作区留下的角色图要清掉，否则角色库会显示旧项目的角色。
+	p, err := e.store.Project(projectID)
+	if err != nil {
+		return nil, err
+	}
+	if old := strings.TrimSpace(p.WorkspaceID); old != "" && old != workspaceID {
+		if _, err := e.store.RemoveAssetsByMuseavWorkspace(projectID, old); err != nil {
+			return nil, err
+		}
+		e.dropMirrorsForWorkspace(old)
+	}
 	return e.store.SetProjectWorkspace(projectID, workspaceID, name)
 }
 

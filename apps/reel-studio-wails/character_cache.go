@@ -60,7 +60,10 @@ type CharacterMirror struct {
 	Assets []MirrorAsset `json:"assets,omitempty"`
 	// SourceBatch 五视图的同源批次标记。
 	SourceBatch string `json:"sourceBatch,omitempty"`
-	UpdatedAt   string `json:"updatedAt"`
+	// Workspace 这个镜像来自哪个中台工作区。
+	// 换绑时要按它清掉旧工作区的镜像。
+	Workspace string `json:"workspace,omitempty"`
+	UpdatedAt string `json:"updatedAt"`
 }
 
 // MirrorAsset 一张已落到本地的角色素材。
@@ -433,6 +436,8 @@ func (e *Engine) cacheOneCharacter(ctx context.Context, client *MuseavClient, su
 		asset, err := e.store.AddAsset(projectID, ref.Name, mime, data, map[string]any{
 			"source": "museav", "sourceUrl": ref.URL, "museavSubjectId": sub.ID,
 			"museavSubjectName": sub.Name, "museavRole": ref.Role,
+			// 记下所属工作区：换绑时要按它清掉旧工作区留下的素材。
+			"museavWorkspaceId": client.Workspace,
 		})
 		if err != nil {
 			continue
@@ -580,7 +585,8 @@ func (e *Engine) writeMirror(character *Character, assets []MirrorAsset) {
 	}
 	mirror := &CharacterMirror{
 		ID: character.ID, SubjectID: character.ID, Name: character.Name, Persona: character.Persona,
-		Traits: character.Traits, Complete: character.Complete, Missing: character.Missing,
+		Workspace: character.Workspace,
+		Traits:    character.Traits, Complete: character.Complete, Missing: character.Missing,
 		Warnings: character.Warnings, Views: map[string]string{}, Assets: assets,
 		SourceBatch: character.SourceBatch, UpdatedAt: nowISO(),
 	}
@@ -663,3 +669,24 @@ func (e *Engine) ListCharacterPortraits(projectID string) ([]CharacterPortrait, 
 }
 
 var _ = errors.New
+
+// dropMirrorsForWorkspace 清掉某个工作区的角色镜像。
+//
+// 换绑后旧工作区的镜像留着，角色库会按新工作区的主体去找头像，
+// 命中的却是旧角色的图。
+func (e *Engine) dropMirrorsForWorkspace(workspaceID string) {
+	if e.store == nil || workspaceID == "" {
+		return
+	}
+	mirrors, err := e.ListCharacterMirrors()
+	if err != nil {
+		return
+	}
+	dir := e.characterMirrorDir()
+	for _, m := range mirrors {
+		if m.Workspace != workspaceID {
+			continue
+		}
+		_ = os.Remove(filepath.Join(dir, sanitizeFileName(m.Name)+".json"))
+	}
+}
