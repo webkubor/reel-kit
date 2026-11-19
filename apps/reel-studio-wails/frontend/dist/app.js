@@ -746,10 +746,10 @@
     if (episode.publishPlatform) {
       var pub = el('div', 'flex items-baseline justify-between gap-3 text-2xs')
       pub.appendChild(el('span', 'text-ink-mid', '已发布到 ' + episode.publishPlatform))
-      pub.appendChild(el('a', 'text-ink-dim underline decoration-dotted', '打开原片'))
-      pub.setAttribute('href', episode.publishUrl || '#')
-      pub.setAttribute('target', '_blank')
-      pub.setAttribute('rel', 'noreferrer')
+      var open = el('button', 'text-ink-dim underline decoration-dotted', '打开原片')
+      open.type = 'button'
+      open.addEventListener('click', function () { openExternal(episode.publishUrl) })
+      pub.appendChild(open)
       body.appendChild(pub)
     }
     line('出场角色', (episode.characterCount || 0) > 0 ? 'ok' : 'gap')
@@ -2222,6 +2222,24 @@
   }
 
   // 已发布的剧集：用 YouTube 内嵌播放器直接放（不下载、不转存）。
+  // 用系统浏览器打开外链。桌面窗口里 <a target=_blank> 不会跳出去，要走 Wails 运行时。
+  function openExternal(url) {
+    if (!url) return
+    if (window.runtime && window.runtime.BrowserOpenURL) window.runtime.BrowserOpenURL(url)
+    else window.open(url, '_blank', 'noopener')
+  }
+
+  // 页面是否由 http(s) 提供。打包后的桌面窗口跑在 wails:// 上，不是。
+  function servedOverHTTP() {
+    return /^https?:$/.test(location.protocol)
+  }
+
+  // 已发布剧集的播放区。
+  //
+  // YouTube 内嵌播放器要求请求带 HTTP Referer，否则报「视频播放器配置错误 错误 153」。
+  // 打包后的桌面窗口页面在 wails:// 上，WebKit 不会给非 http(s) 来源发 Referer，
+  // referrerpolicy 也改变不了（2026-11-19 在原生窗口实测仍是 153）。
+  // 所以桌面里不嵌 iframe：显示封面，点按钮用系统浏览器播放；http(s) 环境照旧内嵌。
   function showYouTube(videoID) {
     var box = $('stage-youtube')
     if (!box || !videoID) return
@@ -2229,14 +2247,26 @@
     $('stage-video').classList.add('hidden')
     $('stage-canvas').classList.add('hidden')
     box.classList.remove('hidden')
-    // YouTube 在没有 HTTP Referer 时会报「视频播放器配置错误 错误 153」。
-    // 桌面 webview（Wails 走 wails:// scheme）发不出 Referer，浏览器里却正常。
-    // referrerpolicy 让它带上当前来源；同时给一个在浏览器打开的退路。
-    box.innerHTML = '<iframe class="h-full w-full" referrerpolicy="strict-origin-when-cross-origin" ' +
-      'src="https://www.youtube.com/embed/' + encodeURIComponent(videoID) +
-      '?rel=0&playsinline=1" title="已发布剧集" ' +
-      'allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>'
-    $('stage-note').textContent = '已发布版本 · YouTube 内嵌播放'
+    var id = encodeURIComponent(videoID)
+    var watch = 'https://www.youtube.com/watch?v=' + id
+    if (servedOverHTTP()) {
+      box.innerHTML = '<iframe class="h-full w-full" src="https://www.youtube-nocookie.com/embed/' + id +
+        '?rel=0" title="已发布剧集" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>'
+      $('stage-note').textContent = '已发布版本 · YouTube 内嵌播放'
+    } else {
+      box.innerHTML = ''
+      var btn = el('button', 'yt-cover')
+      btn.type = 'button'
+      btn.setAttribute('aria-label', '在浏览器里播放这一集')
+      var img = el('img', 'h-full w-full object-cover')
+      img.src = 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg'
+      img.alt = ''
+      btn.appendChild(img)
+      btn.appendChild(el('span', 'yt-cover-play', '▶ 在浏览器播放'))
+      btn.addEventListener('click', function () { openExternal(watch) })
+      box.appendChild(btn)
+      $('stage-note').textContent = '已发布版本 · YouTube 不允许在桌面窗口内嵌播放，点封面用浏览器打开'
+    }
     $('preview-meta').textContent = 'YouTube · 16:9'
     $('btn-export').classList.add('hidden')
     layoutStage()

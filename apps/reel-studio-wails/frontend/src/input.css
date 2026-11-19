@@ -569,3 +569,13 @@
     @apply absolute inset-0 h-full w-full bg-stage object-contain;
   }
 }
+
+/* 桌面窗口里的已发布剧集封面（YouTube 不允许 wails:// 页面内嵌播放） */
+.yt-cover { position: relative; display: block; width: 100%; height: 100%; cursor: pointer; background: #000; }
+.yt-cover img { opacity: .82; transition: opacity .15s; }
+.yt-cover:hover img, .yt-cover:focus-visible img { opacity: 1; }
+.yt-cover-play {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  padding: .55rem 1rem; border-radius: 999px; font-size: .8rem; font-weight: 600;
+  color: #fff; background: rgba(11, 12, 14, .78); border: 1px solid rgba(255, 255, 255, .22);
+}
