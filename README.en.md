@@ -16,6 +16,32 @@ muse·tv is a macOS desktop app. A short-drama project can hold a dozen episodes
 |---|---|
 | ![Character library: 18 character cards, 14 with avatars, the rest marked "avatar pending"](docs/images/muse-tv-cast.png) | ![Scene library: 4 scenes, each with a reference image and a description](docs/images/muse-tv-scene.png) |
 
+## The drama made with it: "Boiling Snow"
+
+This short drama was produced with muse-tv —— 13 集、4 个场景、13 characters, all inside one project.
+
+[![《沸腾之雪》序章](https://i.ytimg.com/vi/stNWoECC9NY/hqdefault.jpg)](https://www.youtube.com/watch?v=stNWoECC9NY)
+
+*Prologue "天下三分：这场雪，开始沸腾" — watch all  13 episodes on YouTube*
+
+| Ep. | Title |
+|---|---|
+| 序 | [天下三分：这场雪，开始沸腾](https://www.youtube.com/watch?v=stNWoECC9NY) |
+| 01 | [雪夜传说：边关风起，杀机先落](https://www.youtube.com/watch?v=1r8_JSdrLiU) |
+| 02 | [不是告别，是江湖开场｜小师妹下山](https://www.youtube.com/watch?v=qzlEaFfdk3w) |
+| 03 | [酒肆风声：一碗阳春面，听尽三杰名号](https://www.youtube.com/watch?v=yOoyG8hNZcc) |
+| 04 | [鬼面枪影：不报姓名，只等欧阳狂徒](https://www.youtube.com/watch?v=il-ag2QbE80) |
+| 05 | [雪山三日战：天下第一](https://www.youtube.com/watch?v=DqGLZVfFlgk) |
+| 06 | [戏里戏外·灯火疑城](https://www.youtube.com/watch?v=g7JNUd0vDSg) |
+| 07 | [笛止王线：江湖深水](https://www.youtube.com/watch?v=lk6pi4fGY18) |
+| 08 | [皇影入局：黑市开门](https://www.youtube.com/watch?v=BkJEJuWC4-8) |
+| 09 | [暗坊深水：夜惊鸿](https://www.youtube.com/watch?v=99chg2_Lx-Q) |
+| 10 | [暗坊索剑：孤山惊榜，王府风紧](https://www.youtube.com/watch?v=lZfdplPH4JE) |
+| 11 | [茶间问雪：和尚入局，狂刀还生](https://www.youtube.com/watch?v=lTnn7C5oygA) |
+| 12 | [旧梦北荒：兵锋将至](https://www.youtube.com/watch?v=AMhECm-PVsg) |
+
+Every episode plays inside the app. Episode status spells out what is still missing (cast, storyboard); missing parts are never invented.
+
 ## Project types
 
 You pick the type when creating a project, and it cannot be changed later. Each type has its own workspaces:
