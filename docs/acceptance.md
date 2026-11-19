@@ -41,11 +41,15 @@ bash apps/reel-studio-wails/scripts/preflight.sh <包目录>
 
 ## 发布状态
 
-- 最新包：`dist/pkg-20261119-004740/`（1.9.0，commit `3ab5369`）
-- tag `app-v1.9.0` 已指向该 commit；发布 dry-run 通过
-- **1.9.0 尚未创建 GitHub release** —— 发布是对外可见的动作，等人确认再执行。
-  命令：`bash scripts/publish-desktop-release.sh app-v1.9.0 dist/pkg-20261119-004740 docs/releases/app-v1.9.0.md`
-- 上一个已发布的版本是 1.8.1（2026-11-17），比这批改动早得多。
+**1.9.0 已发布并验收**（2026-11-19）：
+
+- 发布页：https://github.com/museav-ai/muse-tv/releases/tag/app-v1.9.0
+- 资产：`muse-tv-1.9.0-darwin-arm64.zip`（302,757,940 字节）+ `SHA256SUMS` + `build-info.json`
+- **线上验收**：`SHA256SUMS` 与本地包哈希一致
+  （`d0da6c02…67bfe`），证明线上发布的就是本地预检通过的那个包。
+  303MB 主包下载受网络限制未跑完全程校验，但元数据与哈希已核对一致。
+- Windows 包已构建（`dist/pkg-win-20261119-130905/muse-tv-1.9.0-windows-amd64.zip`），
+  **尚未上传到 release**，等是否发布的决定。
 
 ## 未验（如实记录）
 
