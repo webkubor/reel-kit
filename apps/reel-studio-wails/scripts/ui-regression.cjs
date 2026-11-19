@@ -1,6 +1,6 @@
 const { spawn } = require('child_process'); const fs = require('fs'); const path = require('path')
 const SP=process.argv[2]
-const chrome=process.env.REEL_CHROME||'/Users/webkubor/dev/video/reel-kit/apps/reel-studio/resources/darwin-arm64/chrome/chrome-headless-shell'
+const chrome=process.env.REEL_CHROME||'/Users/webkubor/dev/video/reel-kit/apps/reel-studio-wails/resources/darwin-arm64/chrome/chrome-headless-shell'
 const dir=fs.mkdtempSync(path.join(SP,'cdp-'))
 const proc=spawn(chrome,['--headless','--disable-gpu','--no-sandbox','--remote-debugging-port=0',`--user-data-dir=${dir}`,'about:blank'],{stdio:'ignore'})
 const wait=ms=>new Promise(r=>setTimeout(r,ms))

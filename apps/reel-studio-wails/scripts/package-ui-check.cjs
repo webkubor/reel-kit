@@ -7,7 +7,7 @@ const os = require('os')
 const port = process.argv[2] || '34122'
 const outDir = process.argv[3] || '/tmp'
 const chrome = process.env.REEL_CHROME ||
-  '/Users/webkubor/dev/video/reel-kit/apps/reel-studio/resources/darwin-arm64/chrome/chrome-headless-shell'
+  '/Users/webkubor/dev/video/reel-kit/apps/reel-studio-wails/resources/darwin-arm64/chrome/chrome-headless-shell'
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pkgui-'))
 const proc = spawn(chrome, ['--headless', '--disable-gpu', '--no-sandbox',
   '--remote-debugging-port=0', `--user-data-dir=${dir}`, 'about:blank'], { stdio: 'ignore' })

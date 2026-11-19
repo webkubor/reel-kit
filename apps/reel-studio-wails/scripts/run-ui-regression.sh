@@ -11,8 +11,8 @@ chrome=${REEL_CHROME:-}
 if [[ -z "$chrome" ]]; then
   for candidate in \
     "$here/../resources/darwin-arm64/chrome/chrome-headless-shell" \
-    "$here/../../reel-studio/resources/darwin-arm64/chrome/chrome-headless-shell" \
-    "/Users/webkubor/dev/video/reel-kit/apps/reel-studio/resources/darwin-arm64/chrome/chrome-headless-shell"; do
+    "$HOME/.cache/deps/chrome-darwin-arm64/chrome-headless-shell" \
+    "/Users/webkubor/dev/video/reel-kit/apps/reel-studio-wails/resources/darwin-arm64/chrome/chrome-headless-shell"; do
     [[ -x "$candidate" ]] && { chrome="$candidate"; break; }
   done
 fi
