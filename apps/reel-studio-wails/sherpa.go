@@ -16,12 +16,17 @@ import (
 func sherpaFiles() (bin, model, tokens, lexicon, lib string, err error) {
 	home := os.Getenv("REEL_SHERPA_HOME")
 	if home == "" {
-		var executable string
-		executable, err = os.Executable()
-		if err != nil {
-			return
+		// 随应用分发的 sherpa：macOS 与 Windows 的包布局不同，由 bundledDir 挨个找。
+		if h := bundledDir("sherpa"); h != "" {
+			home = h
+		} else {
+			var executable string
+			executable, err = os.Executable()
+			if err != nil {
+				return
+			}
+			home = filepath.Join(filepath.Dir(executable), "..", "Resources", "sherpa")
 		}
-		home = filepath.Join(filepath.Dir(executable), "..", "Resources", "sherpa")
 	}
 	name := "sherpa-onnx-offline-tts"
 	if runtime.GOOS == "windows" {
