@@ -1,5 +1,7 @@
 # AGENTS.md — reel-kit 仓库级行为准则
 
+通用表达规范见 `writing-standard-skills`，此处只写本项目特有细则；表达规范以 `~/dev/agent-skills/writing-standard-skills` 为准。
+
 ## 这是什么
 
 **短视频合成引擎 · AI 无人值守的批量装配器**(用户 2026-08-24 拍板定位)。
