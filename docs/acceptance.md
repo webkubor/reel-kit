@@ -88,9 +88,24 @@ bash apps/reel-studio-wails/scripts/preflight.sh <包目录>
   但截到的是锁屏壁纸或别的应用 —— muse-tv 窗口在截屏前就被锁屏盖住了，
   所以**窗口内容仍未目视确认**。
 
-  **仍未验的只有「眼睛看到的」那一层**：窗口内的渲染与原生控件交互，
-  以及 macOS 的首次启动拦截提示。屏幕每 5–7 分钟自动锁一次，
-  需要你在场时才能完成这一层验收。
+  **原生控件交互已验收**（2026-11-19 上午屏幕解锁期间，用辅助功能 API 与
+  CGEvent 真实鼠标事件）：
+
+  ```
+  菜单栏：4 个菜单（Apple / muse-tv / Edit / Window），各项齐全
+  点「About muse-tv」→ 弹出关于对话框（窗口数 1→2）
+    读到：图标 / 「muse-tv」/ 说明文字 / OK 按钮（即 main.go 配的 mac.AboutInfo）
+  点「＋ 导入素材」→ 弹出 macOS 原生文件选择器（AXSheet）
+    结构：AXSheet → AXSplitGroup → AXScrollArea → AXOutline
+    侧边栏：Recents / Shared / Favorites / Applications / Desktop / Documents / Movies …
+  两次都按 Esc 正常取消，窗口回到 1 个
+  ```
+
+  即：菜单栏可点、原生对话框可弹、系统文件选择器可弹可取消。
+
+  **仍未验的只剩**：导出对话框（需要先有成片才能触发）、
+  以及 macOS 的首次启动拦截提示（ad-hoc 签名首次打开时的 Gatekeeper 弹窗，
+  只能由真人首次打开时见到）。
 - **付费链路**：素材模板真生成、出镜（联网生成视频）要提交计费任务，未在验收中执行。
   两者的提示词组装、命名规则、分类落位已用单元测试覆盖。
 - **Apple 公证**：只有 ad-hoc 本机签名。
