@@ -93,10 +93,12 @@ muse·tv 是 macOS 桌面应用。一个短剧项目可以有十几集、几十�
 | 平台 | 当前发布状态 |
 |---|---|
 | macOS Apple Silicon（M 系列芯片） | [下载 1.9.0 ZIP](https://github.com/museav-ai/muse-tv/releases/download/app-v1.9.0/muse-tv-1.9.0-darwin-arm64.zip)，需要 macOS 13 或更新 |
-| Windows | 尚未发布本版安装包 |
+| Windows x64 | 安装包已构建，待发布（未签名，需在 Windows 真机验证） |
 | macOS Intel | 尚未发布本版安装包 |
 
-解压后把 `muse-tv.app` 放进「应用程序」。当前包只做了 **ad-hoc 签名，没有 Apple 公证**，macOS 可能会拦截首次启动。[发布页](https://github.com/museav-ai/muse-tv/releases/tag/app-v1.9.0)提供 SHA256SUMS 和构建信息。
+**macOS**：解压后把 `muse-tv.app` 放进「应用程序」。当前包只做了 **ad-hoc 签名，没有 Apple 公证**，macOS 可能会拦截首次启动。[发布页](https://github.com/museav-ai/muse-tv/releases/tag/app-v1.9.0)提供 SHA256SUMS 和构建信息。
+
+**Windows**：解压后双击 `muse-tv.exe`。安装包自带离线资源（Chrome、ffmpeg、中文语音模型、MuseAV CLI），不需另装 Node。当前 Windows 包**未签名**，SmartScreen 会提示「已保护你的电脑」——点「更多信息」→「仍要运行」。运行依赖 WebView2（Windows 10/11 通常自带）。
 
 只支持手动下载安装，不会自动升级。
 

@@ -28,9 +28,17 @@ muse-tv 1.9.0
 - 界面回归脚本：bash scripts/run-ui-regression.sh
 - 发布前检查：bash scripts/preflight.sh <包目录>
 
+Windows 版（本次新增）
+- 安装包已构建：`muse-tv-1.9.0-windows-amd64.zip`，解压后双击 `muse-tv.exe`
+- 自带离线资源（Chrome、ffmpeg、中文语音模型、MuseAV CLI），不需另装 Node
+- 运行依赖 WebView2（Windows 10/11 通常自带）
+- **未在 Windows 真机上运行验证过**；**未做代码签名**，SmartScreen 会拦截，
+  需手动「更多信息」→「仍要运行」
+
 已知限制（如实说明）
-- 本包仅做本机 ad-hoc 签名，未做 Apple 公证；macOS 可能拦截首次启动
+- macOS 包仅做本机 ad-hoc 签名，未做 Apple 公证；首次启动可能被拦截
+- Windows 包未签名，SmartScreen 会拦截
 - 出镜（联网生成视频）与素材模板真生成需提交付费任务，本版未在验收中执行
-- 验收期间屏幕一直锁定，原生窗口、菜单栏、系统文件选择器一次都没点过；
-  界面验收均用无界面浏览器打开同一套前端完成
+- 原生窗口、菜单栏、关于对话框、系统文件选择器已验收（辅助功能 API 逐个点击验证）；
+  导出对话框（NSSavePanel）与 macOS 首次启动拦截提示未验
 - 13 集的出场角色与分镜是空的：YouTube 只提供标题与链接，工作台已显式标出
