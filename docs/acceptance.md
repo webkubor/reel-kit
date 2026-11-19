@@ -114,6 +114,6 @@ bash apps/reel-studio-wails/scripts/preflight.sh <包目录>
   只能由真人首次打开时见到）。
 - **付费链路**：素材模板真生成、出镜（联网生成视频）要提交计费任务，未在验收中执行。
   两者的提示词组装、命名规则、分类落位已用单元测试覆盖。
-- **Apple 公证**：只有 ad-hoc 本机签名。
+- **Apple 公证**：只有 ad-hoc 本机签名。已查可行性：公证需要付费的 Apple Developer Program（$99/年）才能申请 Developer ID Application 证书，本机只有 Apple Development 证书（开发用，不能用于分发公证），也没有公证凭据。按「不花钱就做」的决定，此项不做。
 - **13 集的出场角色与分镜**：YouTube 只提供标题与链接，这些信息视频里没有。
   工作台已显式标出「待分镜」，没有编造内容。
