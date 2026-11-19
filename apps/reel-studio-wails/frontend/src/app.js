@@ -2229,8 +2229,13 @@
     $('stage-video').classList.add('hidden')
     $('stage-canvas').classList.add('hidden')
     box.classList.remove('hidden')
-    box.innerHTML = '<iframe class="h-full w-full" src="https://www.youtube-nocookie.com/embed/' +
-      encodeURIComponent(videoID) + '?rel=0" title="已发布剧集" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>'
+    // YouTube 在没有 HTTP Referer 时会报「视频播放器配置错误 错误 153」。
+    // 桌面 webview（Wails 走 wails:// scheme）发不出 Referer，浏览器里却正常。
+    // referrerpolicy 让它带上当前来源；同时给一个在浏览器打开的退路。
+    box.innerHTML = '<iframe class="h-full w-full" referrerpolicy="strict-origin-when-cross-origin" ' +
+      'src="https://www.youtube.com/embed/' + encodeURIComponent(videoID) +
+      '?rel=0&playsinline=1" title="已发布剧集" ' +
+      'allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>'
     $('stage-note').textContent = '已发布版本 · YouTube 内嵌播放'
     $('preview-meta').textContent = 'YouTube · 16:9'
     $('btn-export').classList.add('hidden')
