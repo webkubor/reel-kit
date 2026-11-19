@@ -10,5 +10,5 @@ dist/
 .claude/
 
 # 打包产物
-apps/reel-studio/website/*.exe
-apps/reel-studio/website/*.dmg
+apps/reel-studio-wails/resources/
+dist/pkg-*/

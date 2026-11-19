@@ -1,4 +1,4 @@
-# 桌面版发版（Reel Studio）
+# 桌面版发版（muse-tv）
 
 当前桌面产品为 `apps/reel-studio-wails`：Wails 原生窗口、Go 业务引擎、绑定调用，无 Node 运行时或本地 HTTP 业务服务。1.6.0 接替 1.5.1；MVP 是功能范围，不回退应用版本号。
 

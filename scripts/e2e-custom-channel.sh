@@ -157,8 +157,8 @@ fi
 # ffprobe 不一定在 PATH 上：先用系统里的，没有就用随包分发的那个
 FFPROBE="$(command -v ffprobe || true)"
 if [ -z "$FFPROBE" ]; then
-  for candidate in "$PWD/apps/reel-studio/resources/darwin-arm64/bin/ffprobe" \
-                   "$PWD/apps/reel-studio/resources/darwin-amd64/bin/ffprobe"; do
+  for candidate in "$PWD/apps/reel-studio-wails/resources/darwin-arm64/bin/ffprobe" \
+                   "$PWD/apps/reel-studio-wails/resources/darwin-amd64/bin/ffprobe"; do
     [ -x "$candidate" ] && FFPROBE="$candidate" && break
   done
 fi

@@ -8,13 +8,13 @@
 #   bash scripts/prepare-resources.sh darwin-amd64
 #   bash scripts/prepare-resources.sh windows-amd64
 #
-# 产物落在 apps/reel-studio/resources/<platform>/，由 mygo build 打进 App 包。
+# 产物落在 apps/reel-studio-wails/resources/<platform>/，由 mygo build 打进 App 包。
 
 set -euo pipefail
 
 PLATFORM="${1:-}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RES="$ROOT/apps/reel-studio/resources"
+RES="$ROOT/apps/reel-studio-wails/resources"
 CACHE="$ROOT/.cache/deps"
 
 NODE_VERSION="22.14.0"

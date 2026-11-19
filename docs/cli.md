@@ -197,7 +197,7 @@ reel-kit/                          # reel-kit 仓库
 ├── templates/                     # 10 套 HTML 模板
 ├── prompts/                       # 手绘风格配方库
 ├── studio/                        # 本地可视化工作台(网页版)
-├── apps/reel-studio/              # 桌面应用(Go + mygo 原生界面)
+├── apps/reel-studio-wails/        # 桌面应用(Wails + Go)
 ├── docs/                          # 设计取舍、合成笔记
 └── examples/                      # 完整可复现 demo 素材
 ```
@@ -241,10 +241,10 @@ Agent 工作流里也可通过 [cs-mcp](https://github.com/webkubor/cs-mcp) 调�
 ## 桌面应用开发
 
 ```bash
-cd apps/reel-studio
-go tool mygo dev      # 开发（带热重载）
+cd apps/reel-studio-wails
+wails dev             # 开发（前端热重载）
 go test ./...         # 不开窗口测交互
-go tool mygo build    # 打包成 .app
+bash scripts/package.sh <输出目录> <资源目录>   # 打包成 .app
 ```
 
 原生界面与网页版共用同一套本地 HTTP 接口（`studio/server.mjs`），数据、素材、成片都还在 `~/.reel-kit/studio/`。端点清单与调用示例见 [本地 HTTP 接口](studio-api.md)。

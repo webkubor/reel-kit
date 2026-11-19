@@ -38,7 +38,7 @@ add('bin/reel.mjs', 'bin/reel.mjs')
 
 let bad = 0
 for (const platform of platforms) {
-  const bundle = join(root, 'apps/reel-studio/resources', platform, 'backend')
+  const bundle = join(root, 'apps/reel-studio-wails/resources', platform, 'backend')
   if (!existsSync(bundle)) continue
   for (const [repoPath, bundlePath] of pairs) {
     const src = join(root, repoPath)

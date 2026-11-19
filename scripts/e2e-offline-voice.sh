@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # 端到端实测：用「打包版布局」的工作台，配「随应用自带」的离线引擎，出一条真视频。
 #
-# 跑的是 apps/reel-studio/resources/darwin-arm64 里那套真实产物：
+# 跑的是 apps/reel-studio-wails/resources/darwin-arm64 里那套真实产物：
 # 自带的 node、自带的 chrome headless、自带的 ffmpeg、自带的本机语音引擎。
 set -euo pipefail
 
-RES="$PWD/apps/reel-studio/resources/darwin-arm64"
+RES="$PWD/apps/reel-studio-wails/resources/darwin-arm64"
 HOME_DIR="/tmp/rs-e2e-home"
 PORT=4397
 rm -rf "$HOME_DIR"; mkdir -p "$HOME_DIR"

@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Reel Studio 的引擎:素材 + 逐句文案 + 配音/BGM,套 HTML 模板出片。桌面应用(macOS/Windows)与命令行同一套流水线。本地 TTS 零成本,10 套模板,44 套知识短视频视觉风格,9 种转场。本仓库不发布到 npm 仓库,用户走应用下载。",
+  "description": "muse-tv 的引擎:素材 + 逐句文案 + 配音/BGM,套 HTML 模板出片。桌面应用(macOS/Windows)与命令行同一套流水线。本地 TTS 零成本,10 套模板,44 套知识短视频视觉风格,9 种转场。本仓库不发布到 npm 仓库,用户走应用下载。",
   "bin": {
     "reel": "./bin/reel.mjs"
   },
