@@ -6,10 +6,52 @@
 //   3. 改 outputDir / filePrefix
 //   4. bun run shoot.mjs
 //
-// 截图用本机已有的 chromium（reel-kit 装过的那份），不额外下载浏览器。
-import { chromium } from '/Users/webkubor/dev/video/reel-kit/node_modules/.pnpm/playwright-core@1.62.1/node_modules/playwright-core/index.mjs'
+// 截图用本机已有的 chromium（muse·tv 装过的那份），不额外下载浏览器。
+// 可执行文件在 playwright 缓存里按版本目录存放，这里动态解析，不写死版本号；
+// 素材目录也从本文件位置派生，仓库改名 / 换机都不用改。
+import { chromium } from 'playwright-core'
+import { existsSync, mkdirSync, readdirSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const CHROME = '/Users/webkubor/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'
+const here = dirname(fileURLToPath(import.meta.url))
+
+// playwright 缓存根目录：macOS 与 Linux 各一份。
+const CACHE_ROOTS = [
+  join(homedir(), 'Library/Caches/ms-playwright'),
+  join(homedir(), '.cache/ms-playwright'),
+]
+
+function cachedChromiumDirs() {
+  const dirs = []
+  for (const root of CACHE_ROOTS) {
+    if (!existsSync(root)) continue
+    for (const name of readdirSync(root)) {
+      const matched = name.match(/^chromium(?:_headless_shell)?-(\d+)$/)
+      if (!matched) continue
+      dirs.push({ root, name, revision: Number(matched[1]) })
+    }
+  }
+  return dirs.sort((a, b) => b.revision - a.revision)
+}
+
+// 优先用完整版 Chrome for Testing，其次 headless shell，最后 Linux 版 chrome。
+function resolveChrome() {
+  const dirs = cachedChromiumDirs()
+  const candidates = [
+    ...dirs.map(dir => join(dir.root, dir.name, 'chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing')),
+    ...dirs.map(dir => join(dir.root, dir.name, 'chrome-headless-shell-mac-arm64/chrome-headless-shell')),
+    ...dirs.map(dir => join(dir.root, dir.name, 'chrome-linux/chrome')),
+  ]
+  const hit = candidates.find(candidate => existsSync(candidate))
+  if (!hit) {
+    throw new Error('找不到 chromium 可执行文件：用 REEL_CHROME 指定，或先 npx playwright install chromium')
+  }
+  return hit
+}
+
+const CHROME = process.env.REEL_CHROME || resolveChrome()
 
 const frames = [
   'terminal-frame',      // ① 问题：明文出现在哪
@@ -20,13 +62,16 @@ const frames = [
   'logo-endcard',        // ⑥ 收尾：logo + 链接
 ]
 
-const outputDir = '/Users/webkubor/dev/video/project-demo-kit/shots'
+const outputDir = join(here, 'shots')
+const framesDir = join(here, 'frames')
 const filePrefix = 'shot'
+
+mkdirSync(outputDir, { recursive: true })
 
 const browser = await chromium.launch({ executablePath: CHROME })
 const page = await browser.newPage({ viewport: { width: 1000, height: 1000 }, deviceScaleFactor: 2 })
 for (let i = 0; i < frames.length; i++) {
-  await page.goto(`file:///Users/webkubor/dev/video/project-demo-kit/frames/${frames[i]}.html`)
+  await page.goto(pathToFileURL(join(framesDir, `${frames[i]}.html`)).href)
   await page.waitForTimeout(250)
   const name = `${filePrefix}${String(i + 1).padStart(2, '0')}.png`
   await page.screenshot({ path: `${outputDir}/${name}` })

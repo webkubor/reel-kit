@@ -106,7 +106,9 @@ reel make ... --voice <音色ID> --voice-engine mimo        # 小米 MiMo TTS（
 | 音色 | 已注册的本地音色 | 供应商音色 ID |
 | 前置 | 需先注册音色 | 注入 `MINIMAX_API_KEY` |
 
-> `museav speak` 在当前 MuseAV CLI 中不可用，不能作为配音后端。voxcraft 的音色库初始为空，使用前需注册音色。
+> `museav speak` 需要 museav-cli 3.17.0+（3.16.0 里没有这个命令）。选 `--voice-engine museav` 时，
+> 桌面版从 Finder 启动可能找不到 PATH，用 `MUSEA_BIN` 指向可用的 `museav` 可执行文件。
+> voxcraft 的音色库初始为空，使用前需注册音色。
 > reel-kit 会自动定位本机的 voxcraft 安装（它的 `voice` 命令在 venv 里，默认不在 PATH），缺什么会明确报出来并给可复制的修复命令 —— **不会自动去装 4.2GB 的东西**。
 
 桌面版另有一套：随包自带 sherpa-onnx 中文离线模型（免费、离线、macOS 与 Windows 同一套），云端 TTS 与声音克隆见 README。

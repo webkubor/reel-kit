@@ -53,8 +53,10 @@
 |---|---|
 | `voxcraft`（默认） | 批量。本地 Qwen3-TTS，一次性 4.2GB 模型，之后免费 |
 | `minimax` | MiniMax 云端 TTS，需 `MINIMAX_API_KEY`，按量计费，音色用 voice_id |
+| `museav` | 走 `museav speak`（museav-cli 3.17.0+），直连上游 TTS，不扣中台 credits；命令路径用 `MUSEA_BIN` 覆盖 |
 
-`museav speak` **不存在**（CLI 3.16.0 实测）；不要再拿它当配音兜底。
+`museav speak` 在 CLI 3.16.0 不存在、3.17.0 起可用——所以 `museav` 这个后端要求
+museav-cli ≥ 3.17.0；旧 CLI 上跑会明确报「unknown command」并提示用 `MUSEA_BIN` 覆盖路径。
 
 **voxcraft 的 `voice` 命令在它自己的 venv 里，默认不在 PATH。**
 `src/voxcraft-locate.mjs` 负责定位并按完整度打分（能跑 > 有模型 > 有音色），

@@ -9,12 +9,15 @@ port=${1:-34117}
 # chrome-headless-shell 随离线资源分发：优先用环境变量，否则在本机几个常见位置找。
 chrome=${REEL_CHROME:-}
 if [[ -z "$chrome" ]]; then
+  shopt -s nullglob
   for candidate in \
     "$here/../resources/darwin-arm64/chrome/chrome-headless-shell" \
     "$HOME/.cache/deps/chrome-darwin-arm64/chrome-headless-shell" \
-    "/Users/webkubor/dev/video/reel-kit/apps/reel-studio-wails/resources/darwin-arm64/chrome/chrome-headless-shell"; do
+    "$HOME"/Library/Caches/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-mac-arm64/chrome-headless-shell \
+    "$HOME"/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux/chrome-headless-shell; do
     [[ -x "$candidate" ]] && { chrome="$candidate"; break; }
   done
+  shopt -u nullglob
 fi
 [[ -x "$chrome" ]] || { printf '找不到 chrome-headless-shell（可用 REEL_CHROME 指定）\n' >&2; exit 2; }
 curl -s -o /dev/null "http://127.0.0.1:$port/" || { printf '开发服务没起来\n' >&2; exit 2; }
