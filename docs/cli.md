@@ -1,4 +1,4 @@
-# reel-kit 命令行与引擎文档
+# muse·tv 命令行与引擎文档
 
 面向想用命令行、接自己的流程、或改引擎源码的人。只想装个桌面应用出片，见 [README](../README.md)。
 
@@ -16,7 +16,7 @@ npx github:museav-ai/muse-tv make --template sticker-promo ...
 
 ```bash
 git clone git@github.com:museav-ai/muse-tv
-cd reel-kit && pnpm install && npm link   # npm link 只是把本仓库挂成全局命令 reel
+cd muse-tv && pnpm install && npm link   # npm link 只是把本仓库挂成全局命令 reel
 ```
 
 不想装全局命令，就在仓库里直接跑：`node bin/reel.mjs make ...`。
@@ -31,7 +31,7 @@ cd reel-kit && pnpm install && npm link   # npm link 只是把本仓库挂成全
 
 ```bash
 reel make --template sticker-promo \
-  --title "reel-kit" --subtitle "竖版短视频合成工作台" \
+  --title "muse·tv" --subtitle "竖版短视频合成工作台" \
   --assets ./examples/assets --caps ./examples/demo-caps.txt \
   --out demo.mp4
 ```
@@ -109,7 +109,7 @@ reel make ... --voice <音色ID> --voice-engine mimo        # 小米 MiMo TTS（
 > `museav speak` 需要 museav-cli 3.17.0+（3.16.0 里没有这个命令）。选 `--voice-engine museav` 时，
 > 桌面版从 Finder 启动可能找不到 PATH，用 `MUSEA_BIN` 指向可用的 `museav` 可执行文件。
 > voxcraft 的音色库初始为空，使用前需注册音色。
-> reel-kit 会自动定位本机的 voxcraft 安装（它的 `voice` 命令在 venv 里，默认不在 PATH），缺什么会明确报出来并给可复制的修复命令 —— **不会自动去装 4.2GB 的东西**。
+> muse·tv 会自动定位本机的 voxcraft 安装（它的 `voice` 命令在 venv 里，默认不在 PATH），缺什么会明确报出来并给可复制的修复命令 —— **不会自动去装 4.2GB 的东西**。
 
 桌面版另有一套：随包自带 sherpa-onnx 中文离线模型（免费、离线、macOS 与 Windows 同一套），云端 TTS 与声音克隆见 README。
 
@@ -161,7 +161,7 @@ reel make ... --bgm 轻快         # 按别名取，首次自动下载并缓存�
 
 `key` 可以是相对 `cdn` 的路径、完整 URL，或本地绝对路径。
 
-> **reel-kit 不自带任何配乐** —— 音乐授权是使用者自己的事，塞一批曲子进来只会给你添麻烦。
+> **muse·tv 不自带任何配乐** —— 音乐授权是使用者自己的事，塞一批曲子进来只会给你添麻烦。
 
 填了 `license` 就会在出片时打印出来，**每次**都打印：
 
@@ -193,7 +193,7 @@ reel channels check <id>                 # 探活：不通不花钱，不生成�
 ## 仓库结构
 
 ```
-reel-kit/                          # reel-kit 仓库
+muse-tv/                           # muse·tv 仓库
 ├── bin/                           # CLI 入口(`reel` 命令)
 ├── src/                           # 视频合成核心(导出为库:import { renderFrames, compose, ... })
 ├── templates/                     # 10 套 HTML 模板
@@ -259,7 +259,7 @@ bash scripts/package.sh <输出目录> <资源目录>   # 打包成 .app
 
 ## 官网
 
-`docs/index.html` 是 reel-kit 的官方单页网站，部署到 GitHub Pages 后可在 <https://museav-ai.github.io/muse-tv/> 访问。启用方法：仓库 **Settings → Pages → Source 选 `Deploy from a branch` → Branch 选 `main`、Folder 选 `/docs`**。
+`docs/index.html` 是 muse·tv 的官方单页网站，部署到 GitHub Pages 后可在 <https://museav-ai.github.io/muse-tv/> 访问。启用方法：仓库 **Settings → Pages → Source 选 `Deploy from a branch` → Branch 选 `main`、Folder 选 `/docs`**。
 
 ## License
 

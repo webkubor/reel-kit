@@ -5,7 +5,7 @@
 **为什么记这个**：那个项目本身对我没用（靠 pexels 免费素材库拼片，而我有 museav 中台出图，路线更强也更独家），
 2026-08-28 已删。但它踩过的合成坑是真的，删项目前先把知识捞出来 —— **留下的是踩坑结论，不是代码**。
 
-以下每条都标注了「reel-kit 现状」，说明哪些已经做了、哪些是待补的。
+以下每条都标注了「muse·tv 现状」，说明哪些已经做了、哪些是待补的。
 
 ---
 
@@ -35,7 +35,7 @@ _runtime_disabled_video_codecs.add(codec)
 **第三层是关键**，也是最容易漏的。硬件编码器「列表里有但实际跑挂」很常见（驱动版本、
 显存占满、并发限制），失败一次就该记住。
 
-> reel-kit 现状：**未做**。目前写死 `libx264`（软编，最稳）。
+> muse·tv 现状：**未做**。目前写死 `libx264`（软编，最稳）。
 > 素材量上来、单片渲染超过几分钟时再考虑加硬编 + 这套降级。
 
 ## 2. concat demuxer 的路径转义
@@ -54,7 +54,7 @@ def _format_ffmpeg_concat_path(file_path):
 中文路径本身没问题（UTF-8 写文件即可），但**空格 + 单引号**的组合会静默产生错误的文件列表 ——
 ffmpeg 不会报「路径错」，而是报「找不到文件」，排查时容易怀疑到别处。
 
-> reel-kit 现状：**已做单引号转义**（`compose.mjs` 的 `buildConcatList`）。
+> muse·tv 现状：**已做单引号转义**（`compose.mjs` 的 `buildConcatList`）。
 > 反斜杠转换未做 —— 只跑 macOS，暂不需要。
 
 ## 3. concat list 不要重复末帧(基于 ffmpeg 7.x 实测修正)
@@ -86,7 +86,7 @@ ffmpeg 文档原文:
 
 意思是:末行 duration 被忽略,且不会"补"给任何帧。**末镜时长仍由"前一行 duration"决定**(因为前一行有"下一个 file"作为参照)。
 
-> reel-kit 现状:**不重复末行**。改 `compose.mjs` 时不要重复那行。
+> muse·tv 现状:**不重复末行**。改 `compose.mjs` 时不要重复那行。
 
 ## 4. 视频时长要比音频长一点点
 
@@ -98,7 +98,7 @@ return audio_duration + _VIDEO_DURATION_SAFETY_MARGIN
 做到「刚好等于音频时长」时，**帧率舍入会让成片略短于音频**，结果是旁白最后半个字被切掉。
 统一加一点余量，代价是片尾多几帧静止画面 —— 比吞字好得多。
 
-> reel-kit 现状：**不适用**（当前是「画面定时长，BGM 去适配」，方向相反）。
+> muse·tv 现状：**不适用**（当前是「画面定时长，BGM 去适配」，方向相反）。
 > 但将来若加配音驱动的模式，这条要照抄。
 
 ## 5. 素材去重：优先每个源文件只出现一次
@@ -119,7 +119,7 @@ return primary + overflow
 **取最长片段**而不是随机取一个：避免随机选中视频尾部的零碎短片，
 导致明明素材够用却过早开始复用。
 
-> reel-kit 现状：**不适用**（一图一镜，素材由人指定顺序）。
+> muse·tv 现状：**不适用**（一图一镜，素材由人指定顺序）。
 > 但如果将来做「素材池自动选片」，这个策略直接可用。
 
 ## 6. 字幕换行必须在创建 TextClip 之前算
@@ -139,7 +139,7 @@ font = ImageFont.truetype(font_path, fontsize)
 
 `ascent + descent` 来自字体本身，不受具体字符组合影响。
 
-> reel-kit 现状：**用 HTML/CSS 渲染，天然规避**。浏览器的排版引擎自己处理换行和行高，
+> muse·tv 现状：**用 HTML/CSS 渲染，天然规避**。浏览器的排版引擎自己处理换行和行高，
 > 这正是选浏览器渲染而非 `drawtext` 的原因之一。
 
 ## 7. 文字视觉居中 ≠ 几何居中
@@ -155,7 +155,7 @@ ys, _ = np.where(mask_frame > 0.01)
 visible_top = int(ys.min())   # 按可见像素而非画布边界对齐
 ```
 
-> reel-kit 现状：**用 HTML/CSS 渲染，天然规避**。
+> muse·tv 现状：**用 HTML/CSS 渲染，天然规避**。
 
 ## 8. moviepy 必须手动释放资源
 
@@ -174,7 +174,7 @@ moviepy 的 `VideoFileClip` 会持有 ffmpeg 子进程和文件句柄，不显�
 
 递归关闭子 clip 时要判 `child is not clip`，`CompositeVideoClip` 可能有循环引用。
 
-> reel-kit 现状：**不适用**（不用 moviepy，直接调 ffmpeg CLI，进程退出即回收）。
+> muse·tv 现状：**不适用**（不用 moviepy，直接调 ffmpeg CLI，进程退出即回收）。
 > 这也是当初选 ffmpeg CLI 而非 moviepy 的原因之一 —— 少一整类资源管理问题。
 
 ## 9. 素材分辨率门槛要留容差
@@ -188,9 +188,9 @@ min_dimension = _MIN_MATERIAL_DIMENSION - _MIN_DIMENSION_TOLERANCE
 
 ---
 
-## 这些技巧对 reel-kit 的净收益
+## 这些技巧对 muse·tv 的净收益
 
-| # | 技巧 | reel-kit |
+| # | 技巧 | muse·tv |
 |---|---|---|
 | 2 | concat 单引号转义 | ✅ 已做 |
 | 3 | 最后一帧重复 | ✅ 已做 |

@@ -1,11 +1,11 @@
-# reel-kit
+# muse·tv
 
 > 竖版短视频合成工作台：素材 + 逐句文案 + 配音/BGM，套模板出片。
 > 版式用 HTML/CSS 写，镜头时长由念白决定，配音走本地 TTS 零成本。
 
 ## 它是什么
 
-**Reel Studio**：Reel Studio 是 reel-kit 的桌面应用（macOS / Windows），
+**muse·tv**：muse·tv 是本地视频工作台（macOS / Windows），
 用户下载即用，图形界面里填表出片，文字配音走随包自带的离线引擎（零成本、不联网）。
 本仓库不发布到 npm 仓库 —— 用户走应用下载，命令行只从 Git 仓库取
 （`npx github:museav-ai/muse-tv make ...` 或 clone 后 `node bin/reel.mjs`）。

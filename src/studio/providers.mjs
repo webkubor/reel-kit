@@ -113,7 +113,7 @@ export async function museavJobResult(jobId) {
 /**
  * MuseAV 的视频档次（Seedance / Kling / Wan …）从 CLI 读。
  *
- * 不在 reel-kit 里写死一份模型清单 —— 中台随时会加档或改时长上限，
+ * 不在 muse·tv 里写死一份模型清单 —— 中台随时会加档或改时长上限，
  * 写死的清单会变成「界面上能选、实际调不通」的假选项。
  *
  * CLI 的输出分两处：模型名单独走 stdout（每行一个），
@@ -535,7 +535,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
         available('museav'), available('ffmpeg'),
         Promise.all([jsonFetch(voiceBase + '/api/status', { signal: AbortSignal.timeout(3000) }), jsonFetch(voiceBase + '/api/personas', { signal: AbortSignal.timeout(3000) })]).catch(() => null),
       ])
-      // Magpie 的发现是只读的：清单来自 Magpie 自己公布的内容，不在 reel-kit 里写死一份。
+      // Magpie 的发现是只读的：清单来自 Magpie 自己公布的内容，不在 muse·tv 里写死一份。
       const magpieStatus = await magpie.discover()
       const quotas = await Promise.all(profiles.filter(p => p.key).map(async ({ id, label, key }) => {
         try {
@@ -547,7 +547,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
       }))
       const raw = voice?.[1]?.personas || []
       const personas = Array.isArray(raw) ? raw.map(p => ({ key: p.key, name: p.name || p.key })) : Object.entries(raw).map(([key, p]) => ({ key, name: p.name || key, hasSample: Boolean(p.has_audio || p.has_ref) }))
-      // MuseAV 的档次清单随中台变动，直接问 CLI，不在 reel-kit 里写死一份
+      // MuseAV 的档次清单随中台变动，直接问 CLI，不在 muse·tv 里写死一份
       const [museavModels, museavImageModels] = museav ? await Promise.all([listMuseavVideoModels(), listMuseavImageModels()]) : [[], []]
       const minimaxReady = profiles.some(p => p.key)
       const custom = loadCustomChannels()
@@ -645,7 +645,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
             }),
           ],
         },
-        export: { ready: ffmpeg, label: 'reel-kit · 合成', note: ffmpeg ? 'FFmpeg 已就绪' : '请安装 FFmpeg' },
+        export: { ready: ffmpeg, label: 'muse·tv · 合成', note: ffmpeg ? 'FFmpeg 已就绪' : '请安装 FFmpeg' },
         customChannels: customChannelIssues(),
       }
     },
@@ -686,7 +686,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
             prompt: input.prompt, requestedModel: model, actualModel: 'unknown', ...probe,
           })
         }
-        // 图片走 MuseAV 中台。模型可以自填 —— 中台上新一个档次时不用等 reel-kit 发版。
+        // 图片走 MuseAV 中台。模型可以自填 —— 中台上新一个档次时不用等 muse·tv 发版。
         progress('MuseAV 正在生成图片…')
         const args = ['gen', '--prompt', input.prompt, '--ratio', input.ratio]
         if (input.model) args.push('--model', input.model)
@@ -711,7 +711,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
       if (input.kind === 'video') {
         const channelId = input.backend || 'minimax'
         if (channelId === 'magpie') {
-          // Magpie 网关出视频。结果地址带网关鉴权头，reel-kit 拿不到 ——
+          // Magpie 网关出视频。结果地址带网关鉴权头，muse·tv 拿不到 ——
           // 由 magpie CLI 亲自把 mp4 落到本地，下载失败也只重试「取回」。
           progress('Magpie 正在提交视频任务…')
           const result = await magpie.generateVideo({ input, progress })
@@ -724,7 +724,7 @@ export function createProviders(store, { fetcher = fetch, pause = delay, downloa
         }
         if (channelId === 'museav') {
           // 走 MuseAV 中台出视频：一条链路同时能调 Seedance / Kling / Wan 等多个模型，
-          // 不必每换一个模型就往 reel-kit 里加一条直连实现。
+          // 不必每换一个模型就往 muse·tv 里加一条直连实现。
           progress('MuseAV 正在提交视频任务…')
           const args = ['gen', '--video', '--prompt', input.prompt, '--ratio', input.ratio]
           if (input.duration) args.push('--duration', String(input.duration))

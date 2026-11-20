@@ -13,7 +13,7 @@ const store = {
   addAsset(projectId, name, mime, bytes, meta) { return { id: 'asset-1', projectId, name, mime, bytes, meta } },
 }
 const backend = { generate() { throw new Error('不该走到生成配音这一步') } }
-const base = { projectId: 'p1', persona: 'demo_narrator', title: 'Reel Studio' }
+const base = { projectId: 'p1', persona: 'demo_narrator', title: 'muse·tv' }
 
 test('介绍词必须是 1–8 行、每行不超过 80 字', async () => {
   await assert.rejects(() => makeProductVideo({ ...base, captions: '' }, store, backend), /1–8 行/)

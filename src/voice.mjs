@@ -87,7 +87,7 @@ async function speakViaMinimax({ text, out, voice }) {
  *      用户没法自己 export，所以密钥要能落在配置文件里（该文件权限 0600）。
  *   3. kyvault 的 secret://mimo/api-key —— 本机凭据真源，最后一档兜底。
  *
- * 为什么第 3 档要用子进程而不是 SDK：reel-kit 是零依赖工具（package.json 只依赖
+ * 为什么第 3 档要用子进程而不是 SDK：muse·tv 是零依赖工具（package.json 只依赖
  * playwright-core），引 kyvault SDK 等于给发布包加一条原生依赖链。kyvault 的 CLI
  * 契约是「stdout 是明文，stderr 给人看」，子进程读 stdout 就够。
  *
@@ -245,7 +245,7 @@ export async function synthesizeCaptions({
     const bin = process.env.MUSEA_BIN || 'museav'
     // speak 必填音色；不给就用 MiniMax 默认音色，不让整条链路因为一个可省的参数挂掉
     const voiceId = voice || process.env.REEL_MUSEA_VOICE || 'male-qn-qingse'
-    // museav CLI 自己读 ~/.museav.json 的 minimaxApiKey，但 reel-kit 的密钥在
+    // museav CLI 自己读 ~/.museav.json 的 minimaxApiKey，但 muse·tv 的密钥在
     // ~/.reel-kit/config.json —— 这里显式透传，避免桌面版出现「密钥配了却不认」
     const key = process.env.MINIMAX_API_KEY || readReelConfig().minimaxApiKey || ''
     const env = key ? { ...process.env, MINIMAX_API_KEY: key } : process.env

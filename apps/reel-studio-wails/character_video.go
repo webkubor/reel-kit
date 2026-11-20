@@ -11,7 +11,7 @@ import (
 // 角色出镜：选一个角色 → 中台出一段 ta 的镜头 → 落回本地素材库。
 //
 // 边界（AGENTS.md）：museav 出的是**无声无字幕的素材**，不是成片。
-// 配音、字幕、合成是 reel-kit 的活。这里只做「让角色出镜」这一步。
+// 配音、字幕、合成是 muse·tv 的活。这里只做「让角色出镜」这一步。
 
 // CharacterVideoInput 角色出镜的入参。
 type CharacterVideoInput struct {

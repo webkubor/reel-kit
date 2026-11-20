@@ -17,6 +17,6 @@ body:
     id: scope
     attributes:
       label: 范围确认
-      description: "reel-kit 只做「一图一镜 + 逐句文案」的模板化竖版短片"
+      description: "muse·tv 只做「一图一镜 + 逐句文案」的模板化竖版短片"
       options:
         - label: 我的需求不是「通用剪辑」（调色/多轨/精确到帧对齐那些请用 DaVinci）

@@ -1,6 +1,6 @@
 # 本地 HTTP 接口
 
-> 桌面版原生界面只是这套接口的一个前端。想把 reel-kit 接进自己的工具、脚本或服务，
+> 桌面版原生界面只是这套接口的一个前端。想把 muse·tv 接进自己的工具、脚本或服务，
 > 直接调这里 —— 不必依赖 CLI，也不用把界面扒一遍。
 
 ## 服务从哪来
@@ -93,7 +93,7 @@ curl -s http://127.0.0.1:4390/api/state | head -c 400
   `minimax`（云端，按量计费）。
 - `backend`：图片与视频的通道。`museav`（中台）、`minimax`（H3 直连）、`magpie`（Magpie 网关）、或自定义通道 id。
 - `model`：通道内的模型。`magpie` 通道用 `provider/model` 形式（如 `codex/gpt-image-2.5`），
-  清单来自 Magpie 网关自己公布的可用列表 —— reel-kit 不内置一份模型表。
+  清单来自 Magpie 网关自己公布的可用列表 —— muse·tv 不内置一份模型表。
 - `captions` 一行一镜，最多 8 行，每行不超过 80 字。
 
 提交后拿 `job.id`，轮询 `GET /api/state` 看 `jobs[].status`；成功后 `assetId` 就是成片。
@@ -109,7 +109,7 @@ curl -s -X POST http://127.0.0.1:4390/api/jobs \
 `backend: "magpie"` 把本机跑着的 Magpie 当成统一模型网关接进来。三条约定：
 
 1. **发现是只读的。** `GET /api/providers` 里 `magpie` 通道的 `models` 来自 Magpie 自己公布的可用清单
-   （靠「给一个不存在的模型，它会回出完整清单」拿到），不是 reel-kit 内置的表。
+   （靠「给一个不存在的模型，它会回出完整清单」拿到），不是 muse·tv 内置的表。
    视频通道的可用性只看 Magpie 的工具文档与设置 —— 没配视频模型就是 `ready: false`，并写明原因。
 2. **清单 ≠ 权限。** 清单是网关公布的能力；某个 provider 有没有额度、密钥通没通，以实际调用返回为准。
 3. **提交即计费。** 上游受理后任务上先落 `upstream.taskId` / `upstream.url`，
@@ -124,7 +124,7 @@ curl -s -X POST http://127.0.0.1:4390/api/jobs \
 界面、CLI、网页版共用这一套接口，是同一个工作台的三种皮：
 
 - 想做自己的批量出片工具 → 调 `/api/jobs`；
-- 想在别的产品里嵌一个「生成视频」按钮 → 起一个 reel-kit 工作台，调同一个接口；
+- 想在别的产品里嵌一个「生成视频」按钮 → 起一个 muse·tv 工作台，调同一个接口；
 - 想给别的模型接一条新通道 → 写 `~/.reel-kit/providers.json`（见 README 的「自定义通道」）。
 
 这样第三方接的是**工作台**，不是某一条命令。

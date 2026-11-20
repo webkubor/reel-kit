@@ -22,7 +22,7 @@ export async function exportVideo(input, store, progress, signal = undefined) {
         const captions = join(temp, 'captions.txt'); writeFileSync(captions, lines.join('\n'))
         args.push('--caps', captions)
       }
-      progress('正在用 reel-kit 渲染并合成图片…')
+      progress('正在用 muse·tv 渲染并合成图片…')
       await command(process.execPath, args, { timeout: 900000, signal })
       if (audio) {
         const voiced = join(temp, 'voiced.mp4')
@@ -57,6 +57,6 @@ export async function exportVideo(input, store, progress, signal = undefined) {
     }
     const bytes = readFileSync(out)
     const video = probe.streams.find(s => s.codec_type === 'video')
-    return store.addAsset(input.projectId, `${input.title || '成片'}.mp4`, 'video/mp4', bytes, { source: 'reel-kit', origin: 'code', engine: '本地合成（ffmpeg）', exported: true, width: video?.width, height: video?.height, duration: Number(probe.format?.duration) || undefined, hasAudio: probe.streams.some(s => s.codec_type === 'audio') })
+    return store.addAsset(input.projectId, `${input.title || '成片'}.mp4`, 'video/mp4', bytes, { source: 'muse-tv', origin: 'code', engine: '本地合成（ffmpeg）', exported: true, width: video?.width, height: video?.height, duration: Number(probe.format?.duration) || undefined, hasAudio: probe.streams.some(s => s.codec_type === 'audio') })
   } finally { rmSync(temp, { recursive: true, force: true }) }
 }

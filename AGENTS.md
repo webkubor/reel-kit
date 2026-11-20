@@ -1,4 +1,4 @@
-# AGENTS.md — reel-kit 仓库级行为准则
+# AGENTS.md — muse·tv 仓库级行为准则
 
 通用表达规范见 `writing-standard-skills`，此处只写本项目特有细则；表达规范以 `~/dev/agent-skills/writing-standard-skills` 为准。
 
@@ -11,7 +11,7 @@
 桌面 UI 改动前读 `apps/reel-studio-wails/DESIGN.md` 并加载 `cs skill show ui-design`。发版遵循 `docs/desktop-release.md`；不再将 MyGo/Node 实现作为桌面发布目标。
 
 定位边界(明确不做什么):
-- **不生成视频**(AI 出视频是上游 Hailuo 这类工具的事,reel-kit 不做)
+- **不生成视频**(AI 出视频是上游 Hailuo 这类工具的事,muse·tv 不做)
 - **不剪辑已有视频**(没 timeline、没 trim、没调色)
 - **不是端到端生产线**(用户得自己给文案 + 素材 + 审片)
 
@@ -69,7 +69,7 @@ museav-cli ≥ 3.17.0；旧 CLI 上跑会明确报「unknown command」并提示
 
 ## AI 生成通道（用户选择，不自动切账户）
 
-2026-11-09 用户拍板：Reel Kit 是本地视频工作台，需要图片/视频 AI 能力时，用户自己选：
+2026-11-09 用户拍板：muse·tv 是本地视频工作台，需要图片/视频 AI 能力时，用户自己选：
 
 | 通道 | 适用 | 说明 |
 |---|---|---|

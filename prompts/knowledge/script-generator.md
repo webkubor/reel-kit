@@ -1,6 +1,6 @@
 # 知识短视频文案生成器（Prompt）
 
-将此 Prompt 作为系统提示词喂给 Claude / GPT / DeepSeek，输入一个知识点，即可直接产出用于 `reel-kit` 的文案与命令参数。
+将此 Prompt 作为系统提示词喂给 Claude / GPT / DeepSeek，输入一个知识点，即可直接产出用于 `muse·tv` 的文案与命令参数。
 
 ---
 
@@ -35,7 +35,7 @@
 第六句
 第七句
 
-【reel-kit 执行命令】：
+【muse·tv 执行命令】：
 reel make \
   --style <风格key> \
   --title "<主标题>" \

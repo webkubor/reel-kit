@@ -1,7 +1,7 @@
 {
   "version": 1,
   "default_style": "colored-pencil-diary",
-  "description": "Twenty hand-drawn styles curated for sequential Chinese story-video illustration. Sourced from gnipbao/story-to-handdrawn-video; reel-kit 继承风格库,渲染走自己的 HTML 模板路径而非 Remotion。",
+  "description": "Twenty hand-drawn styles curated for sequential Chinese story-video illustration. Sourced from gnipbao/story-to-handdrawn-video; muse·tv 继承风格库,渲染走自己的 HTML 模板路径而非 Remotion。",
   "contact_sheet": "handdrawn-style-library-contact-sheet.jpg",
   "styles": [
     {
