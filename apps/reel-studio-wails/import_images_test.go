@@ -87,3 +87,18 @@ func TestNormalizeAssetNames(t *testing.T) {
 		t.Fatalf("迁移后：%s", got)
 	}
 }
+
+// 素材名只取文件名：Windows 的路径用反斜杠，
+// 只认 "/" 会把整条路径当素材名（Windows CI 曾经红在这里）。
+func TestFileBaseNameWindowsPath(t *testing.T) {
+	cases := map[string]string{
+		`C:\Users\kubor\Temp\雪夜长街.png`: "雪夜长街",
+		`D:\素材\顾栖月-三视图.png`:            "顾栖月-三视图",
+		"/Users/kubor/Temp/角色定妆.jpg":   "角色定妆",
+	}
+	for path, want := range cases {
+		if got := fileBaseName(path); got != want {
+			t.Fatalf("%s 取名应为 %s，实际 %s", path, want, got)
+		}
+	}
+}

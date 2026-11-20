@@ -31,10 +31,7 @@ func TestProjectWorkspaceBindingPersists(t *testing.T) {
 	if _, err := s.SetProjectWorkspace(p.ID, "ws-snow", "沸腾之雪"); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := NewStudioStoreRoot(s.Root())
-	if err != nil {
-		t.Fatal(err)
-	}
+	reopened := openTestStore(t, s.Root())
 	got, _ := reopened.Project(p.ID)
 	if got.WorkspaceID != "ws-snow" || got.WorkspaceName != "沸腾之雪" {
 		t.Fatalf("绑定没落盘：%+v", got)

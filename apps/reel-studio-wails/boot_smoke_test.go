@@ -13,10 +13,7 @@ func TestBootSequenceAgainstSeededStudio(t *testing.T) {
 	if root == "" {
 		t.Skip("set REEL_BOOT_STUDIO to run")
 	}
-	s, err := NewStudioStoreRoot(root)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s := openTestStore(t, root)
 	e := &Engine{store: s}
 	projects := e.ListProjects()
 	if len(projects) != 1 {

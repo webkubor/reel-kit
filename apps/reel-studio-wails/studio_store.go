@@ -285,7 +285,9 @@ func NewStudioStoreRoot(root string) (*StudioStore, error) {
 		if err := json.Unmarshal(data, state); err != nil {
 			// 账本坏了先留底：素材文件还在 media/ 里，
 			// 覆盖掉原文件就再也拼不回来了。
-			backup := file + ".corrupt-" + nowISO()
+			// 留底文件名要真能落到文件系统里：nowISO() 带冒号，
+			// 在 Windows 上是非法字符名，改名会失败，账本就此覆盖。
+			backup := file + ".corrupt-" + time.Now().UTC().Format("20060102T150405Z")
 			if os.Rename(file, backup) == nil {
 				return nil, fmt.Errorf("工作台状态损坏，已把原文件留到 %s；素材文件仍在 media/ 目录，可据此恢复: %w", backup, err)
 			}
@@ -343,6 +345,18 @@ func NewStudioStoreRoot(root string) (*StudioStore, error) {
 		return nil, err
 	}
 	return s, nil
+}
+
+// Close 关掉本地库，释放 local.db 的文件句柄。
+//
+// 桌面应用整个进程活着，句柄一直占着没问题；测试用完就要删临时目录，
+// Windows 上文件还在被占用就删不掉（"The process cannot access the file
+// because it is being used by another process"）。所以关闭时机得由调用方决定。
+func (s *StudioStore) Close() error {
+	if s == nil || s.local == nil {
+		return nil
+	}
+	return s.local.Close()
 }
 
 // Save serializes all writers, including queue progress and imported assets.

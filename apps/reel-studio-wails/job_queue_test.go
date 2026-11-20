@@ -14,11 +14,7 @@ import (
 func newTestStore(t *testing.T) *StudioStore {
 	t.Helper()
 	root := filepath.Join(t.TempDir(), "studio")
-	s, err := NewStudioStoreRoot(root)
-	if err != nil {
-		t.Fatalf("NewStudioStoreRoot: %v", err)
-	}
-	return s
+	return openTestStore(t, root)
 }
 
 func TestStoreProjectAndAsset(t *testing.T) {
@@ -67,10 +63,7 @@ func TestStoreProjectAndAsset(t *testing.T) {
 // 且带明确的「别重复付费」提示，不能悄悄变回可执行状态。
 func TestStoreInterruptedOnRestart(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "studio")
-	s1, err := NewStudioStoreRoot(root)
-	if err != nil {
-		t.Fatalf("第一次打开: %v", err)
-	}
+	s1 := openTestStore(t, root)
 	p, _ := s1.AddProject("项目", "series")
 	for _, status := range []string{"queued", "running"} {
 		s1.state.Jobs = append(s1.state.Jobs, &Job{
@@ -85,10 +78,7 @@ func TestStoreInterruptedOnRestart(t *testing.T) {
 	})
 	s1.Save()
 
-	s2, err := NewStudioStoreRoot(root)
-	if err != nil {
-		t.Fatalf("第二次打开: %v", err)
-	}
+	s2 := openTestStore(t, root)
 	var interrupted, succeeded int
 	for _, j := range s2.State().Jobs {
 		switch j.Status {

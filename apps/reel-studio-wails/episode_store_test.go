@@ -21,10 +21,7 @@ func TestStoreLoadsLegacyStateWithoutEpisodes(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "studio.json"), data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	s, err := NewStudioStoreRoot(root)
-	if err != nil {
-		t.Fatalf("老数据应能打开：%v", err)
-	}
+	s := openTestStore(t, root)
 	if len(s.State().Projects) != 1 {
 		t.Fatalf("老项目应还在：%+v", s.State().Projects)
 	}
@@ -87,10 +84,7 @@ func TestEpisodeShotUpdatePersists(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := NewStudioStoreRoot(s.Root())
-	if err != nil {
-		t.Fatal(err)
-	}
+	reopened := openTestStore(t, s.Root())
 	got, err := reopened.EpisodeShot(sh.ID)
 	if err != nil {
 		t.Fatal(err)

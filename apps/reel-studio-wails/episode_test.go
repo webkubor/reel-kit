@@ -150,6 +150,9 @@ func TestEpisodeSingleLineTooLong(t *testing.T) {
 // 「不拉长画面、不加速念白」是产品承诺：观众看到的时长就是素材时长，
 // 念到一半被截断比报错更糟。
 func TestEpisodeNarrationTooLong(t *testing.T) {
+	if _, err := exec.LookPath(mediaCommand("ffmpeg")); err != nil {
+		t.Skip("ffmpeg unavailable")
+	}
 	s := newTestStore(t)
 	e := &Engine{store: s}
 	e.speechOverride = fakeSpeech(t, s)

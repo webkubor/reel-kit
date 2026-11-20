@@ -411,14 +411,16 @@ func mimeForImage(path string) string {
 	return ""
 }
 
-// fileBaseName 取文件名（不含目录）。
 // fileBaseName 取文件名（去掉目录与扩展名）。
 //
 // 素材名要能当分类依据（见 docs/asset-classification.md），
 // 带 .png 后缀会让「三视图-xxx.png」这类名字判不准。
+//
+// 目录分隔符两种都要认：Windows 的路径是 `C:\素材\雪夜.png`，
+// 只认 "/" 会把整条路径当成素材名。
 func fileBaseName(path string) string {
 	name := path
-	if i := strings.LastIndex(name, "/"); i >= 0 {
+	if i := strings.LastIndexAny(name, `/\`); i >= 0 {
 		name = name[i+1:]
 	}
 	if i := strings.LastIndex(name, "."); i > 0 {
