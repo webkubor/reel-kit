@@ -16,6 +16,17 @@ import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const platforms = ['darwin-arm64', 'darwin-amd64', 'windows-amd64']
+const args = process.argv.slice(2)
+const requireCheck = args.includes('--require')
+let explicitBundle
+const bundleArgIndex = args.indexOf('--bundle')
+if (bundleArgIndex !== -1) {
+  explicitBundle = args[bundleArgIndex + 1]
+  if (!explicitBundle || args.slice(bundleArgIndex + 2).includes('--bundle')) {
+    console.error('用法：node scripts/check-bundle-freshness.mjs [--require] [--bundle <backend 目录>]')
+    process.exit(2)
+  }
+}
 
 // 仓库里的哪些文件会进包，以及它们在包里对应的位置。
 const pairs = []
@@ -36,9 +47,27 @@ for (const name of readdirSync(join(root, 'templates'))) {
 }
 add('bin/reel.mjs', 'bin/reel.mjs')
 
+const bundles = explicitBundle
+  ? [{ platform: '指定资源目录', bundle: explicitBundle }]
+  : platforms.map(platform => ({
+      platform,
+      bundle: join(root, 'apps/reel-studio-wails/resources', platform, 'backend'),
+    }))
+const missing = bundles.filter(({ bundle }) => !existsSync(bundle))
+
+if (missing.length) {
+  if (requireCheck) {
+    for (const { platform, bundle } of missing) {
+      console.error(`❌ ${platform}：找不到后端快照 ${bundle}`)
+    }
+    process.exit(1)
+  }
+  console.log(`⏭️ 跳过打包后端快照校验（${missing.length}/${bundles.length} 个资源目录未准备，无法校验）`)
+  process.exit(0)
+}
+
 let bad = 0
-for (const platform of platforms) {
-  const bundle = join(root, 'apps/reel-studio-wails/resources', platform, 'backend')
+for (const { platform, bundle } of bundles) {
   if (!existsSync(bundle)) continue
   for (const [repoPath, bundlePath] of pairs) {
     const src = join(root, repoPath)
@@ -62,4 +91,4 @@ if (bad) {
   }
   process.exit(1)
 }
-console.log(`✅ 打包用的后端快照是最新的（${pairs.length} 个文件 × ${platforms.length} 个平台）`)
+console.log(`✅ 打包用的后端快照是最新的（${pairs.length} 个文件 × ${bundles.length} 个资源目录）`)

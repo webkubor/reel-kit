@@ -19,6 +19,12 @@ jobs:
       # 只跑 node --check 不装依赖是不够的：那只查语法，不解析 import。
       - name: 装依赖
         run: pnpm install --frozen-lockfile
+      - name: 准备并校验轻量后端快照
+        run: |
+          for platform in darwin-arm64 darwin-amd64 windows-amd64; do
+            bash scripts/prepare-resources.sh "$platform" --backend-only
+          done
+          node scripts/check-bundle-freshness.mjs --require
 
       - name: 语法检查与模板枚举
         run: |

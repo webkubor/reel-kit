@@ -9,8 +9,10 @@ resources=$2
 [[ ! -e "$output" ]] || { printf 'Output exists: %s\n' "$output" >&2; exit 1; }
 [[ $(uname -s) == Darwin && $(uname -m) == arm64 ]] || { printf 'This package target requires Apple Silicon macOS.\n' >&2; exit 1; }
 here=$(cd "$(dirname "$0")/.." && pwd)
+repo_root=$(cd "$here/../.." && pwd)
 wails=${WAILS_BIN:-$(command -v wails || true)}
 [[ -x "$wails" ]] || { printf 'Set WAILS_BIN to the installed Wails CLI.\n' >&2; exit 1; }
+node "$repo_root/scripts/check-bundle-freshness.mjs" --bundle "$resources/backend" --require
 cd "$here/frontend"
 bash build.sh
 cd "$here"
