@@ -237,10 +237,37 @@ export async function synthesizeCaptions({
   const results = []
 
   if (engine === 'museav') {
-    throw new Error(
-      'museav 配音已下线：中台的 CLI 里没有 speak 命令，这条路径从来没能跑通。\n' +
-      '  改用 --voice-engine edge（微软 Edge 在线免费高保真）、--voice-engine mimo（小米 MiMo，限时免费）、--voice-engine minimax（云端 TTS），或在 Reel Studio 里选相应通道。',
-    )
+    // museav speak（museav-cli 3.17.0+）：直连上游 TTS，逐句合成 wav。
+    // 桌面版从 Finder 启动时 PATH 很干净，命令路径用 MUSEA_BIN 覆盖。
+    //
+    // 这条链路以前是直接抛错的——当时 CLI 里确实没有 speak 命令。3.17.0 起
+    // `museav speak` 存在了（直连 MiniMax，不扣中台 credits），所以这里改成真调用。
+    const bin = process.env.MUSEA_BIN || 'museav'
+    // speak 必填音色；不给就用 MiniMax 默认音色，不让整条链路因为一个可省的参数挂掉
+    const voiceId = voice || process.env.REEL_MUSEA_VOICE || 'male-qn-qingse'
+    // museav CLI 自己读 ~/.museav.json 的 minimaxApiKey，但 reel-kit 的密钥在
+    // ~/.reel-kit/config.json —— 这里显式透传，避免桌面版出现「密钥配了却不认」
+    const key = process.env.MINIMAX_API_KEY || readReelConfig().minimaxApiKey || ''
+    const env = key ? { ...process.env, MINIMAX_API_KEY: key } : process.env
+    for (let i = 0; i < captions.length; i++) {
+      const text = String(captions[i])
+      const out = join(outDir, `voice_${String(i).padStart(4, '0')}.wav`)
+      const args = ['speak', text, '--format', 'wav', '--overwrite', '--out', out, '--voice', voiceId]
+      try {
+        await run(bin, args, { env })
+      } catch (e) {
+        const detail = String(e.stderr || e.message || '').trim()
+        throw new Error(
+          `第 ${i + 1} 句配音失败（"${text.slice(0, 20)}"）：${detail}\n` +
+          '  museav speak 需要 museav-cli 3.17.0+；用 MUSEA_BIN 指向可用的 museav 可执行文件。',
+        )
+      }
+      if (!existsSync(out)) throw new Error(`第 ${i + 1} 句配音失败：museav speak 没有产出 ${out}`)
+      const duration = await probeDuration(out)
+      results.push({ file: out, duration })
+      onProgress?.(i + 1, captions.length, duration)
+    }
+    return results
   }
   if (!['voxcraft', 'minimax', 'edge', 'mimo'].includes(engine)) {
     throw new Error(`未知的配音后端 "${engine}"；可用：edge（微软在线高保真·免费）、mimo（小米 MiMo·限时免费）、voxcraft（本地）、minimax（云端 TTS·按量计费）`)
