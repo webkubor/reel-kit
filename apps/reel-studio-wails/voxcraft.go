@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -43,9 +44,22 @@ type VoxcraftInfo struct {
 
 // LocateVoxcraft 定位本机的 voxcraft 安装，按完整度打分挑最优的一份。
 func LocateVoxcraft() VoxcraftInfo {
-	// PATH 里有就直接用
+	// PATH 里有就直接用。但音色清单是数据侧的东西，跟二进制不在一处：
+	// 这里早退不读它，就会「体检说就绪、合成时才发现没音色」。
 	if pathBin, err := exec.LookPath("voice"); err == nil {
-		return VoxcraftInfo{OK: true, Bin: pathBin, HasModel: true}
+		home := voxflowHome()
+		info := VoxcraftInfo{
+			OK:       true,
+			Bin:      pathBin,
+			Home:     home,
+			HasModel: hasVoiceModel(home),
+			Personas: loadPersonas(home),
+		}
+		if !info.HasModel {
+			info.OK = false
+			info.Reason = "本机缺 Base-1.7B 音色模型（4.2GB），放到 ~/.voxflow/models-mlx/ 再试"
+		}
+		return info
 	}
 
 	var found []*candInfo
@@ -106,22 +120,8 @@ func inspectVoxcraft(home string) *candInfo {
 		bin = venvBin
 	}
 
-	hasModel := existsFile(filepath.Join(homeDir(), ".voxflow/models-mlx/Base-1.7B-8bit")) ||
-		existsFile(filepath.Join(home, "models/Base-1.7B"))
-
-	var personas []string
-	pf := filepath.Join(homeDir(), ".voxflow/configs/personas.json")
-	if !existsFile(pf) {
-		pf = filepath.Join(home, "configs/personas.json")
-	}
-	if data, err := os.ReadFile(pf); err == nil {
-		var m map[string]interface{}
-		if json.Unmarshal(data, &m) == nil {
-			for k := range m {
-				personas = append(personas, k)
-			}
-		}
-	}
+	hasModel := hasVoiceModel(home)
+	personas := loadPersonas(home)
 
 	score := 0
 	if bin != "" {
@@ -134,6 +134,50 @@ func inspectVoxcraft(home string) *candInfo {
 		score += 1
 	}
 	return &candInfo{home: home, bin: bin, hasModel: hasModel, personas: personas, score: score}
+}
+
+// voxflowHome 找到第一个装了 voxcraft 的目录。
+func voxflowHome() string {
+	seen := map[string]bool{}
+	for _, h := range VoxcraftHomes {
+		if h == "" || seen[h] {
+			continue
+		}
+		seen[h] = true
+		if existsFile(filepath.Join(h, "pyproject.toml")) {
+			return h
+		}
+	}
+	return ""
+}
+
+// hasVoiceModel 看本机有没有跑克隆配音要的模型。
+func hasVoiceModel(home string) bool {
+	return existsFile(filepath.Join(homeDir(), ".voxflow/models-mlx/Base-1.7B-8bit")) ||
+		existsFile(filepath.Join(home, "models/Base-1.7B"))
+}
+
+// loadPersonas 读音色清单。数据真源在 ~/.voxflow/configs/personas.json，
+// 项目里的旧格式只当兜底。清单要排序：默认音色不能每次随机换人。
+func loadPersonas(home string) []string {
+	pf := filepath.Join(homeDir(), ".voxflow/configs/personas.json")
+	if !existsFile(pf) && home != "" {
+		pf = filepath.Join(home, "configs/personas.json")
+	}
+	data, err := os.ReadFile(pf)
+	if err != nil {
+		return nil
+	}
+	var m map[string]interface{}
+	if json.Unmarshal(data, &m) != nil {
+		return nil
+	}
+	personas := make([]string, 0, len(m))
+	for k := range m {
+		personas = append(personas, k)
+	}
+	sort.Strings(personas)
+	return personas
 }
 
 type candInfo struct {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -272,7 +273,7 @@ func (e *Engine) VoiceChannels() []VoiceChannel {
 		{
 			ID: "voxflow", Label: "VoxFlow 本机语音",
 			Origin: "local-offline", Engine: "VoxFlow 本地语音",
-			Ready: vox.OK, Note: vox.Reason,
+			Ready: vox.OK && len(vox.Personas) > 0, Note: voxflowNote(vox),
 		},
 		{
 			ID: "minimax", Label: "MiniMax TTS",
@@ -288,6 +289,18 @@ func (e *Engine) VoiceChannels() []VoiceChannel {
 		},
 	}
 	return channels
+}
+
+// voxflowNote 说清楚 VoxFlow 现在卡在哪一步：装好了不等于有音色可用，
+// 没有已登记的 persona，合成一定失败，不能让界面报「就绪」。
+func voxflowNote(vox VoxcraftInfo) string {
+	if !vox.OK {
+		return vox.Reason
+	}
+	if len(vox.Personas) == 0 {
+		return "本机没有已登记的音色：请先在 voxflow 里登记一个 persona"
+	}
+	return fmt.Sprintf("本机已登记 %d 个音色", len(vox.Personas))
 }
 
 // minimaxNote 说明 MiniMax 现在能不能用。
