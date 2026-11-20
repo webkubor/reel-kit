@@ -180,10 +180,7 @@ func TestShootShotPreSubmitFailureRestores(t *testing.T) {
 func TestShootingShotInterruptedOnRestart(t *testing.T) {
 	_, s, sh := boundShot(t)
 	_, _ = s.UpdateShot(sh.ID, func(x *EpisodeShot) { x.Status = "shooting" })
-	reopened, err := NewStudioStoreRoot(s.Root())
-	if err != nil {
-		t.Fatal(err)
-	}
+	reopened := openTestStore(t, s.Root())
 	if cur, _ := reopened.EpisodeShot(sh.ID); cur.Status != "interrupted" {
 		t.Fatalf("重启后应待核对：%s", cur.Status)
 	}

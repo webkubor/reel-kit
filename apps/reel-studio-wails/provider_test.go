@@ -16,10 +16,7 @@ func TestAIProviderSwitch(t *testing.T) {
 	if e.GetAIProviderStatus().Provider != ProviderDirect {
 		t.Fatal("切换没生效")
 	}
-	reopened, err := NewStudioStoreRoot(s.Root())
-	if err != nil {
-		t.Fatal(err)
-	}
+	reopened := openTestStore(t, s.Root())
 	if (&Engine{store: reopened}).GetAIProviderStatus().Provider != ProviderDirect {
 		t.Fatal("切换没落盘")
 	}

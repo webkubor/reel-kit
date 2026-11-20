@@ -18,8 +18,9 @@ func TestCorruptStateIsPreserved(t *testing.T) {
 	if err := os.WriteFile(bad, []byte("{这不是合法的 JSON"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, err := NewStudioStoreRoot(root)
+	s, err := NewStudioStoreRoot(root)
 	if err == nil {
+		_ = s.Close()
 		t.Fatal("损坏的账本应当报错")
 	}
 	if !strings.Contains(err.Error(), "损坏") {
@@ -60,10 +61,7 @@ func TestAssetsSurviveStateLoss(t *testing.T) {
 		t.Fatalf("素材文件不该被删：%v", err)
 	}
 	// 重新打开：项目与素材记录没了，但磁盘文件还在，可以重建
-	s2, err := NewStudioStoreRoot(s.Root())
-	if err != nil {
-		t.Fatal(err)
-	}
+	s2 := openTestStore(t, s.Root())
 	if len(s2.State().Assets) != 0 {
 		t.Fatal("账本没了就该没有素材记录")
 	}

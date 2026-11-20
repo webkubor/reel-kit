@@ -28,10 +28,7 @@ func TestProductPipelineProducesVideo(t *testing.T) {
 
 	ctx := context.Background()
 	root := t.TempDir()
-	store, err := NewStudioStoreRoot(root)
-	if err != nil {
-		t.Fatalf("建素材库失败：%v", err)
-	}
+	store := openTestStore(t, root)
 	e := &Engine{store: store, note: "test"}
 	e.queue = NewJobQueue(store, e.runPipeline)
 

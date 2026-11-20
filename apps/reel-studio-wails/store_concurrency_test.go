@@ -89,10 +89,7 @@ func TestStoreConcurrentProgressAndImports(t *testing.T) {
 	if got := q.Job(job.ID); got.Status != "succeeded" {
 		t.Fatalf("job: %+v", got)
 	}
-	reopened, err := NewStudioStoreRoot(s.Root())
-	if err != nil {
-		t.Fatal(err)
-	}
+	reopened := openTestStore(t, s.Root())
 	state := reopened.State()
 	if len(state.Projects) != 31 || len(state.Assets) != 30 || len(state.Jobs) != 1 || state.Jobs[0].Status != "succeeded" {
 		t.Fatal("concurrent writes were not all persisted")
