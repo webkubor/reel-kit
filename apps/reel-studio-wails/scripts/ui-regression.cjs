@@ -1,6 +1,21 @@
-const { spawn } = require('child_process'); const fs = require('fs'); const path = require('path')
+const { spawn } = require('child_process'); const fs = require('fs'); const path = require('path'); const os = require('os')
 const SP=process.argv[2]
-const chrome=process.env.REEL_CHROME||'/Users/webkubor/dev/video/muse-tv/apps/reel-studio-wails/resources/darwin-arm64/chrome/chrome-headless-shell'
+const chrome=process.env.REEL_CHROME||resolveChrome()
+// 随包分发的 chrome-headless-shell 优先；本机没带就找 playwright 缓存里的那份。
+function resolveChrome(){
+  const roots=[path.join(os.homedir(),'Library/Caches/ms-playwright'),path.join(os.homedir(),'.cache/ms-playwright')]
+  const dirs=[]
+  for(const root of roots){ if(!fs.existsSync(root)) continue
+    for(const name of fs.readdirSync(root)){ const m=name.match(/^chromium(?:_headless_shell)?-(\d+)$/); if(m) dirs.push({root,name,rev:Number(m[1])}) } }
+  dirs.sort((a,b)=>b.rev-a.rev)
+  const candidates=[
+    path.join(__dirname,'..','resources','darwin-arm64','chrome','chrome-headless-shell'),
+    ...dirs.map(d=>path.join(d.root,d.name,'chrome-headless-shell-mac-arm64/chrome-headless-shell')),
+    ...dirs.map(d=>path.join(d.root,d.name,'chrome-headless-shell-linux/chrome-headless-shell'))]
+  const hit=candidates.find(p=>fs.existsSync(p))
+  if(!hit) throw new Error('找不到 chrome-headless-shell（可用 REEL_CHROME 指定）')
+  return hit
+}
 const dir=fs.mkdtempSync(path.join(SP,'cdp-'))
 const proc=spawn(chrome,['--headless','--disable-gpu','--no-sandbox','--remote-debugging-port=0',`--user-data-dir=${dir}`,'about:blank'],{stdio:'ignore'})
 const wait=ms=>new Promise(r=>setTimeout(r,ms))

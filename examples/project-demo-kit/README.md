@@ -29,7 +29,8 @@ kyvault set，密钥加密入库，只存本机
 ### 2. 做素材（HTML → PNG）
 复制 `frames/terminal-frame.html` 改内容，用 `shoot.mjs` 截图：
 ```bash
-# shoot.mjs 里改两处：frames 数组（顺序与文案一一对应）、输出路径
+# shoot.mjs 里改一处：frames 数组（顺序与文案一一对应）
+# 截图输出到同目录 shots/，素材目录由脚本自身位置派生
 bun run shoot.mjs
 ```
 素材图 **1000×1000 方图**、背景与画布同色（白底 `#ffffff`），模板会放在画布左半边。
@@ -40,7 +41,7 @@ cd ~/dev/video/voxflow
 .venv/bin/voice design demo_narrator "你的 API key，正在明文流进 AI 的上下文" \
   --tone "沉稳、清晰、专业" --commit
 # design 不写 ref_text，手动补一句（就是上面那个朗读文本）：
-bun -e "const p='/Users/webkubor/.voxflow/configs/personas.json'; const j=await Bun.file(p).json(); j.demo_narrator.ref_text='你的 API key，正在明文流进 AI 的上下文'; await Bun.write(p, JSON.stringify(j,null,2))"
+bun -e "const p='$HOME/.voxflow/configs/personas.json'; const j=await Bun.file(p).json(); j.demo_narrator.ref_text='你的 API key，正在明文流进 AI 的上下文'; await Bun.write(p, JSON.stringify(j,null,2))"
 ```
 
 ### 4. 合成
@@ -76,7 +77,7 @@ README 里放 GIF（自动播放），MP4 供社媒/嵌入。jsDelivr 有缓存�
 3. **`voice design` 不写 `ref_text`** —— muse·tv 会拒绝合成，手动补进 `~/.voxflow/configs/personas.json`。
 4. **design 的第二个参数是「被朗读的文本」** —— 想要 ref_text 就把这句话显式传进去。
 5. **素材数必须 ≥ 文案句数**，少了会按较少的那边取镜（后面几句白写）。
-6. **Playwright 的 chromium 版本要对上** —— 直接用 `~/Library/Caches/ms-playwright/chromium-1243/` 里的可执行文件，别让 playwright 自己找。
+6. **Playwright 的 chromium 版本会对不上** —— playwright 期望的 revision 和本机缓存往往不同，让它自己找会报「Executable doesn't exist」。`shoot.mjs` 会自己在 playwright 缓存里挑最新那份可执行文件（`REEL_CHROME` 可手动指定），别再写死版本号目录。
 
 ## 质检
 
