@@ -6,8 +6,8 @@
 //   3. 改 outputDir / filePrefix
 //   4. bun run shoot.mjs
 //
-// 截图用本机已有的 chromium（reel-kit 装过的那份），不额外下载浏览器。
-import { chromium } from '/Users/webkubor/dev/video/reel-kit/node_modules/.pnpm/playwright-core@1.62.1/node_modules/playwright-core/index.mjs'
+// 截图用本机已有的 chromium（muse·tv 装过的那份），不额外下载浏览器。
+import { chromium } from '/Users/webkubor/dev/video/muse-tv/node_modules/.pnpm/playwright-core@1.62.1/node_modules/playwright-core/index.mjs'
 
 const CHROME = '/Users/webkubor/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'
 

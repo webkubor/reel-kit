@@ -7,11 +7,11 @@
 
 | 环节 | 工具 | 位置 |
 |---|---|---|
-| 逐句文案 | LLM（每行一句，一句一镜） | `captions.txt` |
-| 版式模板 | reel-kit（HTML/CSS，5 套） | `~/dev/video/reel-kit` |
+| 逐句文案 | LLM（每行一句，一句一镜） | `captions.txt`（从 `captions.example.txt` 改） |
+| 版式模板 | muse·tv（HTML/CSS，5 套） | `~/dev/video/muse-tv` |
 | 素材截图 | Playwright（HTML → PNG） | `shoot.mjs` |
-| 配音 | voxcraft（本地 Qwen3-TTS） | `~/dev/github/app/voxcraft` |
-| 合成 | reel-kit `reel make` | 同上 |
+| 配音 | voxflow（本地 Qwen3-TTS） | `~/dev/video/voxflow` |
+| 合成 | muse·tv `reel make` | 同上 |
 | GIF 导出 | ffmpeg（palettegen/paletteuse） | 系统 |
 
 ## 步骤
@@ -23,6 +23,7 @@ kyvault set，密钥加密入库，只存本机
 工具凭别名取用，模型上下文里只有一个名字
 ...
 ```
+存成 `captions.txt`（同目录，模板 `captions.example.txt`），下面第 4 步按这个路径读。
 句数 = 镜头数。6~8 句 ≈ 25 秒。**每句都要是能单独成立的画面**。
 
 ### 2. 做素材（HTML → PNG）
@@ -35,7 +36,7 @@ bun run shoot.mjs
 
 ### 3. 准备配音音色（只需一次）
 ```bash
-cd ~/dev/github/app/voxcraft
+cd ~/dev/video/voxflow
 .venv/bin/voice design demo_narrator "你的 API key，正在明文流进 AI 的上下文" \
   --tone "沉稳、清晰、专业" --commit
 # design 不写 ref_text，手动补一句（就是上面那个朗读文本）：
@@ -44,11 +45,11 @@ bun -e "const p='/Users/webkubor/.voxflow/configs/personas.json'; const j=await 
 
 ### 4. 合成
 ```bash
-cd ~/dev/video/reel-kit
+cd ~/dev/video/muse-tv
 npx github:museav-ai/muse-tv make --template landscape-product \
   --title "kyvault" --subtitle "AI 时代的密钥管家" --footer "github.com/webkubor/kyvault" \
-  --assets ~/dev/video/project-demo-kit/shots \
-  --caps ~/dev/video/project-demo-kit/captions.txt \
+  --assets ~/dev/video/muse-tv/examples/project-demo-kit/shots \
+  --caps ~/dev/video/muse-tv/examples/project-demo-kit/captions.txt \
   --size 1920x1080 --voice demo_narrator \
   --out out.mp4
 ```
@@ -72,7 +73,7 @@ README 里放 GIF（自动播放），MP4 供社媒/嵌入。jsDelivr 有缓存�
 
 1. **模板文字色硬编码深色** —— 深色背景 = 文字看不清。用白底，让素材自己带深色（终端卡那种）。
 2. **素材图背景要跟画布同色** —— 否则白底画布上出现一个生硬的深色方块。
-3. **`voice design` 不写 `ref_text`** —— reel-kit 会拒绝合成，手动补进 `~/.voxflow/configs/personas.json`。
+3. **`voice design` 不写 `ref_text`** —— muse·tv 会拒绝合成，手动补进 `~/.voxflow/configs/personas.json`。
 4. **design 的第二个参数是「被朗读的文本」** —— 想要 ref_text 就把这句话显式传进去。
 5. **素材数必须 ≥ 文案句数**，少了会按较少的那边取镜（后面几句白写）。
 6. **Playwright 的 chromium 版本要对上** —— 直接用 `~/Library/Caches/ms-playwright/chromium-1243/` 里的可执行文件，别让 playwright 自己找。
