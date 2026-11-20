@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 把桌面版打成自包含的安装包：自带 Node 运行时、ffmpeg/ffprobe、Chrome headless
-# 与 reel-kit 后端源码，用户下载后双击就能用，不必先装 Node。
+# 与 muse·tv 后端源码，用户下载后双击就能用，不必先装 Node。
 #
 # 下载产物不进 git（.gitignore 已排除 resources/），每次发版重新跑本脚本取。
 #

@@ -152,7 +152,7 @@ export async function makeTalkVideo(input, store, backend, progress, report = ()
 
     const bytes = readFileSync(out)
     return store.addAsset(input.projectId, `${input.title || '口播视频'}.mp4`, 'video/mp4', bytes, {
-      source: 'reel-kit', origin: 'code', engine: '本地合成（渲染 + ffmpeg）',
+      source: 'muse-tv', origin: 'code', engine: '本地合成（渲染 + ffmpeg）',
       width: WIDTH, height: HEIGHT, duration: outputDuration, hasAudio: true,
       template: templateName, style: input.style || '', script: lines,
       settings,

@@ -180,7 +180,7 @@ export async function makeProductVideo(input, store, backend, progress, report =
 
     const bytes = readFileSync(out)
     return store.addAsset(input.projectId, `${input.title || '产品介绍'}.mp4`, 'video/mp4', bytes, {
-      source: 'reel-kit', origin: 'code', engine: '本地合成（渲染 + ffmpeg）',
+      source: 'muse-tv', origin: 'code', engine: '本地合成（渲染 + ffmpeg）',
       width: layout.width, height: layout.height, duration: outputDuration, hasAudio: true,
       template: layout.template, style: '', script: lines, ratio,
       settings,

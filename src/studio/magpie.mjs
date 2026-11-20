@@ -110,7 +110,7 @@ export async function discoverMagpie(run = magpieCommand) {
   // 只有文档明确保证「未知模型会被拒绝并回出完整清单」才发这一次探测。
   if (/an unknown one is refused with the full list/.test(imageDocs.stdout)) {
     try {
-      const probe = await run(['tool', 'generate_image', '--json', '--model', `reel-kit-discovery/${randomUUID()}`, '--prompt', 'reel-kit capability discovery'], { timeout: 60000 })
+      const probe = await run(['tool', 'generate_image', '--json', '--model', `reel-kit-discovery/${randomUUID()}`, '--prompt', 'muse·tv capability discovery'], { timeout: 60000 })
       const reply = JSON.parse(probe.stdout)
       if (reply?.isError) {
         const catalog = parseCatalog(textBlocks(reply))
@@ -244,7 +244,7 @@ export function createMagpie({ run = magpieCommand, download, probe = async () =
   /**
    * 视频走「让 Magpie 自己把文件写到磁盘」的路子。
    *
-   * 视频结果地址带着网关的鉴权头，reel-kit 拿不到那个头 ——
+   * 视频结果地址带着网关的鉴权头，muse·tv 拿不到那个头 ——
    * 硬下载只会 401。magpie CLI 手里有头，所以由它把 mp4 落到本地目录。
    */
   const runVideo = async ({ input, progress }) => {

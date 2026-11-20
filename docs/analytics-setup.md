@@ -1,6 +1,6 @@
-# 埋点集成(可选,reel-kit 不默认启用)
+# 埋点集成(可选,muse·tv 不默认启用)
 
-reel-kit 本身是 CLI + 本地工具,**不在 GitHub.com 上产生流量**。但如果将来发布到 GitHub Pages 文档站,推荐用以下方式集成埋点。
+muse·tv 本身是 CLI + 本地工具,**不在 GitHub.com 上产生流量**。但如果将来发布到 GitHub Pages 文档站,推荐用以下方式集成埋点。
 
 ## 选型对比
 
@@ -54,7 +54,7 @@ track('reel_make', {
 > **注意:CLI 工具默认不要开 telemetry**。要开就先在 README / 第一次跑时告知用户,
 > 给 opt-out(`REEL_NO_TRACKING=1`)。
 
-## 推荐姿势(reel-kit 现在不做)
+## 推荐姿势(muse·tv 现在不做)
 
 - 文档站启用 Plausible(只统计页面浏览)
 - CLI 不开 telemetry(避免任何隐私争议)
@@ -62,4 +62,4 @@ track('reel_make', {
 
 ## 当前状态
 
-reel-kit 仓库**未集成任何埋点**。要启用,按上面步骤走,纯前端一行 script,无需改仓内代码。
+muse·tv 仓库**未集成任何埋点**。要启用,按上面步骤走,纯前端一行 script,无需改仓内代码。

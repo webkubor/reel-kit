@@ -67,7 +67,7 @@ function validate(input, store) {
   // 界面上按所选模型给范围，服务端只做基本约束，具体上限由上游说了算
   if (value.kind === 'video' && !Number.isInteger(value.duration)) fail('时长须为整数秒')
   if (value.resolution && !['768P', '1080P', '2K'].includes(value.resolution)) fail('不支持的分辨率')
-  // 通道与模型：允许自填（中台上新一个模型时不用等 reel-kit 发版）。
+  // 通道与模型：允许自填（中台上新一个模型时不用等 muse·tv 发版）。
   // 模型名里常有空格与括号（"Seedance 2.0"、"Chinese (Mandarin)_Warm_Girl"），不能一刀切；
   // 真正要挡的是控制字符与路径分隔符 —— 这两个字段不会拿去拼路径或进 shell。
   if (value.backend !== undefined) {
@@ -462,7 +462,7 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
           if (!job) fail('任务不存在', 404)
           if (!job.upstream?.taskId) fail('这条任务没有可继续的上游任务；请重新提交')
           if (['queued', 'running'].includes(job.status)) fail('任务正在执行中，请稍候')
-          if (!backend.resume) fail('当前后端不支持取回，请升级 reel-kit', 503)
+          if (!backend.resume) fail('当前后端不支持取回，请升级 muse·tv', 503)
           store.project(job.projectId)
           try {
             const asset = await backend.resume({ upstream: job.upstream, input: job.input }, text => { job.message = text; job.updatedAt = now(); store.save() })
@@ -540,6 +540,6 @@ export function createStudio({ root = process.env.REEL_STUDIO_HOME || join(homed
 export function startStudio({ port = Number(process.env.REEL_STUDIO_PORT || 4390) } = {}) {
   const { server } = createStudio()
   server.on('error', error => { console.error(error.code === 'EADDRINUSE' ? `端口 ${port} 已占用，请设置 REEL_STUDIO_PORT。` : error.message); process.exitCode = 1 })
-  server.listen(port, '127.0.0.1', () => console.log(`reel-kit Studio → http://127.0.0.1:${port}`))
+  server.listen(port, '127.0.0.1', () => console.log(`muse·tv Studio → http://127.0.0.1:${port}`))
   return server
 }

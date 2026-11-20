@@ -379,13 +379,13 @@ async function connections() {
 }
 /** 空态预览里那行小字：当前真正可用的通道 */
 function channelCaption() {
-  return ['video', 'image', 'voice'].flatMap(group => (providers[group]?.channels || []).filter(c => c.ready).map(c => c.label.split(/[ ·]/)[0].toUpperCase())).join(' · ') || 'REEL STUDIO'
+  return ['video', 'image', 'voice'].flatMap(group => (providers[group]?.channels || []).filter(c => c.ready).map(c => c.label.split(/[ ·]/)[0].toUpperCase())).join(' · ') || 'MUSE·TV'
 }
 function setMode(next) {
   saveDraft(); mode = next; loadDraft()
   const voice = mode === 'speech', exporting = mode === 'export', recommending = mode === 'recommendation', talking = mode === 'talk', clone = voice && $('voice-mode').value === 'clone'
   document.querySelectorAll('[data-mode]').forEach(button => button.setAttribute('aria-selected', String(button.dataset.mode === mode)))
-  const titles = { recommendation: ['从项目到视频', '输入 GitHub 地址 · 编辑分镜并生成旁白', 'PROJECT'], talk: ['把想法讲清楚', '逐句配音 · 知识口播流水线', 'TALK'], video: ['描述你的镜头', 'MiniMax H3 · 让文字与参考图成为动态画面', 'H3'], image: ['创造第一帧', 'MuseAV · 生成图片，再把它交给视频模型', 'IMAGE'], speech: ['让故事有声音', 'VoxFlow · 本地生成与参考音频克隆', 'VOICE'], export: ['把素材变成作品', 'reel-kit · 按选择顺序合成，导出到本地', 'EXPORT'] }
+  const titles = { recommendation: ['从项目到视频', '输入 GitHub 地址 · 编辑分镜并生成旁白', 'PROJECT'], talk: ['把想法讲清楚', '逐句配音 · 知识口播流水线', 'TALK'], video: ['描述你的镜头', 'MiniMax H3 · 让文字与参考图成为动态画面', 'H3'], image: ['创造第一帧', 'MuseAV · 生成图片，再把它交给视频模型', 'IMAGE'], speech: ['让故事有声音', 'VoxFlow · 本地生成与参考音频克隆', 'VOICE'], export: ['把素材变成作品', 'muse·tv · 按选择顺序合成，导出到本地', 'EXPORT'] }
   const [title, subtitle, badge] = titles[mode]
   $('mode-title').textContent = title; $('mode-subtitle').textContent = subtitle; $('engine-badge').textContent = badge
   $('prompt-group').hidden = exporting || recommending || talking; $('export-fields').hidden = !exporting; $('recommendation-fields').hidden = !recommending; $('talk-fields').hidden = !talking

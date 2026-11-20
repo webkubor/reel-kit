@@ -9,7 +9,7 @@ import { resolve } from 'node:path'
 // `npx github:museav-ai/muse-tv` 也是官方推荐的一次性用法，
 // 不收进正则的话这些示例里的参数就等于没被校验过。
 const CLI_COMMAND =
-  /^\s*(?:reel\b|npx\s+(?:@kubor\/reel-kit|reel|github:webkubor\/reel-kit)\b|node\s+(?:\.\/)?bin\/reel\.mjs\b)/
+  /^\s*(?:reel\b|npx\s+(?:@kubor\/reel-kit|reel|github:(?:webkubor\/reel-kit|museav-ai\/muse-tv))\b|node\s+(?:\.\/)?bin\/reel\.mjs\b)/
 
 export function documentedOptions(markdown) {
   const options = new Set()

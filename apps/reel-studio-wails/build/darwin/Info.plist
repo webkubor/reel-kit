@@ -11,7 +11,7 @@
     <key>CFBundleExecutable</key>
     <string>{{.OutputFilename}}</string>
     <!-- 跟旧壳保持同一个标识：用户在「应用程序」里换装时，
-         系统认得出这是同一个 App，不会出现两个 Reel Studio。 -->
+         系统认得出这是同一个 App，不会出现两个 muse·tv。 -->
     <key>CFBundleIdentifier</key>
     <string>online.webkubor.reelstudio</string>
     <key>CFBundleVersion</key>

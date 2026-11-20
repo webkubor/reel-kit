@@ -18,7 +18,7 @@ import (
 //	· 有参考图时画幅可选，给了就按给的出；可用 16:9/4:3/1:1/3:4/9:16/21:9
 //	· 提示词 ≤ 7000 字符
 //	· 走 MiniMax M Plan 套餐额度（Explore/Build 档含 H3，消耗按档位计），出镜不自动重试，免得一次点击跑多条
-//	· 成片自带音轨 —— 配音/BGM 合成时以 reel-kit 的音轨为准
+//	· 成片自带音轨 —— 配音/BGM 合成时以 muse·tv 的音轨为准
 type videoProfile struct {
 	Model       string
 	MinDuration int
