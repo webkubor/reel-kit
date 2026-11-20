@@ -59,6 +59,15 @@ jobs:
           cache-dependency-path: apps/reel-studio-wails/go.sum
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      # frontend/ 有自己的 pnpm-lock.yaml，但仓库根有 pnpm-workspace.yaml
+      # （只含根包）。不打断这层关系的话，pnpm 装的是根包的依赖，
+      # vite 根本装不上 —— build.sh 的 pnpm exec vite build 直接失败，
+      # macOS 上的 Go 测试从来没跑到过。
+      - name: Install frontend dependencies
+        working-directory: apps/reel-studio-wails/frontend
+        run: pnpm install --ignore-workspace --frozen-lockfile
       - name: Compile frontend (build time only)
         working-directory: apps/reel-studio-wails/frontend
         run: |
