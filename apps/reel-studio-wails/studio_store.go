@@ -285,7 +285,9 @@ func NewStudioStoreRoot(root string) (*StudioStore, error) {
 		if err := json.Unmarshal(data, state); err != nil {
 			// 账本坏了先留底：素材文件还在 media/ 里，
 			// 覆盖掉原文件就再也拼不回来了。
-			backup := file + ".corrupt-" + nowISO()
+			// 留底文件名要真能落到文件系统里：nowISO() 带冒号，
+			// 在 Windows 上是非法字符名，改名会失败，账本就此覆盖。
+			backup := file + ".corrupt-" + time.Now().UTC().Format("20060102T150405Z")
 			if os.Rename(file, backup) == nil {
 				return nil, fmt.Errorf("工作台状态损坏，已把原文件留到 %s；素材文件仍在 media/ 目录，可据此恢复: %w", backup, err)
 			}

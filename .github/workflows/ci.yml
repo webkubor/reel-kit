@@ -92,6 +92,10 @@ jobs:
         with:
           go-version-file: apps/reel-studio-wails/go.mod
           cache-dependency-path: apps/reel-studio-wails/go.sum
+      # 造测试素材要真 ffmpeg（成片用例走它）。不装的话用例会在
+      # 造素材时就红，看起来像业务坏了，其实是没装依赖。
+      - name: 安装视频测试依赖
+        run: choco install ffmpeg -y --no-progress
       - name: Go engine build and tests (Windows)
         working-directory: apps/reel-studio-wails
         run: |
