@@ -6,13 +6,17 @@
 #
 #   bash scripts/prepare-resources.sh darwin-arm64
 #   bash scripts/prepare-resources.sh darwin-amd64
-#   bash scripts/prepare-resources.sh windows-amd64
+#   bash scripts/prepare-resources.sh windows-amd64 [--backend-only]
 #
 # 产物落在 apps/reel-studio-wails/resources/<platform>/，由 mygo build 打进 App 包。
 
 set -euo pipefail
 
 PLATFORM="${1:-}"
+BACKEND_ONLY=false
+if [[ "${2:-}" == "--backend-only" ]]; then
+  BACKEND_ONLY=true
+fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RES="$ROOT/apps/reel-studio-wails/resources"
 CACHE="$ROOT/.cache/deps"
@@ -58,7 +62,7 @@ case "$PLATFORM" in
     SHERPA_LIB_ARCHIVE="sherpa-onnx-${SHERPA_VERSION}-win-x64-shared-MD-Release-lib.tar.bz2"
     ;;
   "")
-    echo "用法：bash scripts/prepare-resources.sh <darwin-arm64|darwin-amd64|windows-amd64>" >&2
+    echo "用法：bash scripts/prepare-resources.sh <darwin-arm64|darwin-amd64|windows-amd64> [--backend-only]" >&2
     exit 2 ;;
   *)
     echo "不支持的平台：$PLATFORM" >&2; exit 2 ;;
@@ -73,6 +77,31 @@ fetch() {
   curl -fsSL --retry 3 --max-time 600 -o "$dest.part" "$url"
   mv "$dest.part" "$dest"
 }
+
+# 先复制后端源码，供 CI 做轻量新鲜度校验；重二进制全部跳过。
+prepare_backend() {
+  backend="$out/backend"
+  rm -rf "$backend"
+  mkdir -p "$backend"
+  for d in src bin templates prompts studio; do
+    cp -R "$ROOT/$d" "$backend/"
+  done
+  cp "$ROOT/package.json" "$backend/"
+
+  # 后端运行时依赖：playwright-core（无其它依赖）
+  mkdir -p "$backend/node_modules"
+  rm -rf "$backend/node_modules/playwright-core"
+  cp -R "$ROOT/node_modules/.pnpm/playwright-core@1.62.1/node_modules/playwright-core" "$backend/node_modules/"
+}
+
+if [[ "$BACKEND_ONLY" == true ]]; then
+  out="$RES/$PLATFORM"
+  rm -rf "$out"
+  mkdir -p "$out"
+  prepare_backend
+  echo "完成（仅后端快照）：$out"
+  exit
+fi
 
 # ── Node 运行时 ─────────────────────────────────────────────
 fetch "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_ARCHIVE}" "$CACHE/$NODE_ARCHIVE"
@@ -144,17 +173,7 @@ else
 fi
 
 # ── 后端源码（Node 侧） ─────────────────────────────────────
-backend="$out/backend"
-mkdir -p "$backend"
-for d in src bin templates prompts studio; do
-  cp -R "$ROOT/$d" "$backend/"
-done
-cp "$ROOT/package.json" "$backend/"
-
-# 后端运行时依赖：playwright-core（无其它依赖）
-mkdir -p "$backend/node_modules"
-rm -rf "$backend/node_modules/playwright-core"
-cp -R "$ROOT/node_modules/.pnpm/playwright-core@1.62.1/node_modules/playwright-core" "$backend/node_modules/"
+prepare_backend
 
 # ── MuseAV 中台 CLI（出图/出视频走它） ──────────────────────
 # 装到 resources/<platform>/museav/，再在 bin/ 放一个转发脚本。
