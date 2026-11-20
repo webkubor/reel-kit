@@ -47,19 +47,7 @@ func LocateVoxcraft() VoxcraftInfo {
 	// PATH 里有就直接用。但音色清单是数据侧的东西，跟二进制不在一处：
 	// 这里早退不读它，就会「体检说就绪、合成时才发现没音色」。
 	if pathBin, err := exec.LookPath("voice"); err == nil {
-		home := voxflowHome()
-		info := VoxcraftInfo{
-			OK:       true,
-			Bin:      pathBin,
-			Home:     home,
-			HasModel: hasVoiceModel(home),
-			Personas: loadPersonas(home),
-		}
-		if !info.HasModel {
-			info.OK = false
-			info.Reason = "本机缺 Base-1.7B 音色模型（4.2GB），放到 ~/.voxflow/models-mlx/ 再试"
-		}
-		return info
+		return locateVoxcraftInPath(pathBin)
 	}
 
 	var found []*candInfo
@@ -108,6 +96,25 @@ func LocateVoxcraft() VoxcraftInfo {
 		}
 	}
 	return VoxcraftInfo{OK: true, Bin: best.bin, Home: best.home, HasModel: true, Personas: best.personas}
+}
+
+// locateVoxcraftInPath PATH 里已经有 voice 时的体检结果。
+// 单独拆出来是为了能测：LookPath 在 Windows 上按 PATHEXT 找，
+// 拿一个无扩展名的假 binary 走 PATH 根本不成立。
+func locateVoxcraftInPath(bin string) VoxcraftInfo {
+	home := voxflowHome()
+	info := VoxcraftInfo{
+		OK:       true,
+		Bin:      bin,
+		Home:     home,
+		HasModel: hasVoiceModel(home),
+		Personas: loadPersonas(home),
+	}
+	if !info.HasModel {
+		info.OK = false
+		info.Reason = "本机缺 Base-1.7B 音色模型（4.2GB），放到 ~/.voxflow/models-mlx/ 再试"
+	}
+	return info
 }
 
 func inspectVoxcraft(home string) *candInfo {
