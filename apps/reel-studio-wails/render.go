@@ -308,9 +308,15 @@ func RenderFrames(ctx context.Context, opts RenderOpts) ([]string, error) {
 		html := Fill(tpl, vars)
 
 		if err := setDocumentContent(tabCtx, frameID, html); err != nil {
+			if ctx.Err() != nil {
+				return nil, ErrCanceled
+			}
 			return nil, fmt.Errorf("载入第 %d 镜画面失败: %w", i+1, err)
 		}
 		if err := waitForAssets(tabCtx); err != nil {
+			if ctx.Err() != nil {
+				return nil, ErrCanceled
+			}
 			return nil, fmt.Errorf("等待第 %d 镜素材就绪失败: %w", i+1, err)
 		}
 
@@ -318,6 +324,9 @@ func RenderFrames(ctx context.Context, opts RenderOpts) ([]string, error) {
 			out := filepath.Join(opts.OutDir, fmt.Sprintf("frame_%04d.png", i))
 			png, err := chromedp.Run(tabCtx, chromedp.CaptureScreenshot())
 			if err != nil {
+				if ctx.Err() != nil {
+					return nil, ErrCanceled
+				}
 				return nil, fmt.Errorf("截取第 %d 镜失败: %w", i+1, err)
 			}
 			if err := os.WriteFile(out, png, 0o600); err != nil {
@@ -414,7 +423,15 @@ func seekMotion(ctx context.Context, time float64, duration float64) error {
 //
 // 取消必须真的掐断编码器：被取消的渲染继续跑，上游云服务照样计费。
 func encodeMotion(ctx context.Context, parent context.Context, out string, duration float64, fps int, onProgress func(string, float64), index, total int) error {
+	// 取消可能落在 Chrome 渲完、ffmpeg 还没起这段窗口。
+	// 这时还去准备动效、起编码器，既白干，又把用户自己的取消说成了出错。
+	if parent.Err() != nil {
+		return ErrCanceled
+	}
 	if err := prepareMotion(ctx, duration); err != nil {
+		if parent.Err() != nil {
+			return ErrCanceled
+		}
 		return fmt.Errorf("准备第 %d 镜动效失败: %w", index+1, err)
 	}
 
@@ -433,6 +450,11 @@ func encodeMotion(ctx context.Context, parent context.Context, out string, durat
 		return err
 	}
 	if err := cmd.Start(); err != nil {
+		// 取消先到、编码器后起：exec 会拿 context canceled 拒绝启动，
+		// 报「启动 ffmpeg 失败」是把用户自己的取消说成了出错。
+		if parent.Err() != nil {
+			return ErrCanceled
+		}
 		return fmt.Errorf("启动 ffmpeg 失败: %w", err)
 	}
 
@@ -451,11 +473,17 @@ func encodeMotion(ctx context.Context, parent context.Context, out string, durat
 		t := float64(frame) / float64(fps)
 		if err := seekMotion(ctx, t, duration); err != nil {
 			_ = cmd.Process.Kill()
+			if parent.Err() != nil {
+				return ErrCanceled
+			}
 			return fmt.Errorf("第 %d 镜动效定位失败: %w", index+1, err)
 		}
 		png, err := chromedp.Run(ctx, chromedp.CaptureScreenshot())
 		if err != nil {
 			_ = cmd.Process.Kill()
+			if parent.Err() != nil {
+				return ErrCanceled
+			}
 			return fmt.Errorf("截取第 %d 镜动效帧失败: %w", index+1, err)
 		}
 		if _, err := stdin.Write(png); err != nil {
