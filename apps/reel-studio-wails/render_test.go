@@ -213,3 +213,14 @@ func TestRenderFramesCancel(t *testing.T) {
 		t.Fatalf("取消应报 ErrCanceled，实际 %v", err)
 	}
 }
+
+// 取消信号先到、ffmpeg 后起时，也必须报「已取消」而不是「启动 ffmpeg 失败」。
+// 这条不依赖 Chrome：取消在前置检查就该返回，跑得再慢也不会退化成别的报错。
+func TestEncodeMotionCanceledBeforeStart(t *testing.T) {
+	parent, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := encodeMotion(context.Background(), parent, filepath.Join(t.TempDir(), "out.mp4"), 8.0, 30, nil, 0, 1)
+	if err != ErrCanceled {
+		t.Fatalf("已取消的动效编码应报 ErrCanceled，实际 %v", err)
+	}
+}

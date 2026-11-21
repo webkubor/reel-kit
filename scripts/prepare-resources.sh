@@ -1,22 +1,21 @@
 #!/usr/bin/env bash
-# 把桌面版打成自包含的安装包：自带 Node 运行时、ffmpeg/ffprobe、Chrome headless
-# 与 muse·tv 后端源码，用户下载后双击就能用，不必先装 Node。
+# 把桌面版打成自包含的安装包：自带 MuseAV 中台命令行所需的 Node 运行时、
+# ffmpeg/ffprobe、Chrome headless 与本机离线语音引擎，用户下载后双击就能用。
+#
+# 桌面业务引擎是 Go，随应用编译进包，不需要随包分发 node 后端源码：
+# 随包再拷一份源码快照，装机用户拿到的还是快照，不改这里就不会有第二种分发面。
 #
 # 下载产物不进 git（.gitignore 已排除 resources/），每次发版重新跑本脚本取。
 #
 #   bash scripts/prepare-resources.sh darwin-arm64
 #   bash scripts/prepare-resources.sh darwin-amd64
-#   bash scripts/prepare-resources.sh windows-amd64 [--backend-only]
+#   bash scripts/prepare-resources.sh windows-amd64
 #
-# 产物落在 apps/reel-studio-wails/resources/<platform>/，由 mygo build 打进 App 包。
+# 产物落在 apps/reel-studio-wails/resources/<platform>/，由 Wails 打包打进 App 包。
 
 set -euo pipefail
 
 PLATFORM="${1:-}"
-BACKEND_ONLY=false
-if [[ "${2:-}" == "--backend-only" ]]; then
-  BACKEND_ONLY=true
-fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RES="$ROOT/apps/reel-studio-wails/resources"
 CACHE="$ROOT/.cache/deps"
@@ -62,7 +61,7 @@ case "$PLATFORM" in
     SHERPA_LIB_ARCHIVE="sherpa-onnx-${SHERPA_VERSION}-win-x64-shared-MD-Release-lib.tar.bz2"
     ;;
   "")
-    echo "用法：bash scripts/prepare-resources.sh <darwin-arm64|darwin-amd64|windows-amd64> [--backend-only]" >&2
+    echo "用法：bash scripts/prepare-resources.sh <darwin-arm64|darwin-amd64|windows-amd64>" >&2
     exit 2 ;;
   *)
     echo "不支持的平台：$PLATFORM" >&2; exit 2 ;;
@@ -77,31 +76,6 @@ fetch() {
   curl -fsSL --retry 3 --max-time 600 -o "$dest.part" "$url"
   mv "$dest.part" "$dest"
 }
-
-# 先复制后端源码，供 CI 做轻量新鲜度校验；重二进制全部跳过。
-prepare_backend() {
-  backend="$out/backend"
-  rm -rf "$backend"
-  mkdir -p "$backend"
-  for d in src bin templates prompts studio; do
-    cp -R "$ROOT/$d" "$backend/"
-  done
-  cp "$ROOT/package.json" "$backend/"
-
-  # 后端运行时依赖：playwright-core（无其它依赖）
-  mkdir -p "$backend/node_modules"
-  rm -rf "$backend/node_modules/playwright-core"
-  cp -R "$ROOT/node_modules/.pnpm/playwright-core@1.62.1/node_modules/playwright-core" "$backend/node_modules/"
-}
-
-if [[ "$BACKEND_ONLY" == true ]]; then
-  out="$RES/$PLATFORM"
-  rm -rf "$out"
-  mkdir -p "$out"
-  prepare_backend
-  echo "完成（仅后端快照）：$out"
-  exit
-fi
 
 # ── Node 运行时 ─────────────────────────────────────────────
 fetch "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_ARCHIVE}" "$CACHE/$NODE_ARCHIVE"
@@ -172,9 +146,6 @@ else
   chmod +x "$out/chrome/chrome-headless-shell" 2>/dev/null || true
 fi
 
-# ── 后端源码（Node 侧） ─────────────────────────────────────
-prepare_backend
-
 # ── MuseAV 中台 CLI（出图/出视频走它） ──────────────────────
 # 装到 resources/<platform>/museav/，再在 bin/ 放一个转发脚本。
 # 用户机器上没装 museav 也能用；登录态仍读 ~/.museav.json（用户自己登录）。
@@ -215,7 +186,7 @@ fi
 #   lib/   macOS 的动态库（运行时用 DYLD_LIBRARY_PATH 指过去）
 #   model/ 中文模型
 #
-# 后端按自己所在位置往上找三层：<resources>/backend/src/studio → <resources>/sherpa。
+# 桌面引擎按包内布局找它：<resources>/sherpa（见 apps/reel-studio-wails/resources.go）。
 sherpa_dir="$CACHE/sherpa-$PLATFORM"
 if [ ! -d "$sherpa_dir/model" ]; then
   rm -rf "$sherpa_dir"; mkdir -p "$sherpa_dir"

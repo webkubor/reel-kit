@@ -1,17 +1,18 @@
 # 本地 HTTP 接口
 
-> 桌面版原生界面只是这套接口的一个前端。想把 muse·tv 接进自己的工具、脚本或服务，
+> 这套接口服务命令行与网页版工作台。想把 muse·tv 接进自己的工具、脚本或服务，
 > 直接调这里 —— 不必依赖 CLI，也不用把界面扒一遍。
+>
+> 桌面应用（Wails + Go）不走这套接口：它没有本地 HTTP 服务，业务操作走 Go 绑定。
 
 ## 服务从哪来
 
 | 场景 | 地址 | 怎么起 |
 |---|---|---|
-| 桌面版 | `http://127.0.0.1:4390` | 装完自带，开应用即起；端口可用 `REEL_STUDIO_PORT` 改 |
-| 命令行 | 同上 | `node bin/reel.mjs studio` |
+| 命令行 | `http://127.0.0.1:4390` | `node bin/reel.mjs studio`；端口可用 `REEL_STUDIO_PORT` 改 |
 | 网页版 | 同上 | `node bin/reel.mjs web` |
 
-数据、素材、成片都留在 `~/.reel-kit/studio/`（可用 `REEL_STUDIO_HOME` 指到别处）。
+数据、素材、成片都留在 `~/.reel-kit/studio/`（可用 `REEL_STUDIO_HOME` 指到别处）。桌面应用的数据另在 `~/.reel-kit/studio-desktop/`，与这里不互通。
 
 ## 两条规矩
 
