@@ -22,9 +22,9 @@ const BIN_NAME = process.platform === 'win32' ? 'sherpa-onnx-offline-tts.exe' : 
 /**
  * 找引擎装在哪。
  *
- * 打包后它随应用分发在 resources/<平台>/sherpa/；
- * 打包版的后端源码在 resources/<平台>/backend/src/studio/，
- * 往上三层就是 resources 根目录。开发时用 REEL_SHERPA_HOME 指过去。
+ * 桌面版把引擎随应用分发在 resources/<平台>/sherpa/，那条路径由 Go 侧 resources.go 解析。
+ * node 侧不随包分发：桌面端已不带 node 后端源码，也没有 resources/<平台>/backend/src/studio/ 这一层。
+ * 开发/自测用 REEL_SHERPA_HOME 指过去；下面这个相对寻址是旧打包布局留下的，别依赖。
  */
 export function sherpaHome() {
   const fromEnv = (process.env.REEL_SHERPA_HOME || '').trim()
