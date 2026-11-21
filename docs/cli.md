@@ -249,13 +249,11 @@ go test ./...         # 不开窗口测交互
 bash scripts/package.sh <输出目录> <资源目录>   # 打包成 .app
 ```
 
-原生界面与网页版共用同一套本地 HTTP 接口（`studio/server.mjs`），数据、素材、成片都还在 `~/.reel-kit/studio/`。端点清单与调用示例见 [本地 HTTP 接口](studio-api.md)。
-
-打包进应用的后端是发版那一刻的源码快照（`scripts/prepare-resources.sh`）。改了后端源码却没重新刷新快照，装出来的应用就会少功能 —— `scripts/check-bundle-freshness.mjs` 会拦住这种发版（已接进 `pnpm check`）。发版流程见 [桌面应用发版](desktop-release.md)。
+桌面应用是 Wails + Go：业务引擎编译进包，走 Go 绑定，不起本地 HTTP 服务，也不随包分发 node 后端源码 —— 改完源码重新出包就是最新的，没有「快照过期」这一说。发版流程见 [桌面应用发版](desktop-release.md)。
 
 ## 本地 HTTP 接口
 
-原生界面与网页版共用同一套本地 HTTP 接口，第三方可以拿它做自己的批量出片工具 —— 端点清单见 [本地 HTTP 接口](studio-api.md)。
+本地 HTTP 接口（`src/studio/server.mjs`）服务命令行与网页版，第三方可以拿它做自己的批量出片工具 —— 端点清单见 [本地 HTTP 接口](studio-api.md)。桌面应用不在这套接口里：它没有本地 HTTP 服务，数据另在 `~/.reel-kit/studio-desktop/`。
 
 ## 官网
 
